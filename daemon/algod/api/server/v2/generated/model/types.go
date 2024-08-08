@@ -1143,6 +1143,15 @@ type AccountAssetsInformationResponse struct {
 // data/basics/userBalance.go : AccountData
 type AccountResponse = Account
 
+// ApplicationDisassemblyResponse defines model for ApplicationDisassemblyResponse.
+type ApplicationDisassemblyResponse struct {
+	// ApprovalProgram disassembled approval TEAL code
+	ApprovalProgram string `json:"approval-program"`
+
+	// ClearStateProgram disassembled clearstate TEAL code
+	ClearStateProgram string `json:"clear-state-program"`
+}
+
 // ApplicationResponse Application index and its parameters
 type ApplicationResponse = Application
 
@@ -1514,6 +1523,12 @@ type GetApplicationBoxByNameParams struct {
 type GetApplicationBoxesParams struct {
 	// Max Max number of box names to return. If max is not set, or max == 0, returns all box-names.
 	Max *uint64 `form:"max,omitempty" json:"max,omitempty"`
+}
+
+// GetApplicationDisassemblyParams defines parameters for GetApplicationDisassembly.
+type GetApplicationDisassemblyParams struct {
+	// Sourcemap When set to `true`, returns the source map of the program as a JSON. Defaults to `false`.
+	Sourcemap *bool `form:"sourcemap,omitempty" json:"sourcemap,omitempty"`
 }
 
 // GetBlockParams defines parameters for GetBlock.

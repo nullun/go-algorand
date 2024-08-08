@@ -313,6 +313,30 @@
         },
         "description": "AccountResponse wraps the Account type in a response."
       },
+      "ApplicationDisassemblyResponse": {
+        "content": {
+          "application/json": {
+            "schema": {
+              "properties": {
+                "approval-program": {
+                  "description": "disassembled approval TEAL code",
+                  "type": "string"
+                },
+                "clear-state-program": {
+                  "description": "disassembled clearstate TEAL code",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "approval-program",
+                "clear-state-program"
+              ],
+              "type": "object"
+            }
+          }
+        },
+        "description": "Application Teal disassembly Result"
+      },
       "ApplicationResponse": {
         "content": {
           "application/json": {
@@ -3883,6 +3907,100 @@
           }
         },
         "summary": "Get all box names for a given application.",
+        "tags": [
+          "public",
+          "nonparticipating"
+        ]
+      }
+    },
+    "/v2/applications/{application-id}/disassemble": {
+      "get": {
+        "description": "Given a application ID, it returns the TEAL source code in plain text. This endpoint is only enabled when a node's configuration file sets EnableDeveloperAPI to true.",
+        "operationId": "GetApplicationDisassembly",
+        "parameters": [
+          {
+            "description": "An application identifier",
+            "in": "path",
+            "name": "application-id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "description": "When set to `true`, returns the source map of the program as a JSON. Defaults to `false`.",
+            "in": "query",
+            "name": "sourcemap",
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "approval-program": {
+                      "description": "disassembled approval TEAL code",
+                      "type": "string"
+                    },
+                    "clear-state-program": {
+                      "description": "disassembled clearstate TEAL code",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "approval-program",
+                    "clear-state-program"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Application Teal disassembly Result"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Bad Request - Teal Disassembly Error"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Invalid API Token"
+          },
+          "404": {
+            "content": {},
+            "description": "Developer API not enabled"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Error"
+          },
+          "default": {
+            "content": {},
+            "description": "Unknown Error"
+          }
+        },
+        "summary": "Disassemble program bytes into the TEAL source code.",
         "tags": [
           "public",
           "nonparticipating"

@@ -1710,6 +1710,89 @@ func (v2 *Handlers) GetApplicationByID(ctx echo.Context, applicationID uint64) e
 	return ctx.JSON(http.StatusOK, response)
 }
 
+// DisassemblyResponseWithSourceMap overrides the sourcemap field in
+// the ApplicationDisassemblyResponse for JSON marshalling.
+type DisassemblyResponseWithSourceMap struct {
+	model.ApplicationDisassemblyResponse
+	ApprovalSourcemap   *logic.SourceMap `json:"approval-sourcemap,omitempty"`
+	ClearstateSourcemap *logic.SourceMap `json:"clear-state-sourcemap,omitempty"`
+}
+
+// GetApplicationDisassemblyByID returns disassembled application TEAL and sourcemap by app idx.
+// (GET /v2/applications/{application-id}/disassemble)
+func (v2 *Handlers) GetApplicationDisassembly(ctx echo.Context, applicationID uint64, params model.GetApplicationDisassemblyParams) error {
+	// Return early if DeveloperAPI is not allowed in node config.
+	if !v2.Node.Config().EnableDeveloperAPI {
+		return ctx.String(http.StatusNotFound, "/v2/applications/{application-id}/disassemble was not enabled in the configuration file by setting the EnableDeveloperAPI to true")
+	}
+	if params.Sourcemap == nil {
+		// Backwards compatibility: set sourcemap flag to default false value.
+		defaultValue := false
+		params.Sourcemap = &defaultValue
+	}
+
+	appIdx := basics.AppIndex(applicationID)
+	ledger := v2.Node.LedgerForAPI()
+	creator, ok, err := ledger.GetCreator(basics.CreatableIndex(appIdx), basics.AppCreatable)
+	if err != nil {
+		return internalError(ctx, err, errFailedLookingUpLedger, v2.Log)
+	}
+	if !ok {
+		return notFound(ctx, errors.New(errAppDoesNotExist), errAppDoesNotExist, v2.Log)
+	}
+
+	lastRound := ledger.Latest()
+	record, err := ledger.LookupApplication(lastRound, creator, appIdx)
+	if err != nil {
+		return internalError(ctx, err, errFailedLookingUpLedger, v2.Log)
+	}
+	if record.AppParams == nil {
+		return notFound(ctx, errors.New(errAppDoesNotExist), errAppDoesNotExist, v2.Log)
+	}
+
+	appParams := *record.AppParams
+	approvalProgram, err := logic.Disassemble(appParams.ApprovalProgram)
+	if err != nil {
+		return badRequest(ctx, err, err.Error(), v2.Log)
+	}
+	clearstateProgram, err := logic.Disassemble(appParams.ClearStateProgram)
+	if err != nil {
+		return badRequest(ctx, err, err.Error(), v2.Log)
+	}
+
+	var approvalSourcemap, clearstateSourcemap *logic.SourceMap
+	// If source map flag is enabled, then return the maps.
+	if *params.Sourcemap {
+		approvalOps, err := logic.AssembleString(approvalProgram)
+		if err != nil {
+			sb := strings.Builder{}
+			approvalOps.ReportMultipleErrors("", &sb)
+			return badRequest(ctx, err, sb.String(), v2.Log)
+		}
+		approvalRawmap := logic.GetSourceMap([]string{"<body>"}, approvalOps.OffsetToSource)
+		approvalSourcemap = &approvalRawmap
+
+		clearstateOps, err := logic.AssembleString(clearstateProgram)
+		if err != nil {
+			sb := strings.Builder{}
+			clearstateOps.ReportMultipleErrors("", &sb)
+			return badRequest(ctx, err, sb.String(), v2.Log)
+		}
+		clearstateRawmap := logic.GetSourceMap([]string{"<body>"}, clearstateOps.OffsetToSource)
+		clearstateSourcemap = &clearstateRawmap
+	}
+
+	response := DisassemblyResponseWithSourceMap{
+		model.ApplicationDisassemblyResponse{
+			ApprovalProgram:   approvalProgram,
+			ClearStateProgram: clearstateProgram,
+		},
+		approvalSourcemap,
+		clearstateSourcemap,
+	}
+	return ctx.JSON(http.StatusOK, response)
+}
+
 func applicationBoxesMaxKeys(requestedMax uint64, algodMax uint64) uint64 {
 	if requestedMax == 0 {
 		if algodMax == 0 {

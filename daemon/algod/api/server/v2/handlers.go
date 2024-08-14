@@ -1751,11 +1751,11 @@ func (v2 *Handlers) GetApplicationDisassembly(ctx echo.Context, applicationID ui
 	}
 
 	appParams := *record.AppParams
-	approvalProgram, err := logic.Disassemble(appParams.ApprovalProgram)
+	approvalProgram, approvalSourceLocations, err := logic.DisassembleWithSourceLocation(appParams.ApprovalProgram)
 	if err != nil {
 		return badRequest(ctx, err, err.Error(), v2.Log)
 	}
-	clearstateProgram, err := logic.Disassemble(appParams.ClearStateProgram)
+	clearstateProgram, clearstateSourceLocations, err := logic.DisassembleWithSourceLocation(appParams.ClearStateProgram)
 	if err != nil {
 		return badRequest(ctx, err, err.Error(), v2.Log)
 	}
@@ -1763,22 +1763,10 @@ func (v2 *Handlers) GetApplicationDisassembly(ctx echo.Context, applicationID ui
 	var approvalSourcemap, clearstateSourcemap *logic.SourceMap
 	// If source map flag is enabled, then return the maps.
 	if *params.Sourcemap {
-		approvalOps, err := logic.AssembleString(approvalProgram)
-		if err != nil {
-			sb := strings.Builder{}
-			approvalOps.ReportMultipleErrors("", &sb)
-			return badRequest(ctx, err, sb.String(), v2.Log)
-		}
-		approvalRawmap := logic.GetSourceMap([]string{"<body>"}, approvalOps.OffsetToSource)
+		approvalRawmap := logic.GetSourceMap([]string{"<body>"}, approvalSourceLocations)
 		approvalSourcemap = &approvalRawmap
 
-		clearstateOps, err := logic.AssembleString(clearstateProgram)
-		if err != nil {
-			sb := strings.Builder{}
-			clearstateOps.ReportMultipleErrors("", &sb)
-			return badRequest(ctx, err, sb.String(), v2.Log)
-		}
-		clearstateRawmap := logic.GetSourceMap([]string{"<body>"}, clearstateOps.OffsetToSource)
+		clearstateRawmap := logic.GetSourceMap([]string{"<body>"}, clearstateSourceLocations)
 		clearstateSourcemap = &clearstateRawmap
 	}
 

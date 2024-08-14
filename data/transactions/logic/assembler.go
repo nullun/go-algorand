@@ -3142,6 +3142,54 @@ func disassembleInstrumented(program []byte, labels map[int]string) (text string
 	return
 }
 
+func OffsetToPos(programLen int, lineOffsets []int, offset int) (line, column int) {
+	line, column = 0, 0
+
+	if offset >= programLen {
+		return -1, -1
+	}
+
+	line = sort.Search(len(lineOffsets), func(i int) bool {
+		return lineOffsets[i] > offset
+	})
+
+	if line == 0 {
+		column = offset
+	} else {
+		column = offset - lineOffsets[line-1]
+	}
+
+	return
+}
+
+func preprocessLineOffsets(text string) (lineOffsets []int) {
+	for i, b := range text {
+		if b == '\n' {
+			lineOffsets = append(lineOffsets, i+1)
+		}
+	}
+	return
+}
+
+// Dissasemble with SourceLocation
+func DisassembleWithSourceLocation(program []byte) (text string, sl map[int]SourceLocation, err error) {
+	text, ds, err := disassembleInstrumented(program, nil)
+	programLen := len(text)
+
+	lineOffsets := preprocessLineOffsets(text)
+
+	sl = make(map[int]SourceLocation, len(ds.pcOffset))
+	for _, offset := range ds.pcOffset {
+		line, col := OffsetToPos(programLen, lineOffsets, offset.Offset)
+		location := SourceLocation{
+			Line:   line,
+			Column: col,
+		}
+		sl[offset.PC] = location
+	}
+	return
+}
+
 // Disassemble produces a text form of program bytes.
 // AssembleString(Disassemble()) should result in the same program bytes.
 func Disassemble(program []byte) (text string, err error) {

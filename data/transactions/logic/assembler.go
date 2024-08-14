@@ -3142,6 +3142,7 @@ func disassembleInstrumented(program []byte, labels map[int]string) (text string
 	return
 }
 
+// Given an array of line offets, return the line and column of any given offset
 func OffsetToPos(programLen int, lineOffsets []int, offset int) (line, column int) {
 	line, column = 0, 0
 
@@ -3149,10 +3150,12 @@ func OffsetToPos(programLen int, lineOffsets []int, offset int) (line, column in
 		return -1, -1
 	}
 
+	// Binary search to find the line an offset is on
 	line = sort.Search(len(lineOffsets), func(i int) bool {
 		return lineOffsets[i] > offset
 	})
 
+	// Calculate the column
 	if line == 0 {
 		column = offset
 	} else {
@@ -3162,6 +3165,7 @@ func OffsetToPos(programLen int, lineOffsets []int, offset int) (line, column in
 	return
 }
 
+// Given text, generate an array of line offsets
 func preprocessLineOffsets(text string) (lineOffsets []int) {
 	for i, b := range text {
 		if b == '\n' {
@@ -3176,8 +3180,11 @@ func DisassembleWithSourceLocation(program []byte) (text string, sl map[int]Sour
 	text, ds, err := disassembleInstrumented(program, nil)
 	programLen := len(text)
 
+	// Generate an array of line offsets once,
+	// so we don't need to do it for every PC
 	lineOffsets := preprocessLineOffsets(text)
 
+	// Generate a map of PC to SourceLocation
 	sl = make(map[int]SourceLocation, len(ds.pcOffset))
 	for _, offset := range ds.pcOffset {
 		line, col := OffsetToPos(programLen, lineOffsets, offset.Offset)

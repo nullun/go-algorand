@@ -3142,58 +3142,52 @@ func disassembleInstrumented(program []byte, labels map[int]string) (text string
 	return
 }
 
-// Given an array of line offets, return the line and column of any given offset
-func OffsetToPos(programLen int, lineOffsets []int, offset int) (line, column int) {
-	line, column = 0, 0
-
-	if offset >= programLen {
-		return -1, -1
-	}
-
-	// Binary search to find the line an offset is on
-	line = sort.Search(len(lineOffsets), func(i int) bool {
-		return lineOffsets[i] > offset
-	})
-
-	// Calculate the column
-	if line == 0 {
-		column = offset
-	} else {
-		column = offset - lineOffsets[line-1]
-	}
-
-	return
-}
-
-// Given text, generate an array of line offsets
-func preprocessLineOffsets(text string) (lineOffsets []int) {
+// Given a disassembled program (TEAL), and a list of PCOffsets,
+// return map of Offsets to SourceLocations (line and column)
+func pcOffsetToSourceLocation(text string, pcOffsets []PCOffset) (sl map[int]SourceLocation, err error) {
+	// Generate an array of line offsets
+	// (aka the number of bytes before the next line)
+	lineOffsets := make([]int, 0)
 	for i, b := range text {
 		if b == '\n' {
 			lineOffsets = append(lineOffsets, i+1)
 		}
 	}
-	return
+
+	sl = make(map[int]SourceLocation, len(pcOffsets))
+	programLength := len(text)
+	line, column := 0, 0
+	for _, pcOffset := range pcOffsets {
+		if pcOffset.Offset > programLength {
+			err = errors.New("program counter offset exceeds program length")
+			return nil, err
+		}
+
+		// Binary search to find the line an offset is on
+		line = sort.Search(len(lineOffsets), func(i int) bool {
+			return lineOffsets[i] > pcOffset.Offset
+		})
+
+		// Calculate the column
+		if line == 0 {
+			column = pcOffset.Offset
+		} else {
+			column = pcOffset.Offset - lineOffsets[line-1]
+		}
+		location := SourceLocation{
+			Line:   line,
+			Column: column,
+		}
+		sl[pcOffset.PC] = location
+	}
+
+	return sl, nil
 }
 
 // Dissasemble with SourceLocation
 func DisassembleWithSourceLocation(program []byte) (text string, sl map[int]SourceLocation, err error) {
 	text, ds, err := disassembleInstrumented(program, nil)
-	programLen := len(text)
-
-	// Generate an array of line offsets once,
-	// so we don't need to do it for every PC
-	lineOffsets := preprocessLineOffsets(text)
-
-	// Generate a map of PC to SourceLocation
-	sl = make(map[int]SourceLocation, len(ds.pcOffset))
-	for _, offset := range ds.pcOffset {
-		line, col := OffsetToPos(programLen, lineOffsets, offset.Offset)
-		location := SourceLocation{
-			Line:   line,
-			Column: col,
-		}
-		sl[offset.PC] = location
-	}
+	sl, err = pcOffsetToSourceLocation(text, ds.pcOffset)
 	return
 }
 

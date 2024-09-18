@@ -1739,7 +1739,11 @@ func (v2 *Handlers) GetApplicationBoxes(ctx echo.Context, applicationID uint64, 
 	appIdx := basics.AppIndex(applicationID)
 	ledger := v2.Node.LedgerForAPI()
 	lastRound := ledger.Latest()
-	keyPrefix := apps.MakeBoxKey(uint64(appIdx), "")
+	additionalPrefix := ""
+	if params.Prefix != nil {
+		additionalPrefix = *params.Prefix
+	}
+	keyPrefix := apps.MakeBoxKey(uint64(appIdx), additionalPrefix)
 
 	requestedMax, algodMax := nilToZero(params.Max), v2.Node.Config().MaxAPIBoxPerApplication
 	max := applicationBoxesMaxKeys(requestedMax, algodMax)
@@ -1766,7 +1770,7 @@ func (v2 *Handlers) GetApplicationBoxes(ctx echo.Context, applicationID uint64, 
 		return internalError(ctx, err, errFailedLookingUpLedger, v2.Log)
 	}
 
-	prefixLen := len(keyPrefix)
+	prefixLen := 11 // len("bx:") + 8 (appIdx, big-endian)
 	responseBoxes := make([]model.BoxDescriptor, len(boxKeys))
 	for i, boxKey := range boxKeys {
 		responseBoxes[i] = model.BoxDescriptor{

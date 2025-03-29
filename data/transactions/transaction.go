@@ -434,6 +434,8 @@ func (tx Transaction) WellFormed(spec SpecialAddresses, proto config.ConsensusPa
 		switch tx.OnCompletion {
 		case NoOpOC, OptInOC, CloseOutOC, ClearStateOC, UpdateApplicationOC, DeleteApplicationOC:
 			/* ok */
+		case AssetCreateOC, AssetConfigOC, AssetXferOC, AssetOptInOC, AssetCloseOutOC, AssetClawbackOC, AssetFreezeOC:
+			/* ok */
 		default:
 			return fmt.Errorf("invalid application OnCompletion")
 		}

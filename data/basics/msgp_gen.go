@@ -2871,106 +2871,115 @@ func AssetIndexMaxSize() (s int) {
 func (z *AssetParams) MarshalMsg(b []byte) (o []byte) {
 	o = msgp.Require(b, z.Msgsize())
 	// omitempty: check for empty values
-	zb0002Len := uint32(11)
-	var zb0002Mask uint16 /* 12 bits */
-	if (*z).MetadataHash == ([32]byte{}) {
+	zb0002Len := uint32(12)
+	var zb0002Mask uint16 /* 13 bits */
+	if (*z).AssetHookAppID == 0 {
 		zb0002Len--
 		zb0002Mask |= 0x2
 	}
-	if (*z).AssetName == "" {
+	if (*z).MetadataHash == ([32]byte{}) {
 		zb0002Len--
 		zb0002Mask |= 0x4
 	}
-	if (*z).URL == "" {
+	if (*z).AssetName == "" {
 		zb0002Len--
 		zb0002Mask |= 0x8
 	}
-	if (*z).Clawback.MsgIsZero() {
+	if (*z).URL == "" {
 		zb0002Len--
 		zb0002Mask |= 0x10
 	}
-	if (*z).Decimals == 0 {
+	if (*z).Clawback.MsgIsZero() {
 		zb0002Len--
 		zb0002Mask |= 0x20
 	}
-	if (*z).DefaultFrozen == false {
+	if (*z).Decimals == 0 {
 		zb0002Len--
 		zb0002Mask |= 0x40
 	}
-	if (*z).Freeze.MsgIsZero() {
+	if (*z).DefaultFrozen == false {
 		zb0002Len--
 		zb0002Mask |= 0x80
 	}
-	if (*z).Manager.MsgIsZero() {
+	if (*z).Freeze.MsgIsZero() {
 		zb0002Len--
 		zb0002Mask |= 0x100
 	}
-	if (*z).Reserve.MsgIsZero() {
+	if (*z).Manager.MsgIsZero() {
 		zb0002Len--
 		zb0002Mask |= 0x200
 	}
-	if (*z).Total == 0 {
+	if (*z).Reserve.MsgIsZero() {
 		zb0002Len--
 		zb0002Mask |= 0x400
 	}
-	if (*z).UnitName == "" {
+	if (*z).Total == 0 {
 		zb0002Len--
 		zb0002Mask |= 0x800
+	}
+	if (*z).UnitName == "" {
+		zb0002Len--
+		zb0002Mask |= 0x1000
 	}
 	// variable map header, size zb0002Len
 	o = append(o, 0x80|uint8(zb0002Len))
 	if zb0002Len != 0 {
 		if (zb0002Mask & 0x2) == 0 { // if not empty
+			// string "ah"
+			o = append(o, 0xa2, 0x61, 0x68)
+			o = msgp.AppendUint64(o, uint64((*z).AssetHookAppID))
+		}
+		if (zb0002Mask & 0x4) == 0 { // if not empty
 			// string "am"
 			o = append(o, 0xa2, 0x61, 0x6d)
 			o = msgp.AppendBytes(o, ((*z).MetadataHash)[:])
 		}
-		if (zb0002Mask & 0x4) == 0 { // if not empty
+		if (zb0002Mask & 0x8) == 0 { // if not empty
 			// string "an"
 			o = append(o, 0xa2, 0x61, 0x6e)
 			o = msgp.AppendString(o, (*z).AssetName)
 		}
-		if (zb0002Mask & 0x8) == 0 { // if not empty
+		if (zb0002Mask & 0x10) == 0 { // if not empty
 			// string "au"
 			o = append(o, 0xa2, 0x61, 0x75)
 			o = msgp.AppendString(o, (*z).URL)
 		}
-		if (zb0002Mask & 0x10) == 0 { // if not empty
+		if (zb0002Mask & 0x20) == 0 { // if not empty
 			// string "c"
 			o = append(o, 0xa1, 0x63)
 			o = (*z).Clawback.MarshalMsg(o)
 		}
-		if (zb0002Mask & 0x20) == 0 { // if not empty
+		if (zb0002Mask & 0x40) == 0 { // if not empty
 			// string "dc"
 			o = append(o, 0xa2, 0x64, 0x63)
 			o = msgp.AppendUint32(o, (*z).Decimals)
 		}
-		if (zb0002Mask & 0x40) == 0 { // if not empty
+		if (zb0002Mask & 0x80) == 0 { // if not empty
 			// string "df"
 			o = append(o, 0xa2, 0x64, 0x66)
 			o = msgp.AppendBool(o, (*z).DefaultFrozen)
 		}
-		if (zb0002Mask & 0x80) == 0 { // if not empty
+		if (zb0002Mask & 0x100) == 0 { // if not empty
 			// string "f"
 			o = append(o, 0xa1, 0x66)
 			o = (*z).Freeze.MarshalMsg(o)
 		}
-		if (zb0002Mask & 0x100) == 0 { // if not empty
+		if (zb0002Mask & 0x200) == 0 { // if not empty
 			// string "m"
 			o = append(o, 0xa1, 0x6d)
 			o = (*z).Manager.MarshalMsg(o)
 		}
-		if (zb0002Mask & 0x200) == 0 { // if not empty
+		if (zb0002Mask & 0x400) == 0 { // if not empty
 			// string "r"
 			o = append(o, 0xa1, 0x72)
 			o = (*z).Reserve.MarshalMsg(o)
 		}
-		if (zb0002Mask & 0x400) == 0 { // if not empty
+		if (zb0002Mask & 0x800) == 0 { // if not empty
 			// string "t"
 			o = append(o, 0xa1, 0x74)
 			o = msgp.AppendUint64(o, (*z).Total)
 		}
-		if (zb0002Mask & 0x800) == 0 { // if not empty
+		if (zb0002Mask & 0x1000) == 0 { // if not empty
 			// string "un"
 			o = append(o, 0xa2, 0x75, 0x6e)
 			o = msgp.AppendString(o, (*z).UnitName)
@@ -3121,6 +3130,18 @@ func (z *AssetParams) UnmarshalMsgWithState(bts []byte, st msgp.UnmarshalState) 
 			}
 		}
 		if zb0002 > 0 {
+			zb0002--
+			{
+				var zb0007 uint64
+				zb0007, bts, err = msgp.ReadUint64Bytes(bts)
+				if err != nil {
+					err = msgp.WrapError(err, "struct-from-array", "AssetHookAppID")
+					return
+				}
+				(*z).AssetHookAppID = AppIndex(zb0007)
+			}
+		}
+		if zb0002 > 0 {
 			err = msgp.ErrTooManyArrayFields(zb0002)
 			if err != nil {
 				err = msgp.WrapError(err, "struct-from-array")
@@ -3162,14 +3183,14 @@ func (z *AssetParams) UnmarshalMsgWithState(bts []byte, st msgp.UnmarshalState) 
 					return
 				}
 			case "un":
-				var zb0007 int
-				zb0007, err = msgp.ReadBytesBytesHeader(bts)
+				var zb0008 int
+				zb0008, err = msgp.ReadBytesBytesHeader(bts)
 				if err != nil {
 					err = msgp.WrapError(err, "UnitName")
 					return
 				}
-				if zb0007 > config.MaxAssetUnitNameBytes {
-					err = msgp.ErrOverflow(uint64(zb0007), uint64(config.MaxAssetUnitNameBytes))
+				if zb0008 > config.MaxAssetUnitNameBytes {
+					err = msgp.ErrOverflow(uint64(zb0008), uint64(config.MaxAssetUnitNameBytes))
 					return
 				}
 				(*z).UnitName, bts, err = msgp.ReadStringBytes(bts)
@@ -3178,14 +3199,14 @@ func (z *AssetParams) UnmarshalMsgWithState(bts []byte, st msgp.UnmarshalState) 
 					return
 				}
 			case "an":
-				var zb0008 int
-				zb0008, err = msgp.ReadBytesBytesHeader(bts)
+				var zb0009 int
+				zb0009, err = msgp.ReadBytesBytesHeader(bts)
 				if err != nil {
 					err = msgp.WrapError(err, "AssetName")
 					return
 				}
-				if zb0008 > config.MaxAssetNameBytes {
-					err = msgp.ErrOverflow(uint64(zb0008), uint64(config.MaxAssetNameBytes))
+				if zb0009 > config.MaxAssetNameBytes {
+					err = msgp.ErrOverflow(uint64(zb0009), uint64(config.MaxAssetNameBytes))
 					return
 				}
 				(*z).AssetName, bts, err = msgp.ReadStringBytes(bts)
@@ -3194,14 +3215,14 @@ func (z *AssetParams) UnmarshalMsgWithState(bts []byte, st msgp.UnmarshalState) 
 					return
 				}
 			case "au":
-				var zb0009 int
-				zb0009, err = msgp.ReadBytesBytesHeader(bts)
+				var zb0010 int
+				zb0010, err = msgp.ReadBytesBytesHeader(bts)
 				if err != nil {
 					err = msgp.WrapError(err, "URL")
 					return
 				}
-				if zb0009 > config.MaxAssetURLBytes {
-					err = msgp.ErrOverflow(uint64(zb0009), uint64(config.MaxAssetURLBytes))
+				if zb0010 > config.MaxAssetURLBytes {
+					err = msgp.ErrOverflow(uint64(zb0010), uint64(config.MaxAssetURLBytes))
 					return
 				}
 				(*z).URL, bts, err = msgp.ReadStringBytes(bts)
@@ -3239,6 +3260,16 @@ func (z *AssetParams) UnmarshalMsgWithState(bts []byte, st msgp.UnmarshalState) 
 					err = msgp.WrapError(err, "Clawback")
 					return
 				}
+			case "ah":
+				{
+					var zb0011 uint64
+					zb0011, bts, err = msgp.ReadUint64Bytes(bts)
+					if err != nil {
+						err = msgp.WrapError(err, "AssetHookAppID")
+						return
+					}
+					(*z).AssetHookAppID = AppIndex(zb0011)
+				}
 			default:
 				err = msgp.ErrNoField(string(field))
 				if err != nil {
@@ -3262,13 +3293,13 @@ func (_ *AssetParams) CanUnmarshalMsg(z interface{}) bool {
 
 // Msgsize returns an upper bound estimate of the number of bytes occupied by the serialized message
 func (z *AssetParams) Msgsize() (s int) {
-	s = 1 + 2 + msgp.Uint64Size + 3 + msgp.Uint32Size + 3 + msgp.BoolSize + 3 + msgp.StringPrefixSize + len((*z).UnitName) + 3 + msgp.StringPrefixSize + len((*z).AssetName) + 3 + msgp.StringPrefixSize + len((*z).URL) + 3 + msgp.ArrayHeaderSize + (32 * (msgp.ByteSize)) + 2 + (*z).Manager.Msgsize() + 2 + (*z).Reserve.Msgsize() + 2 + (*z).Freeze.Msgsize() + 2 + (*z).Clawback.Msgsize()
+	s = 1 + 2 + msgp.Uint64Size + 3 + msgp.Uint32Size + 3 + msgp.BoolSize + 3 + msgp.StringPrefixSize + len((*z).UnitName) + 3 + msgp.StringPrefixSize + len((*z).AssetName) + 3 + msgp.StringPrefixSize + len((*z).URL) + 3 + msgp.ArrayHeaderSize + (32 * (msgp.ByteSize)) + 2 + (*z).Manager.Msgsize() + 2 + (*z).Reserve.Msgsize() + 2 + (*z).Freeze.Msgsize() + 2 + (*z).Clawback.Msgsize() + 3 + msgp.Uint64Size
 	return
 }
 
 // MsgIsZero returns whether this is a zero value
 func (z *AssetParams) MsgIsZero() bool {
-	return ((*z).Total == 0) && ((*z).Decimals == 0) && ((*z).DefaultFrozen == false) && ((*z).UnitName == "") && ((*z).AssetName == "") && ((*z).URL == "") && ((*z).MetadataHash == ([32]byte{})) && ((*z).Manager.MsgIsZero()) && ((*z).Reserve.MsgIsZero()) && ((*z).Freeze.MsgIsZero()) && ((*z).Clawback.MsgIsZero())
+	return ((*z).Total == 0) && ((*z).Decimals == 0) && ((*z).DefaultFrozen == false) && ((*z).UnitName == "") && ((*z).AssetName == "") && ((*z).URL == "") && ((*z).MetadataHash == ([32]byte{})) && ((*z).Manager.MsgIsZero()) && ((*z).Reserve.MsgIsZero()) && ((*z).Freeze.MsgIsZero()) && ((*z).Clawback.MsgIsZero()) && ((*z).AssetHookAppID == 0)
 }
 
 // MaxSize returns a maximum valid message size for this message type
@@ -3276,7 +3307,7 @@ func AssetParamsMaxSize() (s int) {
 	s = 1 + 2 + msgp.Uint64Size + 3 + msgp.Uint32Size + 3 + msgp.BoolSize + 3 + msgp.StringPrefixSize + config.MaxAssetUnitNameBytes + 3 + msgp.StringPrefixSize + config.MaxAssetNameBytes + 3 + msgp.StringPrefixSize + config.MaxAssetURLBytes + 3
 	// Calculating size of array: z.MetadataHash
 	s += msgp.ArrayHeaderSize + ((32) * (msgp.ByteSize))
-	s += 2 + AddressMaxSize() + 2 + AddressMaxSize() + 2 + AddressMaxSize() + 2 + AddressMaxSize()
+	s += 2 + AddressMaxSize() + 2 + AddressMaxSize() + 2 + AddressMaxSize() + 2 + AddressMaxSize() + 3 + msgp.Uint64Size
 	return
 }
 

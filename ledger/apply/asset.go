@@ -21,6 +21,7 @@ import (
 
 	"github.com/algorand/go-algorand/data/basics"
 	"github.com/algorand/go-algorand/data/transactions"
+	"github.com/algorand/go-algorand/data/transactions/logic"
 )
 
 func getParams(balances Balances, aidx basics.AssetIndex) (params basics.AssetParams, creator basics.Address, err error) {
@@ -52,7 +53,7 @@ func getParams(balances Balances, aidx basics.AssetIndex) (params basics.AssetPa
 }
 
 // AssetConfig applies an AssetConfig transaction using the Balances interface.
-func AssetConfig(cc transactions.AssetConfigTxnFields, header transactions.Header, balances Balances, spec transactions.SpecialAddresses, ad *transactions.ApplyData, txnCounter uint64) error {
+func AssetConfig(cc transactions.AssetConfigTxnFields, header transactions.Header, balances Balances, spec transactions.SpecialAddresses, ad *transactions.ApplyData, gi int, evalParams *logic.EvalParams, txnCounter uint64) error {
 	if cc.ConfigAsset == 0 {
 		// Allocating an asset.
 		record, err := balances.Get(header.Sender, false)
@@ -72,10 +73,16 @@ func AssetConfig(cc transactions.AssetConfigTxnFields, header transactions.Heade
 			return fmt.Errorf("already found asset with index %d", newidx)
 		}
 
+		fmt.Printf("Asset Params: %+v\n", cc.AssetParams)
 		assetParams := cc.AssetParams
 		assetHolding := basics.AssetHolding{
 			Amount: cc.AssetParams.Total,
 		}
+
+		// err = AssetHook(balances, &assetParams, evalParams, gi, ad)
+		// if err != nil {
+		// 	return err
+		// }
 
 		totalAssets := record.TotalAssets
 		maxAssetsPerAccount := balances.ConsensusParams().MaxAssetsPerAccount
@@ -172,6 +179,11 @@ func AssetConfig(cc transactions.AssetConfigTxnFields, header transactions.Heade
 			return err
 		}
 	} else {
+		// err := AssetHook(balances, &params, evalParams, gi, ad)
+		// if err != nil {
+		// 	return err
+		// }
+
 		// Changing keys in an asset.
 		if !params.Manager.IsZero() {
 			params.Manager = cc.AssetParams.Manager
@@ -248,19 +260,19 @@ func putIn(balances Balances, addr basics.Address, asset basics.AssetIndex, amou
 }
 
 // AssetTransfer applies an AssetTransfer transaction using the Balances interface.
-func AssetTransfer(ct transactions.AssetTransferTxnFields, header transactions.Header, balances Balances, spec transactions.SpecialAddresses, ad *transactions.ApplyData) error {
+func AssetTransfer(ct transactions.AssetTransferTxnFields, header transactions.Header, balances Balances, spec transactions.SpecialAddresses, ad *transactions.ApplyData, gi int, evalParams *logic.EvalParams, txnCounter uint64) error {
 	// Default to sending from the transaction sender's account.
 	source := header.Sender
 	clawback := false
 
+	params, _, err := getParams(balances, ct.XferAsset)
+	if err != nil {
+		return err
+	}
+
 	if !ct.AssetSender.IsZero() {
 		// Clawback transaction.  Check that the transaction sender
 		// is the Clawback address for this asset.
-		params, _, err := getParams(balances, ct.XferAsset)
-		if err != nil {
-			return err
-		}
-
 		if params.Clawback.IsZero() || (header.Sender != params.Clawback) {
 			return fmt.Errorf("clawback not allowed: sender %v, clawback %v", header.Sender, params.Clawback)
 		}
@@ -280,11 +292,6 @@ func AssetTransfer(ct transactions.AssetTransferTxnFields, header transactions.H
 
 		if !ok {
 			// Initialize holding with default Frozen value.
-			params, _, err := getParams(balances, ct.XferAsset)
-			if err != nil {
-				return err
-			}
-
 			sndHolding.Frozen = params.DefaultFrozen
 
 			record, err := balances.Get(source, false)
@@ -316,12 +323,20 @@ func AssetTransfer(ct transactions.AssetTransferTxnFields, header transactions.H
 		}
 	}
 
+	// Check if the AssetHookAppID exists and evaluate the program if it does
+	if params.AssetHookAppID != 0 {
+		err = AssetHook(balances, &params, evalParams, gi, ad)
+		if err != nil {
+			return err
+		}
+	}
+
 	// Actually move the asset.  Zero transfers return right away
 	// without looking up accounts, so it's fine to have a zero transfer
 	// to an all-zero address (e.g., when the only meaningful part of
 	// the transaction is the close-to address). Similarly, takeOut and
 	// putIn will succeed for zero transfers on frozen asset holdings
-	err := takeOut(balances, source, ct.XferAsset, ct.AssetAmount, clawback)
+	err = takeOut(balances, source, ct.XferAsset, ct.AssetAmount, clawback)
 	if err != nil {
 		return err
 	}
@@ -433,7 +448,7 @@ func AssetTransfer(ct transactions.AssetTransferTxnFields, header transactions.H
 }
 
 // AssetFreeze applies an AssetFreeze transaction using the Balances interface.
-func AssetFreeze(cf transactions.AssetFreezeTxnFields, header transactions.Header, balances Balances, spec transactions.SpecialAddresses, ad *transactions.ApplyData) error {
+func AssetFreeze(cf transactions.AssetFreezeTxnFields, header transactions.Header, balances Balances, spec transactions.SpecialAddresses, ad *transactions.ApplyData, gi int, evalParams *logic.EvalParams, txnCounter uint64) error {
 	// Only the Freeze address can change the freeze value.
 	params, _, err := getParams(balances, cf.FreezeAsset)
 	if err != nil {
@@ -453,6 +468,51 @@ func AssetFreeze(cf transactions.AssetFreezeTxnFields, header transactions.Heade
 		return fmt.Errorf("asset not found in account")
 	}
 
+	// err = AssetHook(balances, &params, evalParams, gi, ad)
+	// if err != nil {
+	// 	return err
+	// }
+
 	holding.Frozen = cf.AssetFrozen
 	return balances.PutAssetHolding(cf.FreezeAccount, cf.FreezeAsset, holding)
+}
+
+func AssetHook(balances Balances, params *basics.AssetParams, evalParams *logic.EvalParams, gi int, ad *transactions.ApplyData) (err error) {
+	fmt.Println("AssetHookAppID exists")
+	// Fetch the application parameters, if they exist
+	hookParams, creator, exists, err := getAppParams(balances, params.AssetHookAppID)
+	fmt.Printf("hookParams: %+v\n", hookParams)
+	fmt.Printf("creator: %v\n", creator)
+	fmt.Printf("exists: %v\n", exists)
+	fmt.Printf("err: %v\n", err)
+	if err != nil {
+		return err
+	}
+
+	// fmt.Printf("txn: %+v\n", evalParams.TxnGroup[gi])
+
+	// Ensure that the application exists
+	// CloseOuts should be able to succeed even if the application does not exist
+	if !exists {
+		return fmt.Errorf("AssetHookAppID (%d) does not exist", params.AssetHookAppID)
+	}
+
+	// Execute the Approval program
+	approved, evalDelta, err := balances.StatefulEval(gi, evalParams, params.AssetHookAppID, hookParams.ApprovalProgram)
+	_ = evalDelta // Add to axfer transaction?
+	if err != nil {
+		return err
+	}
+
+	if !approved {
+		return fmt.Errorf("transaction rejected by ApprovalProgram")
+	}
+
+	// Fill in applyData, so that consumers don't have to implement a
+	// stateful TEAL interpreter to apply state changes
+	ad.EvalDelta = evalDelta
+
+	fmt.Println("AssetHookAppID should have been evaluated")
+
+	return nil
 }

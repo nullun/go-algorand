@@ -89,6 +89,27 @@ const (
 	// delete the AppParams for the application from the creator's balance
 	// record
 	DeleteApplicationOC OnCompletion = 5
+
+	// AssetCreateOC indicates an xASA Hook for creating an asset
+	AssetCreateOC OnCompletion = 6
+
+	// AssetConfigOC indicates an xASA Hook for configuring an asset
+	AssetConfigOC OnCompletion = 7
+
+	// AssetXferOC indicates an xASA Hook for transferring an asset
+	AssetXferOC OnCompletion = 8
+
+	// AssetOptInOC indicates an xASA Hook for opting in to an asset
+	AssetOptInOC OnCompletion = 9
+
+	// AssetCloseOutOC indicates an xASA Hook for closing out an asset
+	AssetCloseOutOC OnCompletion = 10
+
+	// AssetClawbackOC indicates an xASA Hook for clawback an asset
+	AssetClawbackOC OnCompletion = 11
+
+	// AssetFreezeOC indicates an xASA Hook for freezing an asset
+	AssetFreezeOC OnCompletion = 12
 )
 
 // ApplicationCallTxnFields captures the transaction fields used for all

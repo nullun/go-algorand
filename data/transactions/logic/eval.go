@@ -1143,7 +1143,7 @@ func EvalContract(program []byte, gi int, aid basics.AppIndex, params *EvalParam
 	}
 
 	// If this is a creation...
-	if cx.txn.Txn.ApplicationID == 0 {
+	if cx.txn.Txn.Type == protocol.ApplicationCallTx && cx.txn.Txn.ApplicationID == 0 {
 		// make any "0 index" box refs available now that we have an appID.
 		for _, br := range cx.txn.Txn.Boxes {
 			if br.Index == 0 {
@@ -4841,6 +4841,9 @@ func (cx *EvalContext) resolveAsset(ref uint64) (aid basics.AssetIndex, err erro
 				err = fmt.Errorf("low Asset lookup %d", aid)
 			}
 		}()
+	}
+	if ref == 0 || ref == uint64(cx.txn.Txn.XferAsset) {
+		return cx.txn.Txn.XferAsset, nil
 	}
 	aid = basics.AssetIndex(ref)
 	if cx.availableAsset(aid) {

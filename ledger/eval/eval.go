@@ -1291,13 +1291,13 @@ func (eval *BlockEvaluator) applyTransaction(tx transactions.Transaction, cow *r
 		err = apply.Keyreg(tx.KeyregTxnFields, tx.Header, cow, eval.specials, &ad, cow.Round())
 
 	case protocol.AssetConfigTx:
-		err = apply.AssetConfig(tx.AssetConfigTxnFields, tx.Header, cow, eval.specials, &ad, ctr)
+		err = apply.AssetConfig(tx.AssetConfigTxnFields, tx.Header, cow, eval.specials, &ad, gi, evalParams, ctr)
 
 	case protocol.AssetTransferTx:
-		err = apply.AssetTransfer(tx.AssetTransferTxnFields, tx.Header, cow, eval.specials, &ad)
+		err = apply.AssetTransfer(tx.AssetTransferTxnFields, tx.Header, cow, eval.specials, &ad, gi, evalParams, ctr)
 
 	case protocol.AssetFreezeTx:
-		err = apply.AssetFreeze(tx.AssetFreezeTxnFields, tx.Header, cow, eval.specials, &ad)
+		err = apply.AssetFreeze(tx.AssetFreezeTxnFields, tx.Header, cow, eval.specials, &ad, gi, evalParams, ctr)
 
 	case protocol.ApplicationCallTx:
 		err = apply.ApplicationCall(tx.ApplicationCallTxnFields, tx.Header, cow, &ad, gi, evalParams, ctr)

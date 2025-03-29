@@ -90,17 +90,18 @@ type ResourcesData struct {
 	_struct struct{} `codec:",omitempty,omitemptyarray"`
 
 	// asset parameters ( basics.AssetParams )
-	Total         uint64         `codec:"a"`
-	Decimals      uint32         `codec:"b"`
-	DefaultFrozen bool           `codec:"c"`
-	UnitName      string         `codec:"d"`
-	AssetName     string         `codec:"e"`
-	URL           string         `codec:"f"`
-	MetadataHash  [32]byte       `codec:"g"`
-	Manager       basics.Address `codec:"h"`
-	Reserve       basics.Address `codec:"i"`
-	Freeze        basics.Address `codec:"j"`
-	Clawback      basics.Address `codec:"k"`
+	Total          uint64          `codec:"a"`
+	Decimals       uint32          `codec:"b"`
+	DefaultFrozen  bool            `codec:"c"`
+	UnitName       string          `codec:"d"`
+	AssetName      string          `codec:"e"`
+	URL            string          `codec:"f"`
+	MetadataHash   [32]byte        `codec:"g"`
+	Manager        basics.Address  `codec:"h"`
+	Reserve        basics.Address  `codec:"i"`
+	Freeze         basics.Address  `codec:"j"`
+	Clawback       basics.Address  `codec:"k"`
+	AssetHookAppID basics.AppIndex `codec:"ah"`
 
 	// asset holding ( basics.AssetHolding )
 	Amount uint64 `codec:"l"`
@@ -577,7 +578,8 @@ func (rd *ResourcesData) IsEmptyAssetFields() bool {
 		rd.Manager.IsZero() &&
 		rd.Reserve.IsZero() &&
 		rd.Freeze.IsZero() &&
-		rd.Clawback.IsZero()
+		rd.Clawback.IsZero() &&
+		rd.AssetHookAppID == 0
 }
 
 // IsAsset returns true if the flag is ResourceFlagsEmptyAsset and the fields are not empty.
@@ -601,6 +603,7 @@ func (rd *ResourcesData) ClearAssetParams() {
 	rd.Reserve = basics.Address{}
 	rd.Freeze = basics.Address{}
 	rd.Clawback = basics.Address{}
+	rd.AssetHookAppID = 0
 	hadHolding := (rd.ResourceFlags & ResourceFlagsNotHolding) == ResourceFlagsHolding
 	rd.ResourceFlags -= rd.ResourceFlags & ResourceFlagsOwnership
 	rd.ResourceFlags &= ^ResourceFlagsEmptyAsset
@@ -622,6 +625,7 @@ func (rd *ResourcesData) SetAssetParams(ap basics.AssetParams, haveHoldings bool
 	rd.Reserve = ap.Reserve
 	rd.Freeze = ap.Freeze
 	rd.Clawback = ap.Clawback
+	rd.AssetHookAppID = ap.AssetHookAppID
 	rd.ResourceFlags |= ResourceFlagsOwnership
 	if !haveHoldings {
 		rd.ResourceFlags |= ResourceFlagsNotHolding
@@ -635,17 +639,18 @@ func (rd *ResourcesData) SetAssetParams(ap basics.AssetParams, haveHoldings bool
 // GetAssetParams getter for asset params.
 func (rd *ResourcesData) GetAssetParams() basics.AssetParams {
 	ap := basics.AssetParams{
-		Total:         rd.Total,
-		Decimals:      rd.Decimals,
-		DefaultFrozen: rd.DefaultFrozen,
-		UnitName:      rd.UnitName,
-		AssetName:     rd.AssetName,
-		URL:           rd.URL,
-		MetadataHash:  rd.MetadataHash,
-		Manager:       rd.Manager,
-		Reserve:       rd.Reserve,
-		Freeze:        rd.Freeze,
-		Clawback:      rd.Clawback,
+		Total:          rd.Total,
+		Decimals:       rd.Decimals,
+		DefaultFrozen:  rd.DefaultFrozen,
+		UnitName:       rd.UnitName,
+		AssetName:      rd.AssetName,
+		URL:            rd.URL,
+		MetadataHash:   rd.MetadataHash,
+		Manager:        rd.Manager,
+		Reserve:        rd.Reserve,
+		Freeze:         rd.Freeze,
+		Clawback:       rd.Clawback,
+		AssetHookAppID: rd.AssetHookAppID,
 	}
 	return ap
 }

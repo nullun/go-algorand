@@ -420,6 +420,10 @@ type AssetParams struct {
 	// Clawback specifies an account that is allowed to take units
 	// of this asset from any account.
 	Clawback Address `codec:"c"`
+
+	// AssetHookAppID specifies an application that is to be evaluated
+	// when an asset is transferred.
+	AssetHookAppID AppIndex `codec:"ah"`
 }
 
 // ToBeHashed implements crypto.Hashable

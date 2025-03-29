@@ -14,11 +14,18 @@ func _() {
 	_ = x[ClearStateOC-3]
 	_ = x[UpdateApplicationOC-4]
 	_ = x[DeleteApplicationOC-5]
+	_ = x[AssetCreateOC-6]
+	_ = x[AssetConfigOC-7]
+	_ = x[AssetXferOC-8]
+	_ = x[AssetOptInOC-9]
+	_ = x[AssetCloseOutOC-10]
+	_ = x[AssetClawbackOC-11]
+	_ = x[AssetFreezeOC-12]
 }
 
-const _OnCompletion_name = "NoOpOCOptInOCCloseOutOCClearStateOCUpdateApplicationOCDeleteApplicationOC"
+const _OnCompletion_name = "NoOpOCOptInOCCloseOutOCClearStateOCUpdateApplicationOCDeleteApplicationOCAssetCreateOCAssetConfigOCAssetXferOCAssetOptInOCAssetCloseOutOCAssetClawbackOCAssetFreezeOC"
 
-var _OnCompletion_index = [...]uint8{0, 6, 13, 23, 35, 54, 73}
+var _OnCompletion_index = [...]uint8{0, 6, 13, 23, 35, 54, 73, 86, 99, 110, 122, 137, 152, 165}
 
 func (i OnCompletion) String() string {
 	if i >= OnCompletion(len(_OnCompletion_index)-1) {

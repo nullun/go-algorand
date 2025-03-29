@@ -337,14 +337,13 @@ func (cs *roundCowState) Perform(gi int, ep *logic.EvalParams) error {
 			cs.Round())
 
 	case protocol.AssetConfigTx:
-		err = apply.AssetConfig(txn.Txn.AssetConfigTxnFields, txn.Txn.Header, cs, *ep.Specials, &txn.ApplyData,
-			cs.Counter())
+		err = apply.AssetConfig(txn.Txn.AssetConfigTxnFields, txn.Txn.Header, cs, *ep.Specials, &txn.ApplyData, gi, ep, cs.Counter())
 
 	case protocol.AssetTransferTx:
-		err = apply.AssetTransfer(txn.Txn.AssetTransferTxnFields, txn.Txn.Header, cs, *ep.Specials, &txn.ApplyData)
+		err = apply.AssetTransfer(txn.Txn.AssetTransferTxnFields, txn.Txn.Header, cs, *ep.Specials, &txn.ApplyData, gi, ep, cs.Counter())
 
 	case protocol.AssetFreezeTx:
-		err = apply.AssetFreeze(txn.Txn.AssetFreezeTxnFields, txn.Txn.Header, cs, *ep.Specials, &txn.ApplyData)
+		err = apply.AssetFreeze(txn.Txn.AssetFreezeTxnFields, txn.Txn.Header, cs, *ep.Specials, &txn.ApplyData, gi, ep, cs.Counter())
 
 	case protocol.ApplicationCallTx:
 		err = apply.ApplicationCall(txn.Txn.ApplicationCallTxnFields, txn.Txn.Header, cs, &txn.ApplyData,

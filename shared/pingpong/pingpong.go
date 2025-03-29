@@ -1295,7 +1295,7 @@ func (pps *WorkerState) constructNFTGenTxn(from, to string, fee uint64, client *
 	rand.Read(meta[:])
 	assetName := pps.nftSpamAssetName()
 	const totalSupply = 1
-	txn, err = client.MakeUnsignedAssetCreateTx(totalSupply, false, sender, sender, sender, sender, "ping", assetName, "", meta[:], 0)
+	txn, err = client.MakeUnsignedAssetCreateTx(totalSupply, false, sender, sender, sender, sender, "ping", assetName, "", meta[:], 0, 0)
 	if err != nil {
 		fmt.Printf("Cannot make asset create txn with meta %v\n", meta)
 		return

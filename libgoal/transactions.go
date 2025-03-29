@@ -621,14 +621,15 @@ func parseTxnForeignAssets(foreignAssets []uint64) (parsed []basics.AssetIndex) 
 //
 // Call FillUnsignedTxTemplate afterwards to fill out common fields in
 // the resulting transaction template.
-func (c *Client) MakeUnsignedAssetCreateTx(total uint64, defaultFrozen bool, manager string, reserve string, freeze string, clawback string, unitName string, assetName string, url string, metadataHash []byte, decimals uint32) (transactions.Transaction, error) {
+func (c *Client) MakeUnsignedAssetCreateTx(total uint64, defaultFrozen bool, manager string, reserve string, freeze string, clawback string, unitName string, assetName string, url string, metadataHash []byte, decimals uint32, hookAppID uint64) (transactions.Transaction, error) {
 	var tx transactions.Transaction
 	var err error
 
 	tx.Type = protocol.AssetConfigTx
 	tx.AssetParams = basics.AssetParams{
-		Total:         total,
-		DefaultFrozen: defaultFrozen,
+		Total:          total,
+		AssetHookAppID: basics.AppIndex(hookAppID),
+		DefaultFrozen:  defaultFrozen,
 	}
 
 	if manager != "" {

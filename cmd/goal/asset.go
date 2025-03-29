@@ -45,6 +45,7 @@ var (
 	assetNoReserve          bool
 	assetNoFreezer          bool
 	assetNoClawback         bool
+	assetHookAppID          uint64
 
 	assetNewManager  string
 	assetNewReserve  string
@@ -79,6 +80,7 @@ func init() {
 	createAssetCmd.Flags().BoolVar(&assetNoReserve, "no-reserve", false, "Explicitly declare the lack of reserve")
 	createAssetCmd.Flags().BoolVar(&assetNoFreezer, "no-freezer", false, "Explicitly declare the lack of freezer")
 	createAssetCmd.Flags().BoolVar(&assetNoClawback, "no-clawback", false, "Explicitly declare the lack of clawback")
+	createAssetCmd.Flags().Uint64Var(&assetHookAppID, "asset-hook-app-id", 0, "Asset Hook App ID")
 	createAssetCmd.MarkFlagRequired("total")
 	createAssetCmd.MarkFlagRequired("creator")
 
@@ -284,7 +286,7 @@ var createAssetCmd = &cobra.Command{
 			}
 		}
 
-		tx, err := client.MakeUnsignedAssetCreateTx(assetTotal, assetFrozen, manager, reserve, freezer, clawback, assetUnitName, assetName, assetURL, assetMetadataHash, assetDecimals)
+		tx, err := client.MakeUnsignedAssetCreateTx(assetTotal, assetFrozen, manager, reserve, freezer, clawback, assetUnitName, assetName, assetURL, assetMetadataHash, assetDecimals, assetHookAppID)
 		if err != nil {
 			reportErrorf("Cannot construct transaction: %s", err)
 		}

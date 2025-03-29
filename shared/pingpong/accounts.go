@@ -397,7 +397,7 @@ func (pps *WorkerState) makeNewAssets(client *libgoal.Client) (err error) {
 		if !pps.cfg.Quiet {
 			fmt.Printf("Creating asset %s\n", assetName)
 		}
-		tx, createErr := client.MakeUnsignedAssetCreateTx(totalSupply, false, addr, addr, addr, addr, "ping", assetName, "", meta[:], 0)
+		tx, createErr := client.MakeUnsignedAssetCreateTx(totalSupply, false, addr, addr, addr, addr, "ping", assetName, "", meta[:], 0, 0)
 		if createErr != nil {
 			fmt.Printf("Cannot make asset create txn with meta %v\n", meta)
 			err = createErr

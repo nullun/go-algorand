@@ -79,6 +79,12 @@ type Header struct {
 	// This allows "re-keying" a long-lived account -- rotating the signing key, changing
 	// membership of a multisig account, etc.
 	RekeyTo basics.Address `codec:"rekey"`
+
+	// Sponsor specifies a different address to take the transaction fee from
+	// instead of the Sender. If provided, the transaction is only valid when
+	// an additional signature from the sponsor is provided alongside the senders.
+	// The Sponsor cannot be the same as Sender.
+	Sponsor basics.Address `codec:"spsr"`
 }
 
 // Transaction describes a transaction that can appear in a block.
@@ -271,6 +277,23 @@ func (tx Transaction) Sign(secrets *crypto.SignatureSecrets) SignedTxn {
 	// Set the AuthAddr if the signing key doesn't match the transaction sender
 	if basics.Address(secrets.SignatureVerifier) != tx.Sender {
 		s.AuthAddr = basics.Address(secrets.SignatureVerifier)
+	}
+	return s
+}
+
+// SignAsSponsor signs a transaction as a sponsor using a given Account's secrets.
+func (tx Transaction) SignAsSponsor(secrets *crypto.SignatureSecrets) SignedTxn {
+	ssig := secrets.Sign(tx)
+
+	s := SignedTxn{
+		Txn: tx,
+		Spsr: SponsorSig{
+			Sig: ssig,
+		},
+	}
+	// Set the Sponsor AuthAddr if the signing key doesn't match the transaction sender
+	if basics.Address(secrets.SignatureVerifier) != tx.Sender {
+		s.Spsr.AuthAddr = basics.Address(secrets.SignatureVerifier)
 	}
 	return s
 }

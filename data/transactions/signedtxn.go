@@ -37,6 +37,7 @@ type SignedTxn struct {
 	Lsig     LogicSig           `codec:"lsig"`
 	Txn      Transaction        `codec:"txn"`
 	AuthAddr basics.Address     `codec:"sgnr"`
+	Spsr     SponsorSig         `codec:"spsr"`
 }
 
 // SignedTxnInBlock is how a signed transaction is encoded in a block.

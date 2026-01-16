@@ -109,6 +109,17 @@ func (s SignedTxn) Authorizer() basics.Address {
 	return s.AuthAddr
 }
 
+// SponsorAuthorizer returns the address against which the sponsor's signature/msig/lsig
+// should be checked, or so the sponsored SignedTxn claims.
+// This is just s.Spsr.AuthAddr or, if s.Spsr.AuthAddr is zero, s.Txn.Sponsor.
+// It's provided as a convenience method.
+func (s SignedTxn) SponsorAuthorizer() basics.Address {
+	if s.Spsr.AuthAddr.IsZero() {
+		return s.Txn.Sponsor
+	}
+	return s.Spsr.AuthAddr
+}
+
 // AssembleSignedTxn assembles a multisig-signed transaction from a transaction an optional sig, and an optional multisig.
 // No signature checking is done -- for example, this might only be a partial multisig
 // TODO: is this method used anywhere, or is it safe to remove?

@@ -152,7 +152,6 @@ func (cs *roundCowState) DelLocal(addr basics.Address, appIdx basics.AppIndex, k
 func (cs *roundCowState) fetchAppCreator(appIdx basics.AppIndex) (basics.Address, error) {
 	// Fetch the application creator
 	addr, ok, err := cs.GetCreator(basics.CreatableIndex(appIdx), basics.AppCreatable)
-
 	if err != nil {
 		return basics.Address{}, err
 	}
@@ -307,7 +306,7 @@ func (cs *roundCowState) DelBox(appIdx basics.AppIndex, key string, appAddr basi
 func (cs *roundCowState) Perform(gi int, ep *logic.EvalParams) error {
 	txn := &ep.TxnGroup[gi]
 
-	err := cs.takeFee(&txn.Txn, &txn.ApplyData.SenderRewards, ep)
+	err := cs.takeFee(&txn.Txn, &txn.ApplyData.SenderRewards, &txn.ApplyData.SponsorRewards, ep)
 	if err != nil {
 		return err
 	}

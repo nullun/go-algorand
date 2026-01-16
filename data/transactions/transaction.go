@@ -122,10 +122,11 @@ type ApplyData struct {
 	// Closing amount for asset transaction.
 	AssetClosingAmount uint64 `codec:"aca"`
 
-	// Rewards applied to the Sender, Receiver, and CloseRemainderTo accounts.
+	// Rewards applied to the Sender, Receiver, CloseRemainderTo, and Fee Sponsor accounts.
 	SenderRewards   basics.MicroAlgos `codec:"rs"`
 	ReceiverRewards basics.MicroAlgos `codec:"rr"`
 	CloseRewards    basics.MicroAlgos `codec:"rc"`
+	SponsorRewards  basics.MicroAlgos `codec:"rf"`
 	EvalDelta       EvalDelta         `codec:"dt"`
 
 	// If asa or app is being created, the id used. Else 0.
@@ -151,6 +152,9 @@ func (ad ApplyData) Equal(o ApplyData) bool {
 		return false
 	}
 	if ad.CloseRewards != o.CloseRewards {
+		return false
+	}
+	if ad.SponsorRewards != o.SponsorRewards {
 		return false
 	}
 	if ad.ConfigAsset != o.ConfigAsset {

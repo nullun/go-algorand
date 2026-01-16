@@ -1185,6 +1185,21 @@ func (eval *BlockEvaluator) transaction(txn transactions.SignedTxn, evalParams *
 		if txn.Authorizer() != correctAuthorizer {
 			return fmt.Errorf("transaction %v: should have been authorized by %v but was actually authorized by %v", txn.ID(), correctAuthorizer, txn.Authorizer())
 		}
+
+		// If Sponsor is present, similarly check if the correct authoratative address was used.
+		if !txn.Txn.Sponsor.IsZero() {
+			acctspsrdata, lookupErr := cow.lookup(txn.Txn.Sponsor)
+			if lookupErr != nil {
+				return lookupErr
+			}
+			correctSponsorAuthorizer := acctspsrdata.AuthAddr
+			if (correctSponsorAuthorizer == basics.Address{}) {
+				correctSponsorAuthorizer = txn.Txn.Sponsor
+			}
+			if txn.SponsorAuthorizer() != correctSponsorAuthorizer {
+				return fmt.Errorf("sponsored transaction %v: should have been authorized by sponsor %v but was actually authorized by sponsor %v", txn.ID(), correctSponsorAuthorizer, txn.SponsorAuthorizer())
+			}
+		}
 	}
 
 	// Apply the transaction, updating the cow balances
@@ -1235,27 +1250,34 @@ func (eval *BlockEvaluator) transaction(txn transactions.SignedTxn, evalParams *
 	return nil
 }
 
-func (cs *roundCowState) takeFee(tx *transactions.Transaction, senderRewards *basics.MicroAlgos, ep *logic.EvalParams) error {
-	err := cs.Move(tx.Sender, ep.Specials.FeeSink, tx.Fee, senderRewards, nil)
+func (cs *roundCowState) takeFee(tx *transactions.Transaction, senderRewards *basics.MicroAlgos, sponsorRewards *basics.MicroAlgos, ep *logic.EvalParams) error {
+	feePayer := tx.Sender
+	feePayerRewards := senderRewards
+
+	if !tx.Sponsor.IsZero() {
+		feePayer = tx.Sponsor
+		feePayerRewards = sponsorRewards
+	}
+
+	err := cs.Move(feePayer, ep.Specials.FeeSink, tx.Fee, feePayerRewards, nil)
 	if err != nil {
 		return err
 	}
 	// transactions from FeeSink should be exceedingly rare. But we can't count
 	// them in feesCollected because there are no net algos added to the Sink
-	if tx.Sender == ep.Specials.FeeSink {
+	if feePayer == ep.Specials.FeeSink {
 		return nil
 	}
 	// overflow impossible, since these sum the fees actually paid and max supply is uint64
 	cs.feesCollected, _ = basics.OAddA(cs.feesCollected, tx.Fee)
 	return nil
-
 }
 
 // applyTransaction changes the balances according to this transaction.
 func (eval *BlockEvaluator) applyTransaction(tx transactions.Transaction, cow *roundCowState, evalParams *logic.EvalParams, gi int, ctr uint64) (ad transactions.ApplyData, err error) {
 	params := cow.ConsensusParams()
 
-	err = cow.takeFee(&tx, &ad.SenderRewards, evalParams)
+	err = cow.takeFee(&tx, &ad.SenderRewards, &ad.SponsorRewards, evalParams)
 	if err != nil {
 		return
 	}

@@ -495,6 +495,9 @@ func (tx Transaction) WellFormed(spec SpecialAddresses, proto config.ConsensusPa
 	if !proto.SupportRekeying && (tx.RekeyTo != basics.Address{}) {
 		return fmt.Errorf("transaction has RekeyTo set but rekeying not yet enabled")
 	}
+	if !proto.SupportSponsoredFee && (tx.Sponsor != basics.Address{}) {
+		return fmt.Errorf("transaction has Sponsor set but sponsoring not yet enabled")
+	}
 	return nil
 }
 

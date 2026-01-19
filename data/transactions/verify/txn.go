@@ -277,51 +277,27 @@ func txnGroupBatchPrep(stxs []transactions.SignedTxn, contextHdr *bookkeeping.Bl
 	return groupCtx, nil
 }
 
-type sigOrTxnType int
+type sigType int
 
-const regularSig sigOrTxnType = 1
-const multiSig sigOrTxnType = 2
-const logicSig sigOrTxnType = 3
-const stateProofTxn sigOrTxnType = 4
+const missingSig sigType = 0
+const singleSig sigType = 1
+const multiSig sigType = 2
+const logicSig sigType = 3
 
 // checkTxnSigTypeCounts checks the number of signature types and reports an error in case of a violation
-func checkTxnSigTypeCounts(s *transactions.SignedTxn, groupIndex int, isSponsor bool) (sigType sigOrTxnType, err *TxGroupError) {
-	var sig *crypto.Signature
-	var msig *crypto.MultisigSig
-	var lsig *transactions.LogicSig
-
-	if isSponsor {
-		sig = &s.Sponsor.Sig
-		msig = &s.Sponsor.Msig
-		lsig = &s.Sponsor.Lsig
-	} else {
-		sig = &s.Sig
-		msig = &s.Msig
-		lsig = &s.Lsig
-	}
-
+func checkTxnSigTypeCounts(s *transactions.SignatureFields, groupIndex int) (sigType sigType, err *TxGroupError) {
 	numSigCategories := 0
-	if !sig.Blank() {
+	if !s.Sig.Blank() {
 		numSigCategories++
-		sigType = regularSig
+		sigType = singleSig
 	}
-	if !msig.Blank() {
+	if !s.Msig.Blank() {
 		numSigCategories++
 		sigType = multiSig
 	}
-	if !lsig.Blank() {
+	if !s.Lsig.Blank() {
 		numSigCategories++
 		sigType = logicSig
-	}
-	if numSigCategories == 0 {
-		// Special case: special sender address can issue special transaction
-		// types (state proof txn) without any signature.  The well-formed
-		// check ensures that this transaction cannot pay any fee, and
-		// cannot have any other interesting fields, except for the state proof payload.
-		if s.Txn.Sender == transactions.StateProofSender && s.Txn.Type == protocol.StateProofTx {
-			return stateProofTxn, nil
-		}
-		return 0, &TxGroupError{err: errTxnSigHasNoSig, GroupIndex: groupIndex, Reason: TxGroupErrorReasonHasNoSig}
 	}
 	if numSigCategories > 1 {
 		return 0, &TxGroupError{err: errTxnSigNotWellFormed, GroupIndex: groupIndex, Reason: TxGroupErrorReasonSigNotWellFormed}
@@ -331,59 +307,62 @@ func checkTxnSigTypeCounts(s *transactions.SignedTxn, groupIndex int, isSponsor 
 
 // stxnCoreChecks runs signatures validity checks and enqueues signature into batchVerifier for verification.
 func stxnCoreChecks(gi int, groupCtx *GroupContext, batchVerifier crypto.BatchVerifier) *TxGroupError {
-	s := &groupCtx.signedGroupTxns[gi]
-	senderSigType, err := checkTxnSigTypeCounts(s, gi, false)
+	stxn := &groupCtx.signedGroupTxns[gi]
+
+	senderSigType, err := checkTxnSigTypeCounts(&stxn.SignatureFields, gi)
 	if err != nil {
 		return err
 	}
 
-	if s.Txn.Type == protocol.HeartbeatTx {
-		id := basics.OneTimeIDForRound(s.Txn.LastValid, s.Txn.HbKeyDilution)
-		s.Txn.HbProof.BatchPrep(s.Txn.HbVoteID, id, s.Txn.HbSeed, batchVerifier)
+	if senderSigType == missingSig {
+		// Special case: special sender address can issue special transaction
+		// types (state proof txn) without any signature.  The well-formed
+		// check ensures that this transaction cannot pay any fee, and
+		// cannot have any other interesting fields, except for the state proof payload.
+		if stxn.Txn.Sender == transactions.StateProofSender && stxn.Txn.Type == protocol.StateProofTx {
+			return nil
+		}
+		return &TxGroupError{err: errTxnSigHasNoSig, GroupIndex: gi, Reason: TxGroupErrorReasonHasNoSig}
 	}
 
-	err = enqueueSigTypeVerify(gi, groupCtx, senderSigType, batchVerifier, false)
+	if stxn.Txn.Type == protocol.HeartbeatTx {
+		id := basics.OneTimeIDForRound(stxn.Txn.LastValid, stxn.Txn.HbKeyDilution)
+		stxn.Txn.HbProof.BatchPrep(stxn.Txn.HbVoteID, id, stxn.Txn.HbSeed, batchVerifier)
+	}
+
+	err = enqueueAuthSigVerify(stxn.Authorizer(), &stxn.SignatureFields, &stxn.Txn, gi, groupCtx, senderSigType, batchVerifier)
 	if err != nil {
 		return err
 	}
 
-	if !s.Txn.Sponsor.IsZero() {
-		sponsorSigType, err := checkTxnSigTypeCounts(s, gi, true)
+	if stxn.IsSponsored() {
+		sponsorSigType, err := checkTxnSigTypeCounts(&stxn.SignatureFields, gi)
 		if err != nil {
 			return err
 		}
-		return enqueueSigTypeVerify(gi, groupCtx, sponsorSigType, batchVerifier, true)
+		return enqueueAuthSigVerify(stxn.SponsorAuthorizer(), (*transactions.SignatureFields)(&stxn.Sponsor), &stxn.Txn, gi, groupCtx, sponsorSigType, batchVerifier)
 	}
 
 	return nil
 }
 
-func enqueueSigTypeVerify(gi int, groupCtx *GroupContext, sigOrTxnType sigOrTxnType, batchVerifier crypto.BatchVerifier, isSponsor bool) *TxGroupError {
-	s := &groupCtx.signedGroupTxns[gi]
+func enqueueAuthSigVerify(auth basics.Address, s *transactions.SignatureFields, t *transactions.Transaction, gi int, groupCtx *GroupContext, sigType sigType, batchVerifier crypto.BatchVerifier) *TxGroupError {
+	switch sigType {
+	case missingSig:
+		if t.Type == protocol.StateProofTx {
+			return nil
+		}
+		return &TxGroupError{err: errTxnSigHasNoSig, GroupIndex: gi, Reason: TxGroupErrorReasonGeneric}
 
-	var sig crypto.Signature
-	var msig crypto.MultisigSig
-	var auth basics.Address
-
-	if isSponsor {
-		sig = s.Sponsor.Sig
-		msig = s.Sponsor.Msig
-		auth = s.SponsorAuthorizer()
-	} else {
-		sig = s.Sig
-		msig = s.Msig
-		auth = s.Authorizer()
-	}
-
-	switch sigOrTxnType {
-	case regularSig:
-		batchVerifier.EnqueueSignature(crypto.SignatureVerifier(auth), s.Txn, sig)
+	case singleSig:
+		batchVerifier.EnqueueSignature(crypto.SignatureVerifier(auth), t, s.Sig)
 		return nil
+
 	case multiSig:
-		if err := crypto.MultisigBatchPrep(s.Txn, crypto.Digest(auth), msig, batchVerifier); err != nil {
+		if err := crypto.MultisigBatchPrep(t, crypto.Digest(auth), s.Msig, batchVerifier); err != nil {
 			return &TxGroupError{err: fmt.Errorf("multisig validation failed: %w", err), GroupIndex: gi, Reason: TxGroupErrorReasonMsigNotWellFormed}
 		}
-		sigs := msig.Signatures()
+		sigs := s.Msig.Signatures()
 		if sigs <= 4 {
 			msigLessOrEqual4.Inc(nil)
 		} else if sigs <= 10 {
@@ -397,9 +376,6 @@ func enqueueSigTypeVerify(gi int, groupCtx *GroupContext, sigOrTxnType sigOrTxnT
 		if err := logicSigVerify(gi, groupCtx); err != nil {
 			return &TxGroupError{err: err, GroupIndex: gi, Reason: TxGroupErrorReasonLogicSigFailed}
 		}
-		return nil
-
-	case stateProofTxn:
 		return nil
 
 	default:

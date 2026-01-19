@@ -232,30 +232,29 @@ func (ue UnverifiedTxnSigJob) GetNumberOfBatchableItems() (batchSigs uint64, err
 
 func getNumberOfBatchableSigsInTxn(stx *transactions.SignedTxn, groupIndex int) (uint64, error) {
 	var count uint64 = 0
-	senderSigType, err := checkTxnSigTypeCounts(stx, groupIndex, false)
+	senderSigType, err := checkTxnSigTypeCounts(&stx.SignatureFields, groupIndex)
 	if err != nil {
 		return count, err
 	}
+
 	if stx.IsSponsored() {
-		sponsorSigType, err := checkTxnSigTypeCounts(stx, groupIndex, true)
+		sponsorSigType, err := checkTxnSigTypeCounts((*transactions.SignatureFields)(&stx.Sponsor), groupIndex)
 		if err != nil {
 			return count, err
 		}
-		// There are only signatures if it's a sig or msig
+		// There are only batchable signatures if it's a sig or msig
 		switch sponsorSigType {
-		case regularSig:
+		case singleSig:
 			count++
 		case multiSig:
 			count += uint64(stx.Sponsor.Msig.Signatures())
 		case logicSig:
 			// Currently the sigs in here are not batched. Something to consider later.
-		case stateProofTxn:
-		default:
-			// this case is impossible
 		}
 	}
+
 	switch senderSigType {
-	case regularSig:
+	case singleSig:
 		count++
 	case multiSig:
 		count += uint64(stx.Msig.Signatures())

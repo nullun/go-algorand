@@ -32,12 +32,18 @@ import (
 type SignedTxn struct {
 	_struct struct{} `codec:",omitempty,omitemptyarray"`
 
+	SignatureFields
+	Sponsor SponsorSig  `codec:"spsr"`
+	Txn     Transaction `codec:"txn"`
+}
+
+type SignatureFields struct {
+	_struct struct{} `codec:",omitempty,omitemptyarray"`
+
 	Sig      crypto.Signature   `codec:"sig"`
 	Msig     crypto.MultisigSig `codec:"msig"`
 	Lsig     LogicSig           `codec:"lsig"`
-	Txn      Transaction        `codec:"txn"`
 	AuthAddr basics.Address     `codec:"sgnr"`
-	Spsr     SponsorSig         `codec:"spsr"`
 }
 
 // SignedTxnInBlock is how a signed transaction is encoded in a block.
@@ -114,15 +120,15 @@ func (s SignedTxn) Authorizer() basics.Address {
 // This is just s.Spsr.AuthAddr or, if s.Spsr.AuthAddr is zero, s.Txn.Sponsor.
 // It's provided as a convenience method.
 func (s SignedTxn) SponsorAuthorizer() basics.Address {
-	if s.Spsr.AuthAddr.IsZero() {
+	if s.Sponsor.AuthAddr.IsZero() {
 		return s.Txn.Sponsor
 	}
-	return s.Spsr.AuthAddr
+	return s.Sponsor.AuthAddr
 }
 
 // IsSponsored returns true if the transaction is sponsored.
 func (s SignedTxn) IsSponsored() bool {
-	if !s.Txn.Sponsor.IsZero() && !s.Spsr.Blank() {
+	if !s.Txn.Sponsor.IsZero() && !s.Sponsor.Blank() {
 		return true
 	}
 	return false
@@ -136,9 +142,11 @@ func AssembleSignedTxn(txn Transaction, sig crypto.Signature, msig crypto.Multis
 		return SignedTxn{}, errors.New("signed txn can only have one of sig or msig")
 	}
 	s := SignedTxn{
-		Txn:  txn,
-		Sig:  sig,
-		Msig: msig,
+		Txn: txn,
+		SignatureFields: SignatureFields{
+			Sig:  sig,
+			Msig: msig,
+		},
 	}
 	return s, nil
 }

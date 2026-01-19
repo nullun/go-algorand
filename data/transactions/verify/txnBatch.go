@@ -246,7 +246,7 @@ func getNumberOfBatchableSigsInTxn(stx *transactions.SignedTxn, groupIndex int) 
 		case regularSig:
 			count++
 		case multiSig:
-			count += uint64(stx.Spsr.Msig.Signatures())
+			count += uint64(stx.Sponsor.Msig.Signatures())
 		case logicSig:
 			// Currently the sigs in here are not batched. Something to consider later.
 		case stateProofTxn:

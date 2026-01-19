@@ -291,9 +291,9 @@ func checkTxnSigTypeCounts(s *transactions.SignedTxn, groupIndex int, isSponsor 
 	var lsig *transactions.LogicSig
 
 	if isSponsor {
-		sig = &s.Spsr.Sig
-		msig = &s.Spsr.Msig
-		lsig = &s.Spsr.Lsig
+		sig = &s.Sponsor.Sig
+		msig = &s.Sponsor.Msig
+		lsig = &s.Sponsor.Lsig
 	} else {
 		sig = &s.Sig
 		msig = &s.Msig
@@ -366,8 +366,8 @@ func enqueueSigTypeVerify(gi int, groupCtx *GroupContext, sigOrTxnType sigOrTxnT
 	var auth basics.Address
 
 	if isSponsor {
-		sig = s.Spsr.Sig
-		msig = s.Spsr.Msig
+		sig = s.Sponsor.Sig
+		msig = s.Sponsor.Msig
 		auth = s.SponsorAuthorizer()
 	} else {
 		sig = s.Sig

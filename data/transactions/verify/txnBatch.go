@@ -95,7 +95,6 @@ func (bl *batchLoad) addLoad(txngrp []transactions.SignedTxn, gctx *GroupContext
 	bl.groupCtxs = append(bl.groupCtxs, gctx)
 	bl.backlogMessage = append(bl.backlogMessage, backlogMsg)
 	bl.messagesForTxn = append(bl.messagesForTxn, numBatchableSigs)
-
 }
 
 // TxnGroupBatchSigVerifier provides Verify method to synchronously verify a group of transactions
@@ -232,24 +231,36 @@ func (ue UnverifiedTxnSigJob) GetNumberOfBatchableItems() (batchSigs uint64, err
 }
 
 func getNumberOfBatchableSigsInTxn(stx *transactions.SignedTxn, groupIndex int) (uint64, error) {
-	sigType, err := checkTxnSigTypeCounts(stx, groupIndex)
+	var count uint64 = 0
+	senderSigType, err := checkTxnSigTypeCounts(stx, groupIndex, false)
 	if err != nil {
-		return 0, err
+		return count, err
 	}
-	switch sigType {
+	if stx.IsSponsored() {
+		sponsorSigType, err := checkTxnSigTypeCounts(stx, groupIndex, true)
+		if err != nil {
+			return count, err
+		}
+		// There are only signatures if it's a sig or msig
+		switch sponsorSigType {
+		case regularSig:
+			count++
+		case multiSig:
+			count += uint64(stx.Spsr.Msig.Signatures())
+		case logicSig:
+			// Currently the sigs in here are not batched. Something to consider later.
+		case stateProofTxn:
+		default:
+			// this case is impossible
+		}
+	}
+	switch senderSigType {
 	case regularSig:
-		return 1, nil
+		count++
 	case multiSig:
-		return uint64(stx.Msig.Signatures()), nil
-	case logicSig:
-		// Currently the sigs in here are not batched. Something to consider later.
-		return 0, nil
-	case stateProofTxn:
-		return 0, nil
-	default:
-		// this case is impossible
-		return 0, nil
+		count += uint64(stx.Msig.Signatures())
 	}
+	return count, nil
 }
 
 func (tbp *txnSigBatchProcessor) postProcessVerifiedJobs(ctx interface{}, failed []bool, err error) {

@@ -85,6 +85,7 @@ var errTxnSigHasNoSig = errors.New("signedtxn has no sig")
 var errTxnSigNotWellFormed = errors.New("signedtxn should only have one of Sig or Msig or LogicSig")
 var errRekeyingNotSupported = errors.New("nonempty AuthAddr but rekeying is not supported")
 var errAuthAddrEqualsSender = errors.New("AuthAddr must be different from Sender")
+var errSponsoredFeeNotSupported = errors.New("nonempty Sponsor but sponsoring is not supported")
 var errUnknownSignature = errors.New("has one mystery sig. WAT?")
 
 // TxGroupErrorReason is reason code for ErrTxGroupError
@@ -167,6 +168,10 @@ func txnBatchPrep(gi int, groupCtx *GroupContext, verifier crypto.BatchVerifier)
 	s := &groupCtx.signedGroupTxns[gi]
 	if !groupCtx.consensusParams.SupportRekeying && (s.AuthAddr != basics.Address{}) {
 		return &TxGroupError{err: errRekeyingNotSupported, GroupIndex: gi, Reason: TxGroupErrorReasonGeneric}
+	}
+
+	if !groupCtx.consensusParams.SupportSponsoredFee && !s.Txn.Sponsor.IsZero() {
+		return &TxGroupError{err: errSponsoredFeeNotSupported, GroupIndex: gi, Reason: TxGroupErrorReasonGeneric}
 	}
 
 	if groupCtx.consensusParams.EnforceAuthAddrSenderDiff && !s.AuthAddr.IsZero() && s.AuthAddr == s.Txn.Sender {
@@ -280,17 +285,31 @@ const logicSig sigOrTxnType = 3
 const stateProofTxn sigOrTxnType = 4
 
 // checkTxnSigTypeCounts checks the number of signature types and reports an error in case of a violation
-func checkTxnSigTypeCounts(s *transactions.SignedTxn, groupIndex int) (sigType sigOrTxnType, err *TxGroupError) {
+func checkTxnSigTypeCounts(s *transactions.SignedTxn, groupIndex int, isSponsor bool) (sigType sigOrTxnType, err *TxGroupError) {
+	var sig *crypto.Signature
+	var msig *crypto.MultisigSig
+	var lsig *transactions.LogicSig
+
+	if isSponsor {
+		sig = &s.Spsr.Sig
+		msig = &s.Spsr.Msig
+		lsig = &s.Spsr.Lsig
+	} else {
+		sig = &s.Sig
+		msig = &s.Msig
+		lsig = &s.Lsig
+	}
+
 	numSigCategories := 0
-	if !s.Sig.Blank() {
+	if !sig.Blank() {
 		numSigCategories++
 		sigType = regularSig
 	}
-	if !s.Msig.Blank() {
+	if !msig.Blank() {
 		numSigCategories++
 		sigType = multiSig
 	}
-	if !s.Lsig.Blank() {
+	if !lsig.Blank() {
 		numSigCategories++
 		sigType = logicSig
 	}
@@ -313,7 +332,7 @@ func checkTxnSigTypeCounts(s *transactions.SignedTxn, groupIndex int) (sigType s
 // stxnCoreChecks runs signatures validity checks and enqueues signature into batchVerifier for verification.
 func stxnCoreChecks(gi int, groupCtx *GroupContext, batchVerifier crypto.BatchVerifier) *TxGroupError {
 	s := &groupCtx.signedGroupTxns[gi]
-	sigType, err := checkTxnSigTypeCounts(s, gi)
+	senderSigType, err := checkTxnSigTypeCounts(s, gi, false)
 	if err != nil {
 		return err
 	}
@@ -323,15 +342,48 @@ func stxnCoreChecks(gi int, groupCtx *GroupContext, batchVerifier crypto.BatchVe
 		s.Txn.HbProof.BatchPrep(s.Txn.HbVoteID, id, s.Txn.HbSeed, batchVerifier)
 	}
 
-	switch sigType {
+	err = enqueueSigTypeVerify(gi, groupCtx, senderSigType, batchVerifier, false)
+	if err != nil {
+		return err
+	}
+
+	if !s.Txn.Sponsor.IsZero() {
+		sponsorSigType, err := checkTxnSigTypeCounts(s, gi, true)
+		if err != nil {
+			return err
+		}
+		return enqueueSigTypeVerify(gi, groupCtx, sponsorSigType, batchVerifier, true)
+	}
+
+	return nil
+}
+
+func enqueueSigTypeVerify(gi int, groupCtx *GroupContext, sigOrTxnType sigOrTxnType, batchVerifier crypto.BatchVerifier, isSponsor bool) *TxGroupError {
+	s := &groupCtx.signedGroupTxns[gi]
+
+	var sig crypto.Signature
+	var msig crypto.MultisigSig
+	var auth basics.Address
+
+	if isSponsor {
+		sig = s.Spsr.Sig
+		msig = s.Spsr.Msig
+		auth = s.SponsorAuthorizer()
+	} else {
+		sig = s.Sig
+		msig = s.Msig
+		auth = s.Authorizer()
+	}
+
+	switch sigOrTxnType {
 	case regularSig:
-		batchVerifier.EnqueueSignature(crypto.SignatureVerifier(s.Authorizer()), s.Txn, s.Sig)
+		batchVerifier.EnqueueSignature(crypto.SignatureVerifier(auth), s.Txn, sig)
 		return nil
 	case multiSig:
-		if err := crypto.MultisigBatchPrep(s.Txn, crypto.Digest(s.Authorizer()), s.Msig, batchVerifier); err != nil {
+		if err := crypto.MultisigBatchPrep(s.Txn, crypto.Digest(auth), msig, batchVerifier); err != nil {
 			return &TxGroupError{err: fmt.Errorf("multisig validation failed: %w", err), GroupIndex: gi, Reason: TxGroupErrorReasonMsigNotWellFormed}
 		}
-		sigs := s.Msig.Signatures()
+		sigs := msig.Signatures()
 		if sigs <= 4 {
 			msigLessOrEqual4.Inc(nil)
 		} else if sigs <= 10 {
@@ -480,7 +532,6 @@ func logicSigVerify(gi int, groupCtx *GroupContext) error {
 	logicGoodTotal.Inc(nil)
 	logicCostTotal.AddUint64(uint64(cx.Cost()), nil)
 	return nil
-
 }
 
 // PaysetGroups verifies that the payset have a good signature and that the underlying

@@ -120,6 +120,14 @@ func (s SignedTxn) SponsorAuthorizer() basics.Address {
 	return s.Spsr.AuthAddr
 }
 
+// IsSponsored returns true if the transaction is sponsored.
+func (s SignedTxn) IsSponsored() bool {
+	if !s.Txn.Sponsor.IsZero() && !s.Spsr.Blank() {
+		return true
+	}
+	return false
+}
+
 // AssembleSignedTxn assembles a multisig-signed transaction from a transaction an optional sig, and an optional multisig.
 // No signature checking is done -- for example, this might only be a partial multisig
 // TODO: is this method used anywhere, or is it safe to remove?

@@ -319,6 +319,9 @@ func (tx Transaction) MatchAddress(addr basics.Address) bool {
 	if addr == tx.Sender {
 		return true
 	}
+	if addr == tx.Sponsor {
+		return true
+	}
 
 	switch tx.Type {
 	case protocol.PaymentTx:

@@ -139,8 +139,10 @@ func TestEvalDeltaEqual(t *testing.T) {
 	d1 = EvalDelta{
 		InnerTxns: []SignedTxnWithAD{{
 			SignedTxn: SignedTxn{
-				Lsig: LogicSig{
-					Logic: []byte{0x01},
+				SignatureFields: SignatureFields{
+					Lsig: LogicSig{
+						Logic: []byte{0x01},
+					},
 				},
 			},
 		}},
@@ -148,8 +150,10 @@ func TestEvalDeltaEqual(t *testing.T) {
 	d2 = EvalDelta{
 		InnerTxns: []SignedTxnWithAD{{
 			SignedTxn: SignedTxn{
-				Lsig: LogicSig{
-					Logic: []byte{0x01},
+				SignatureFields: SignatureFields{
+					Lsig: LogicSig{
+						Logic: []byte{0x01},
+					},
 				},
 			},
 		}},
@@ -158,9 +162,11 @@ func TestEvalDeltaEqual(t *testing.T) {
 	d2 = EvalDelta{
 		InnerTxns: []SignedTxnWithAD{{
 			SignedTxn: SignedTxn{
-				Lsig: LogicSig{
-					Logic: []byte{0x02},
-					Args:  [][]byte{},
+				SignatureFields: SignatureFields{
+					Lsig: LogicSig{
+						Logic: []byte{0x02},
+						Args:  [][]byte{},
+					},
 				},
 			},
 		}},
@@ -186,7 +192,6 @@ func TestEvalDeltaEqual(t *testing.T) {
 		}},
 	}
 	a.False(d1.Equal(d2))
-
 }
 
 // TestUnchangedAllocBounds ensure that the allocbounds on EvalDelta have not
@@ -271,5 +276,4 @@ func TestUnchangedAllocBounds(t *testing.T) {
 	msg = delta.MarshalMsg(nil)
 	_, err = delta.UnmarshalMsg(msg)
 	require.Error(t, err)
-
 }

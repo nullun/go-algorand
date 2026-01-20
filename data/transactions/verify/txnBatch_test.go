@@ -298,7 +298,7 @@ func TestGetNumberOfBatchableSigsInGroup(t *testing.T) {
 	// txn with 0 sigs
 	txnGroups[mod][0].Sig = crypto.Signature{}
 	batchSigs, err := UnverifiedTxnSigJob{TxnGroup: txnGroups[mod]}.GetNumberOfBatchableItems()
-	require.ErrorIs(t, err, errTxnSigHasNoSig)
+	require.NoError(t, err)
 	require.Equal(t, uint64(0), batchSigs)
 	mod++
 

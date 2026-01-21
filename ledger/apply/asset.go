@@ -18,6 +18,7 @@ package apply
 
 import (
 	"fmt"
+	"slices"
 
 	"github.com/algorand/go-algorand/data/basics"
 	"github.com/algorand/go-algorand/data/transactions"
@@ -312,6 +313,82 @@ func AssetTransfer(ct transactions.AssetTransferTxnFields, header transactions.H
 			err = balances.AllocateAsset(source, ct.XferAsset, false)
 			if err != nil {
 				return err
+			}
+		}
+	}
+
+	// Perform Benefactor Enforcement for AssetTransfer.
+	// This results in the sender (not AssetSender) paying the Minimum
+	// Balance Requirement to the AssetReceiver if required.
+	if ct.AssetReceiver != header.Sender && slices.Contains(header.Enforcements, transactions.Benefactor) {
+		rcvHolding, ok, err := balances.GetAssetHolding(ct.AssetReceiver, ct.XferAsset)
+		if err != nil {
+			return err
+		}
+
+		if !ok {
+			rcvRecord, err := balances.Get(ct.AssetReceiver, false)
+			if err != nil {
+				return err
+			}
+			currentMinBalance := basics.MicroAlgos{}
+			proto := balances.ConsensusParams()
+			if !rcvRecord.IsZero() {
+				currentMinBalance = rcvRecord.MinBalance(&proto)
+			}
+			fmt.Println("Current min balance:", currentMinBalance)
+
+			// Initialize holding with default Frozen value.
+			params, _, err := getParams(balances, ct.XferAsset)
+			if err != nil {
+				return err
+			}
+
+			rcvHolding.Frozen = params.DefaultFrozen
+
+			// beneficiaryAlgos := basics.MicroAlgos{Raw: 100000} // 0.1 Algo minimum balance for asset holding
+			// if rcvRecord.IsZero() {
+			// 	beneficiaryAlgos = basics.MicroAlgos{Raw: 100000 + 100000} // extra 0.1 Algo for account creation
+			// }
+
+			totalRcvAssets := rcvRecord.TotalAssets
+			maxAssetsPerAccount := balances.ConsensusParams().MaxAssetsPerAccount
+			if maxAssetsPerAccount > 0 && totalRcvAssets >= uint64(maxAssetsPerAccount) {
+				return fmt.Errorf("too many assets in account: %d >= %d", totalRcvAssets, maxAssetsPerAccount)
+			}
+
+			rcvRecord.TotalAssets = basics.AddSaturate(rcvRecord.TotalAssets, 1)
+			err = balances.Put(ct.AssetReceiver, rcvRecord)
+			if err != nil {
+				return err
+			}
+
+			// // Benefactor provides MBR to beneficiary.
+			// err = balances.Move(header.Sender, ct.AssetReceiver, beneficiaryAlgos, &ad.SenderRewards, &ad.ReceiverRewards)
+			// if err != nil {
+			// 	return err
+			// }
+
+			err = balances.PutAssetHolding(ct.AssetReceiver, ct.XferAsset, rcvHolding)
+			if err != nil {
+				return err
+			}
+
+			err = balances.AllocateAsset(ct.AssetReceiver, ct.XferAsset, false)
+			if err != nil {
+				return err
+			}
+
+			newMinBalance := rcvRecord.MinBalance(&proto)
+			fmt.Println("New min balance:", newMinBalance)
+			differenceMinBalance, overflow := basics.OSubA(newMinBalance, currentMinBalance)
+			fmt.Println("Difference min balance:", differenceMinBalance, "Overflow:", overflow)
+			if !overflow {
+				// Benefactor provides MBR to beneficiary.
+				err = balances.Move(header.Sender, ct.AssetReceiver, differenceMinBalance, &ad.SenderRewards, &ad.ReceiverRewards)
+				if err != nil {
+					return err
+				}
 			}
 		}
 	}

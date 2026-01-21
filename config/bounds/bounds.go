@@ -152,3 +152,6 @@ const EncodedMaxKeyValueEntries = 1024
 // MaxConsensusVersionLen must be larger than any URL length of any consensus
 // version (which is currently URL+hash=89)
 const MaxConsensusVersionLen = 128
+
+// MaxTxnEnforcements is the maximum number of transaction enforcements
+const MaxTxnEnforcements = 2

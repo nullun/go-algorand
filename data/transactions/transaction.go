@@ -294,7 +294,9 @@ func (tx Transaction) SignAsSponsor(secrets *crypto.SignatureSecrets) SignedTxn 
 	s := SignedTxn{
 		Txn: tx,
 		Sponsor: SponsorSig{
-			Sig: ssig,
+			SignatureFields: SignatureFields{
+				Sig: ssig,
+			},
 		},
 	}
 	// Set the Sponsor AuthAddr if the signing key doesn't match the transaction sender

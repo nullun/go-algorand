@@ -16,19 +16,11 @@
 
 package transactions
 
-import (
-	"github.com/algorand/go-algorand/crypto"
-	"github.com/algorand/go-algorand/data/basics"
-)
-
 // SponsorSig contains a signature that sponsors a transaction fee payment.
 type SponsorSig struct {
 	_struct struct{} `codec:",omitempty,omitemptyarray"`
 
-	Sig      crypto.Signature   `codec:"sig"`
-	Msig     crypto.MultisigSig `codec:"msig"`
-	Lsig     LogicSig           `codec:"lsig"`
-	AuthAddr basics.Address     `codec:"sgnr"`
+	SignatureFields
 }
 
 // Blank returns true if there is no content in this LogicSig

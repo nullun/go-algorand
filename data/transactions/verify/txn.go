@@ -340,7 +340,7 @@ func stxnCoreChecks(gi int, groupCtx *GroupContext, batchVerifier crypto.BatchVe
 		if err != nil {
 			return err
 		}
-		return enqueueAuthSigVerify(stxn.SponsorAuthorizer(), (*transactions.SignatureFields)(&stxn.Sponsor), &stxn.Txn, gi, groupCtx, sponsorSigType, batchVerifier)
+		return enqueueAuthSigVerify(stxn.SponsorAuthorizer(), &stxn.Sponsor.SignatureFields, &stxn.Txn, gi, groupCtx, sponsorSigType, batchVerifier)
 	}
 
 	return nil

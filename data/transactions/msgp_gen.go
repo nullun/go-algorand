@@ -6576,45 +6576,45 @@ func (z *SponsorSig) MarshalMsg(b []byte) (o []byte) {
 	o = msgp.Require(b, z.Msgsize())
 	// omitempty: check for empty values
 	zb0001Len := uint32(4)
-	var zb0001Mask uint8 /* 5 bits */
-	if (*z).Lsig.MsgIsZero() {
-		zb0001Len--
-		zb0001Mask |= 0x2
-	}
-	if (*z).Msig.MsgIsZero() {
+	var zb0001Mask uint8 /* 6 bits */
+	if (*z).SignatureFields.Lsig.MsgIsZero() {
 		zb0001Len--
 		zb0001Mask |= 0x4
 	}
-	if (*z).AuthAddr.MsgIsZero() {
+	if (*z).SignatureFields.Msig.MsgIsZero() {
 		zb0001Len--
 		zb0001Mask |= 0x8
 	}
-	if (*z).Sig.MsgIsZero() {
+	if (*z).SignatureFields.AuthAddr.MsgIsZero() {
 		zb0001Len--
 		zb0001Mask |= 0x10
+	}
+	if (*z).SignatureFields.Sig.MsgIsZero() {
+		zb0001Len--
+		zb0001Mask |= 0x20
 	}
 	// variable map header, size zb0001Len
 	o = append(o, 0x80|uint8(zb0001Len))
 	if zb0001Len != 0 {
-		if (zb0001Mask & 0x2) == 0 { // if not empty
+		if (zb0001Mask & 0x4) == 0 { // if not empty
 			// string "lsig"
 			o = append(o, 0xa4, 0x6c, 0x73, 0x69, 0x67)
-			o = (*z).Lsig.MarshalMsg(o)
-		}
-		if (zb0001Mask & 0x4) == 0 { // if not empty
-			// string "msig"
-			o = append(o, 0xa4, 0x6d, 0x73, 0x69, 0x67)
-			o = (*z).Msig.MarshalMsg(o)
+			o = (*z).SignatureFields.Lsig.MarshalMsg(o)
 		}
 		if (zb0001Mask & 0x8) == 0 { // if not empty
-			// string "sgnr"
-			o = append(o, 0xa4, 0x73, 0x67, 0x6e, 0x72)
-			o = (*z).AuthAddr.MarshalMsg(o)
+			// string "msig"
+			o = append(o, 0xa4, 0x6d, 0x73, 0x69, 0x67)
+			o = (*z).SignatureFields.Msig.MarshalMsg(o)
 		}
 		if (zb0001Mask & 0x10) == 0 { // if not empty
+			// string "sgnr"
+			o = append(o, 0xa4, 0x73, 0x67, 0x6e, 0x72)
+			o = (*z).SignatureFields.AuthAddr.MarshalMsg(o)
+		}
+		if (zb0001Mask & 0x20) == 0 { // if not empty
 			// string "sig"
 			o = append(o, 0xa3, 0x73, 0x69, 0x67)
-			o = (*z).Sig.MarshalMsg(o)
+			o = (*z).SignatureFields.Sig.MarshalMsg(o)
 		}
 	}
 	return
@@ -6645,7 +6645,7 @@ func (z *SponsorSig) UnmarshalMsgWithState(bts []byte, st msgp.UnmarshalState) (
 		}
 		if zb0001 > 0 {
 			zb0001--
-			bts, err = (*z).Sig.UnmarshalMsgWithState(bts, st)
+			bts, err = (*z).SignatureFields.Sig.UnmarshalMsgWithState(bts, st)
 			if err != nil {
 				err = msgp.WrapError(err, "struct-from-array", "Sig")
 				return
@@ -6653,7 +6653,7 @@ func (z *SponsorSig) UnmarshalMsgWithState(bts []byte, st msgp.UnmarshalState) (
 		}
 		if zb0001 > 0 {
 			zb0001--
-			bts, err = (*z).Msig.UnmarshalMsgWithState(bts, st)
+			bts, err = (*z).SignatureFields.Msig.UnmarshalMsgWithState(bts, st)
 			if err != nil {
 				err = msgp.WrapError(err, "struct-from-array", "Msig")
 				return
@@ -6661,7 +6661,7 @@ func (z *SponsorSig) UnmarshalMsgWithState(bts []byte, st msgp.UnmarshalState) (
 		}
 		if zb0001 > 0 {
 			zb0001--
-			bts, err = (*z).Lsig.UnmarshalMsgWithState(bts, st)
+			bts, err = (*z).SignatureFields.Lsig.UnmarshalMsgWithState(bts, st)
 			if err != nil {
 				err = msgp.WrapError(err, "struct-from-array", "Lsig")
 				return
@@ -6669,7 +6669,7 @@ func (z *SponsorSig) UnmarshalMsgWithState(bts []byte, st msgp.UnmarshalState) (
 		}
 		if zb0001 > 0 {
 			zb0001--
-			bts, err = (*z).AuthAddr.UnmarshalMsgWithState(bts, st)
+			bts, err = (*z).SignatureFields.AuthAddr.UnmarshalMsgWithState(bts, st)
 			if err != nil {
 				err = msgp.WrapError(err, "struct-from-array", "AuthAddr")
 				return
@@ -6699,25 +6699,25 @@ func (z *SponsorSig) UnmarshalMsgWithState(bts []byte, st msgp.UnmarshalState) (
 			}
 			switch string(field) {
 			case "sig":
-				bts, err = (*z).Sig.UnmarshalMsgWithState(bts, st)
+				bts, err = (*z).SignatureFields.Sig.UnmarshalMsgWithState(bts, st)
 				if err != nil {
 					err = msgp.WrapError(err, "Sig")
 					return
 				}
 			case "msig":
-				bts, err = (*z).Msig.UnmarshalMsgWithState(bts, st)
+				bts, err = (*z).SignatureFields.Msig.UnmarshalMsgWithState(bts, st)
 				if err != nil {
 					err = msgp.WrapError(err, "Msig")
 					return
 				}
 			case "lsig":
-				bts, err = (*z).Lsig.UnmarshalMsgWithState(bts, st)
+				bts, err = (*z).SignatureFields.Lsig.UnmarshalMsgWithState(bts, st)
 				if err != nil {
 					err = msgp.WrapError(err, "Lsig")
 					return
 				}
 			case "sgnr":
-				bts, err = (*z).AuthAddr.UnmarshalMsgWithState(bts, st)
+				bts, err = (*z).SignatureFields.AuthAddr.UnmarshalMsgWithState(bts, st)
 				if err != nil {
 					err = msgp.WrapError(err, "AuthAddr")
 					return
@@ -6745,13 +6745,13 @@ func (_ *SponsorSig) CanUnmarshalMsg(z interface{}) bool {
 
 // Msgsize returns an upper bound estimate of the number of bytes occupied by the serialized message
 func (z *SponsorSig) Msgsize() (s int) {
-	s = 1 + 4 + (*z).Sig.Msgsize() + 5 + (*z).Msig.Msgsize() + 5 + (*z).Lsig.Msgsize() + 5 + (*z).AuthAddr.Msgsize()
+	s = 1 + 4 + (*z).SignatureFields.Sig.Msgsize() + 5 + (*z).SignatureFields.Msig.Msgsize() + 5 + (*z).SignatureFields.Lsig.Msgsize() + 5 + (*z).SignatureFields.AuthAddr.Msgsize()
 	return
 }
 
 // MsgIsZero returns whether this is a zero value
 func (z *SponsorSig) MsgIsZero() bool {
-	return ((*z).Sig.MsgIsZero()) && ((*z).Msig.MsgIsZero()) && ((*z).Lsig.MsgIsZero()) && ((*z).AuthAddr.MsgIsZero())
+	return ((*z).SignatureFields.Sig.MsgIsZero()) && ((*z).SignatureFields.Msig.MsgIsZero()) && ((*z).SignatureFields.Lsig.MsgIsZero()) && ((*z).SignatureFields.AuthAddr.MsgIsZero())
 }
 
 // SponsorSigMaxSize returns a maximum valid message size for this message type

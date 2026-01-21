@@ -238,7 +238,7 @@ func getNumberOfBatchableSigsInTxn(stx *transactions.SignedTxn, groupIndex int) 
 	}
 
 	if stx.IsSponsored() {
-		sponsorSigType, err := checkTxnSigTypeCounts((*transactions.SignatureFields)(&stx.Sponsor), groupIndex)
+		sponsorSigType, err := checkTxnSigTypeCounts(&stx.Sponsor.SignatureFields, groupIndex)
 		if err != nil {
 			return count, err
 		}

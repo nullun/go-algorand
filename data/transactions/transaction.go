@@ -86,10 +86,10 @@ type Header struct {
 	// The Sponsor cannot be the same as Sender.
 	Sponsor basics.Address `codec:"spsr"`
 
-	// Enforcements specifies a list of protocol level requirements or actions
+	// Extras specifies a list of protocol level requirements or actions
 	// that must be adhered to to be considered a valid transaction. Failing an
 	// enforcement is considered invalid transaction.
-	Enforcements []Enforcement `codec:"enf,allocbound=bounds.MaxTxnEnforcements"`
+	Extras []Extra `codec:"xtr,allocbound=bounds.MaxTxnExtras"`
 }
 
 // Transaction describes a transaction that can appear in a block.
@@ -514,7 +514,7 @@ func (tx Transaction) WellFormed(spec SpecialAddresses, proto config.ConsensusPa
 	if !proto.SupportSponsoredFee && (tx.Sponsor != basics.Address{}) {
 		return fmt.Errorf("transaction has Sponsor set but sponsoring not yet enabled")
 	}
-	if !proto.SupportEnforcements && len(tx.Enforcements) > 0 {
+	if !proto.SupportEnforcements && len(tx.Extras) > 0 {
 		return fmt.Errorf("transaction has Enforcements set but enforcements not yet enabled")
 	}
 	return nil

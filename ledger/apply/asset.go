@@ -321,7 +321,7 @@ func AssetTransfer(ct transactions.AssetTransferTxnFields, header transactions.H
 	// This results in the sender (not AssetSender) increasing their own Minimum
 	// Balance Requirement and Opting In the AssetReceiver into to the asset
 	// rather than failing and only if required.
-	if ct.AssetReceiver != header.Sender && slices.Contains(header.Enforcements, transactions.Benefactor) {
+	if ct.AssetReceiver != header.Sender && slices.Contains(header.Extras, transactions.AssetSponsored) {
 		rcvHolding, ok, err := balances.GetAssetHolding(ct.AssetReceiver, ct.XferAsset)
 		if err != nil {
 			return err

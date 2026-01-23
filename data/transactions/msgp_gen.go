@@ -78,16 +78,6 @@ import (
 //    |-----> (*) MsgIsZero
 //    |-----> BoxRefMaxSize()
 //
-// Enforcement
-//      |-----> MarshalMsg
-//      |-----> CanMarshalMsg
-//      |-----> (*) UnmarshalMsg
-//      |-----> (*) UnmarshalMsgWithState
-//      |-----> (*) CanUnmarshalMsg
-//      |-----> Msgsize
-//      |-----> MsgIsZero
-//      |-----> EnforcementMaxSize()
-//
 // EvalDelta
 //     |-----> (*) MarshalMsg
 //     |-----> (*) CanMarshalMsg
@@ -97,6 +87,16 @@ import (
 //     |-----> (*) Msgsize
 //     |-----> (*) MsgIsZero
 //     |-----> EvalDeltaMaxSize()
+//
+// Extra
+//   |-----> MarshalMsg
+//   |-----> CanMarshalMsg
+//   |-----> (*) UnmarshalMsg
+//   |-----> (*) UnmarshalMsgWithState
+//   |-----> (*) CanUnmarshalMsg
+//   |-----> Msgsize
+//   |-----> MsgIsZero
+//   |-----> ExtraMaxSize()
 //
 // Header
 //    |-----> (*) MarshalMsg
@@ -2272,66 +2272,6 @@ func BoxRefMaxSize() (s int) {
 }
 
 // MarshalMsg implements msgp.Marshaler
-func (z Enforcement) MarshalMsg(b []byte) (o []byte) {
-	o = msgp.Require(b, z.Msgsize())
-	o = msgp.AppendUint8(o, uint8(z))
-	return
-}
-
-func (_ Enforcement) CanMarshalMsg(z interface{}) bool {
-	_, ok := (z).(Enforcement)
-	if !ok {
-		_, ok = (z).(*Enforcement)
-	}
-	return ok
-}
-
-// UnmarshalMsg implements msgp.Unmarshaler
-func (z *Enforcement) UnmarshalMsgWithState(bts []byte, st msgp.UnmarshalState) (o []byte, err error) {
-	if st.AllowableDepth == 0 {
-		err = msgp.ErrMaxDepthExceeded{}
-		return
-	}
-	st.AllowableDepth--
-	{
-		var zb0001 uint8
-		zb0001, bts, err = msgp.ReadUint8Bytes(bts)
-		if err != nil {
-			err = msgp.WrapError(err)
-			return
-		}
-		(*z) = Enforcement(zb0001)
-	}
-	o = bts
-	return
-}
-
-func (z *Enforcement) UnmarshalMsg(bts []byte) (o []byte, err error) {
-	return z.UnmarshalMsgWithState(bts, msgp.DefaultUnmarshalState)
-}
-func (_ *Enforcement) CanUnmarshalMsg(z interface{}) bool {
-	_, ok := (z).(*Enforcement)
-	return ok
-}
-
-// Msgsize returns an upper bound estimate of the number of bytes occupied by the serialized message
-func (z Enforcement) Msgsize() (s int) {
-	s = msgp.Uint8Size
-	return
-}
-
-// MsgIsZero returns whether this is a zero value
-func (z Enforcement) MsgIsZero() bool {
-	return z == 0
-}
-
-// EnforcementMaxSize returns a maximum valid message size for this message type
-func EnforcementMaxSize() (s int) {
-	s = msgp.Uint8Size
-	return
-}
-
-// MarshalMsg implements msgp.Marshaler
 func (z *EvalDelta) MarshalMsg(b []byte) (o []byte) {
 	o = msgp.Require(b, z.Msgsize())
 	// omitempty: check for empty values
@@ -2794,56 +2734,116 @@ func EvalDeltaMaxSize() (s int) {
 }
 
 // MarshalMsg implements msgp.Marshaler
+func (z Extra) MarshalMsg(b []byte) (o []byte) {
+	o = msgp.Require(b, z.Msgsize())
+	o = msgp.AppendUint8(o, uint8(z))
+	return
+}
+
+func (_ Extra) CanMarshalMsg(z interface{}) bool {
+	_, ok := (z).(Extra)
+	if !ok {
+		_, ok = (z).(*Extra)
+	}
+	return ok
+}
+
+// UnmarshalMsg implements msgp.Unmarshaler
+func (z *Extra) UnmarshalMsgWithState(bts []byte, st msgp.UnmarshalState) (o []byte, err error) {
+	if st.AllowableDepth == 0 {
+		err = msgp.ErrMaxDepthExceeded{}
+		return
+	}
+	st.AllowableDepth--
+	{
+		var zb0001 uint8
+		zb0001, bts, err = msgp.ReadUint8Bytes(bts)
+		if err != nil {
+			err = msgp.WrapError(err)
+			return
+		}
+		(*z) = Extra(zb0001)
+	}
+	o = bts
+	return
+}
+
+func (z *Extra) UnmarshalMsg(bts []byte) (o []byte, err error) {
+	return z.UnmarshalMsgWithState(bts, msgp.DefaultUnmarshalState)
+}
+func (_ *Extra) CanUnmarshalMsg(z interface{}) bool {
+	_, ok := (z).(*Extra)
+	return ok
+}
+
+// Msgsize returns an upper bound estimate of the number of bytes occupied by the serialized message
+func (z Extra) Msgsize() (s int) {
+	s = msgp.Uint8Size
+	return
+}
+
+// MsgIsZero returns whether this is a zero value
+func (z Extra) MsgIsZero() bool {
+	return z == 0
+}
+
+// ExtraMaxSize returns a maximum valid message size for this message type
+func ExtraMaxSize() (s int) {
+	s = msgp.Uint8Size
+	return
+}
+
+// MarshalMsg implements msgp.Marshaler
 func (z *Header) MarshalMsg(b []byte) (o []byte) {
 	o = msgp.Require(b, z.Msgsize())
 	// omitempty: check for empty values
 	zb0003Len := uint32(12)
 	var zb0003Mask uint16 /* 13 bits */
-	if len((*z).Enforcements) == 0 {
+	if (*z).Fee.MsgIsZero() {
 		zb0003Len--
 		zb0003Mask |= 0x2
 	}
-	if (*z).Fee.MsgIsZero() {
+	if (*z).FirstValid.MsgIsZero() {
 		zb0003Len--
 		zb0003Mask |= 0x4
 	}
-	if (*z).FirstValid.MsgIsZero() {
+	if (*z).GenesisID == "" {
 		zb0003Len--
 		zb0003Mask |= 0x8
 	}
-	if (*z).GenesisID == "" {
+	if (*z).GenesisHash.MsgIsZero() {
 		zb0003Len--
 		zb0003Mask |= 0x10
 	}
-	if (*z).GenesisHash.MsgIsZero() {
+	if (*z).Group.MsgIsZero() {
 		zb0003Len--
 		zb0003Mask |= 0x20
 	}
-	if (*z).Group.MsgIsZero() {
+	if (*z).LastValid.MsgIsZero() {
 		zb0003Len--
 		zb0003Mask |= 0x40
 	}
-	if (*z).LastValid.MsgIsZero() {
+	if (*z).Lease == ([32]byte{}) {
 		zb0003Len--
 		zb0003Mask |= 0x80
 	}
-	if (*z).Lease == ([32]byte{}) {
+	if len((*z).Note) == 0 {
 		zb0003Len--
 		zb0003Mask |= 0x100
 	}
-	if len((*z).Note) == 0 {
+	if (*z).RekeyTo.MsgIsZero() {
 		zb0003Len--
 		zb0003Mask |= 0x200
 	}
-	if (*z).RekeyTo.MsgIsZero() {
+	if (*z).Sender.MsgIsZero() {
 		zb0003Len--
 		zb0003Mask |= 0x400
 	}
-	if (*z).Sender.MsgIsZero() {
+	if (*z).Sponsor.MsgIsZero() {
 		zb0003Len--
 		zb0003Mask |= 0x800
 	}
-	if (*z).Sponsor.MsgIsZero() {
+	if len((*z).Extras) == 0 {
 		zb0003Len--
 		zb0003Mask |= 0x1000
 	}
@@ -2851,71 +2851,71 @@ func (z *Header) MarshalMsg(b []byte) (o []byte) {
 	o = append(o, 0x80|uint8(zb0003Len))
 	if zb0003Len != 0 {
 		if (zb0003Mask & 0x2) == 0 { // if not empty
-			// string "enf"
-			o = append(o, 0xa3, 0x65, 0x6e, 0x66)
-			if (*z).Enforcements == nil {
-				o = msgp.AppendNil(o)
-			} else {
-				o = msgp.AppendArrayHeader(o, uint32(len((*z).Enforcements)))
-			}
-			for zb0002 := range (*z).Enforcements {
-				o = msgp.AppendUint8(o, uint8((*z).Enforcements[zb0002]))
-			}
-		}
-		if (zb0003Mask & 0x4) == 0 { // if not empty
 			// string "fee"
 			o = append(o, 0xa3, 0x66, 0x65, 0x65)
 			o = (*z).Fee.MarshalMsg(o)
 		}
-		if (zb0003Mask & 0x8) == 0 { // if not empty
+		if (zb0003Mask & 0x4) == 0 { // if not empty
 			// string "fv"
 			o = append(o, 0xa2, 0x66, 0x76)
 			o = (*z).FirstValid.MarshalMsg(o)
 		}
-		if (zb0003Mask & 0x10) == 0 { // if not empty
+		if (zb0003Mask & 0x8) == 0 { // if not empty
 			// string "gen"
 			o = append(o, 0xa3, 0x67, 0x65, 0x6e)
 			o = msgp.AppendString(o, (*z).GenesisID)
 		}
-		if (zb0003Mask & 0x20) == 0 { // if not empty
+		if (zb0003Mask & 0x10) == 0 { // if not empty
 			// string "gh"
 			o = append(o, 0xa2, 0x67, 0x68)
 			o = (*z).GenesisHash.MarshalMsg(o)
 		}
-		if (zb0003Mask & 0x40) == 0 { // if not empty
+		if (zb0003Mask & 0x20) == 0 { // if not empty
 			// string "grp"
 			o = append(o, 0xa3, 0x67, 0x72, 0x70)
 			o = (*z).Group.MarshalMsg(o)
 		}
-		if (zb0003Mask & 0x80) == 0 { // if not empty
+		if (zb0003Mask & 0x40) == 0 { // if not empty
 			// string "lv"
 			o = append(o, 0xa2, 0x6c, 0x76)
 			o = (*z).LastValid.MarshalMsg(o)
 		}
-		if (zb0003Mask & 0x100) == 0 { // if not empty
+		if (zb0003Mask & 0x80) == 0 { // if not empty
 			// string "lx"
 			o = append(o, 0xa2, 0x6c, 0x78)
 			o = msgp.AppendBytes(o, ((*z).Lease)[:])
 		}
-		if (zb0003Mask & 0x200) == 0 { // if not empty
+		if (zb0003Mask & 0x100) == 0 { // if not empty
 			// string "note"
 			o = append(o, 0xa4, 0x6e, 0x6f, 0x74, 0x65)
 			o = msgp.AppendBytes(o, (*z).Note)
 		}
-		if (zb0003Mask & 0x400) == 0 { // if not empty
+		if (zb0003Mask & 0x200) == 0 { // if not empty
 			// string "rekey"
 			o = append(o, 0xa5, 0x72, 0x65, 0x6b, 0x65, 0x79)
 			o = (*z).RekeyTo.MarshalMsg(o)
 		}
-		if (zb0003Mask & 0x800) == 0 { // if not empty
+		if (zb0003Mask & 0x400) == 0 { // if not empty
 			// string "snd"
 			o = append(o, 0xa3, 0x73, 0x6e, 0x64)
 			o = (*z).Sender.MarshalMsg(o)
 		}
-		if (zb0003Mask & 0x1000) == 0 { // if not empty
+		if (zb0003Mask & 0x800) == 0 { // if not empty
 			// string "spsr"
 			o = append(o, 0xa4, 0x73, 0x70, 0x73, 0x72)
 			o = (*z).Sponsor.MarshalMsg(o)
+		}
+		if (zb0003Mask & 0x1000) == 0 { // if not empty
+			// string "xtr"
+			o = append(o, 0xa3, 0x78, 0x74, 0x72)
+			if (*z).Extras == nil {
+				o = msgp.AppendNil(o)
+			} else {
+				o = msgp.AppendArrayHeader(o, uint32(len((*z).Extras)))
+			}
+			for zb0002 := range (*z).Extras {
+				o = msgp.AppendUint8(o, uint8((*z).Extras[zb0002]))
+			}
 		}
 	}
 	return
@@ -3058,30 +3058,30 @@ func (z *Header) UnmarshalMsgWithState(bts []byte, st msgp.UnmarshalState) (o []
 			var zb0008 bool
 			zb0007, zb0008, bts, err = msgp.ReadArrayHeaderBytes(bts)
 			if err != nil {
-				err = msgp.WrapError(err, "struct-from-array", "Enforcements")
+				err = msgp.WrapError(err, "struct-from-array", "Extras")
 				return
 			}
-			if zb0007 > bounds.MaxTxnEnforcements {
-				err = msgp.ErrOverflow(uint64(zb0007), uint64(bounds.MaxTxnEnforcements))
-				err = msgp.WrapError(err, "struct-from-array", "Enforcements")
+			if zb0007 > bounds.MaxTxnExtras {
+				err = msgp.ErrOverflow(uint64(zb0007), uint64(bounds.MaxTxnExtras))
+				err = msgp.WrapError(err, "struct-from-array", "Extras")
 				return
 			}
 			if zb0008 {
-				(*z).Enforcements = nil
-			} else if (*z).Enforcements != nil && cap((*z).Enforcements) >= zb0007 {
-				(*z).Enforcements = ((*z).Enforcements)[:zb0007]
+				(*z).Extras = nil
+			} else if (*z).Extras != nil && cap((*z).Extras) >= zb0007 {
+				(*z).Extras = ((*z).Extras)[:zb0007]
 			} else {
-				(*z).Enforcements = make([]Enforcement, zb0007)
+				(*z).Extras = make([]Extra, zb0007)
 			}
-			for zb0002 := range (*z).Enforcements {
+			for zb0002 := range (*z).Extras {
 				{
 					var zb0009 uint8
 					zb0009, bts, err = msgp.ReadUint8Bytes(bts)
 					if err != nil {
-						err = msgp.WrapError(err, "struct-from-array", "Enforcements", zb0002)
+						err = msgp.WrapError(err, "struct-from-array", "Extras", zb0002)
 						return
 					}
-					(*z).Enforcements[zb0002] = Enforcement(zb0009)
+					(*z).Extras[zb0002] = Extra(zb0009)
 				}
 			}
 		}
@@ -3194,35 +3194,35 @@ func (z *Header) UnmarshalMsgWithState(bts []byte, st msgp.UnmarshalState) (o []
 					err = msgp.WrapError(err, "Sponsor")
 					return
 				}
-			case "enf":
+			case "xtr":
 				var zb0012 int
 				var zb0013 bool
 				zb0012, zb0013, bts, err = msgp.ReadArrayHeaderBytes(bts)
 				if err != nil {
-					err = msgp.WrapError(err, "Enforcements")
+					err = msgp.WrapError(err, "Extras")
 					return
 				}
-				if zb0012 > bounds.MaxTxnEnforcements {
-					err = msgp.ErrOverflow(uint64(zb0012), uint64(bounds.MaxTxnEnforcements))
-					err = msgp.WrapError(err, "Enforcements")
+				if zb0012 > bounds.MaxTxnExtras {
+					err = msgp.ErrOverflow(uint64(zb0012), uint64(bounds.MaxTxnExtras))
+					err = msgp.WrapError(err, "Extras")
 					return
 				}
 				if zb0013 {
-					(*z).Enforcements = nil
-				} else if (*z).Enforcements != nil && cap((*z).Enforcements) >= zb0012 {
-					(*z).Enforcements = ((*z).Enforcements)[:zb0012]
+					(*z).Extras = nil
+				} else if (*z).Extras != nil && cap((*z).Extras) >= zb0012 {
+					(*z).Extras = ((*z).Extras)[:zb0012]
 				} else {
-					(*z).Enforcements = make([]Enforcement, zb0012)
+					(*z).Extras = make([]Extra, zb0012)
 				}
-				for zb0002 := range (*z).Enforcements {
+				for zb0002 := range (*z).Extras {
 					{
 						var zb0014 uint8
 						zb0014, bts, err = msgp.ReadUint8Bytes(bts)
 						if err != nil {
-							err = msgp.WrapError(err, "Enforcements", zb0002)
+							err = msgp.WrapError(err, "Extras", zb0002)
 							return
 						}
-						(*z).Enforcements[zb0002] = Enforcement(zb0014)
+						(*z).Extras[zb0002] = Extra(zb0014)
 					}
 				}
 			default:
@@ -3248,13 +3248,13 @@ func (_ *Header) CanUnmarshalMsg(z interface{}) bool {
 
 // Msgsize returns an upper bound estimate of the number of bytes occupied by the serialized message
 func (z *Header) Msgsize() (s int) {
-	s = 1 + 4 + (*z).Sender.Msgsize() + 4 + (*z).Fee.Msgsize() + 3 + (*z).FirstValid.Msgsize() + 3 + (*z).LastValid.Msgsize() + 5 + msgp.BytesPrefixSize + len((*z).Note) + 4 + msgp.StringPrefixSize + len((*z).GenesisID) + 3 + (*z).GenesisHash.Msgsize() + 4 + (*z).Group.Msgsize() + 3 + msgp.ArrayHeaderSize + (32 * (msgp.ByteSize)) + 6 + (*z).RekeyTo.Msgsize() + 5 + (*z).Sponsor.Msgsize() + 4 + msgp.ArrayHeaderSize + (len((*z).Enforcements) * (msgp.Uint8Size))
+	s = 1 + 4 + (*z).Sender.Msgsize() + 4 + (*z).Fee.Msgsize() + 3 + (*z).FirstValid.Msgsize() + 3 + (*z).LastValid.Msgsize() + 5 + msgp.BytesPrefixSize + len((*z).Note) + 4 + msgp.StringPrefixSize + len((*z).GenesisID) + 3 + (*z).GenesisHash.Msgsize() + 4 + (*z).Group.Msgsize() + 3 + msgp.ArrayHeaderSize + (32 * (msgp.ByteSize)) + 6 + (*z).RekeyTo.Msgsize() + 5 + (*z).Sponsor.Msgsize() + 4 + msgp.ArrayHeaderSize + (len((*z).Extras) * (msgp.Uint8Size))
 	return
 }
 
 // MsgIsZero returns whether this is a zero value
 func (z *Header) MsgIsZero() bool {
-	return ((*z).Sender.MsgIsZero()) && ((*z).Fee.MsgIsZero()) && ((*z).FirstValid.MsgIsZero()) && ((*z).LastValid.MsgIsZero()) && (len((*z).Note) == 0) && ((*z).GenesisID == "") && ((*z).GenesisHash.MsgIsZero()) && ((*z).Group.MsgIsZero()) && ((*z).Lease == ([32]byte{})) && ((*z).RekeyTo.MsgIsZero()) && ((*z).Sponsor.MsgIsZero()) && (len((*z).Enforcements) == 0)
+	return ((*z).Sender.MsgIsZero()) && ((*z).Fee.MsgIsZero()) && ((*z).FirstValid.MsgIsZero()) && ((*z).LastValid.MsgIsZero()) && (len((*z).Note) == 0) && ((*z).GenesisID == "") && ((*z).GenesisHash.MsgIsZero()) && ((*z).Group.MsgIsZero()) && ((*z).Lease == ([32]byte{})) && ((*z).RekeyTo.MsgIsZero()) && ((*z).Sponsor.MsgIsZero()) && (len((*z).Extras) == 0)
 }
 
 // HeaderMaxSize returns a maximum valid message size for this message type
@@ -3263,8 +3263,8 @@ func HeaderMaxSize() (s int) {
 	// Calculating size of array: z.Lease
 	s += msgp.ArrayHeaderSize + ((32) * (msgp.ByteSize))
 	s += 6 + basics.AddressMaxSize() + 5 + basics.AddressMaxSize() + 4
-	// Calculating size of slice: z.Enforcements
-	s += msgp.ArrayHeaderSize + ((bounds.MaxTxnEnforcements) * (msgp.Uint8Size))
+	// Calculating size of slice: z.Extras
+	s += msgp.ArrayHeaderSize + ((bounds.MaxTxnExtras) * (msgp.Uint8Size))
 	return
 }
 
@@ -7176,115 +7176,115 @@ func (z *Transaction) MarshalMsg(b []byte) (o []byte) {
 		zb0009Len--
 		zb0009Mask |= 0x80000000
 	}
-	if len((*z).Header.Enforcements) == 0 {
+	if (*z).AssetFreezeTxnFields.FreezeAccount.MsgIsZero() {
 		zb0009Len--
 		zb0009Mask |= 0x100000000
 	}
-	if (*z).AssetFreezeTxnFields.FreezeAccount.MsgIsZero() {
+	if (*z).AssetFreezeTxnFields.FreezeAsset.MsgIsZero() {
 		zb0009Len--
 		zb0009Mask |= 0x200000000
 	}
-	if (*z).AssetFreezeTxnFields.FreezeAsset.MsgIsZero() {
+	if (*z).Header.Fee.MsgIsZero() {
 		zb0009Len--
 		zb0009Mask |= 0x400000000
 	}
-	if (*z).Header.Fee.MsgIsZero() {
+	if (*z).Header.FirstValid.MsgIsZero() {
 		zb0009Len--
 		zb0009Mask |= 0x800000000
 	}
-	if (*z).Header.FirstValid.MsgIsZero() {
+	if (*z).Header.GenesisID == "" {
 		zb0009Len--
 		zb0009Mask |= 0x1000000000
 	}
-	if (*z).Header.GenesisID == "" {
+	if (*z).Header.GenesisHash.MsgIsZero() {
 		zb0009Len--
 		zb0009Mask |= 0x2000000000
 	}
-	if (*z).Header.GenesisHash.MsgIsZero() {
+	if (*z).Header.Group.MsgIsZero() {
 		zb0009Len--
 		zb0009Mask |= 0x4000000000
 	}
-	if (*z).Header.Group.MsgIsZero() {
+	if (*z).HeartbeatTxnFields == nil {
 		zb0009Len--
 		zb0009Mask |= 0x8000000000
 	}
-	if (*z).HeartbeatTxnFields == nil {
+	if (*z).Header.LastValid.MsgIsZero() {
 		zb0009Len--
 		zb0009Mask |= 0x10000000000
 	}
-	if (*z).Header.LastValid.MsgIsZero() {
+	if (*z).Header.Lease == ([32]byte{}) {
 		zb0009Len--
 		zb0009Mask |= 0x20000000000
 	}
-	if (*z).Header.Lease == ([32]byte{}) {
+	if (*z).KeyregTxnFields.Nonparticipation == false {
 		zb0009Len--
 		zb0009Mask |= 0x40000000000
 	}
-	if (*z).KeyregTxnFields.Nonparticipation == false {
+	if len((*z).Header.Note) == 0 {
 		zb0009Len--
 		zb0009Mask |= 0x80000000000
 	}
-	if len((*z).Header.Note) == 0 {
+	if (*z).PaymentTxnFields.Receiver.MsgIsZero() {
 		zb0009Len--
 		zb0009Mask |= 0x100000000000
 	}
-	if (*z).PaymentTxnFields.Receiver.MsgIsZero() {
+	if (*z).Header.RekeyTo.MsgIsZero() {
 		zb0009Len--
 		zb0009Mask |= 0x200000000000
 	}
-	if (*z).Header.RekeyTo.MsgIsZero() {
+	if (*z).KeyregTxnFields.SelectionPK.MsgIsZero() {
 		zb0009Len--
 		zb0009Mask |= 0x400000000000
 	}
-	if (*z).KeyregTxnFields.SelectionPK.MsgIsZero() {
+	if (*z).Header.Sender.MsgIsZero() {
 		zb0009Len--
 		zb0009Mask |= 0x800000000000
 	}
-	if (*z).Header.Sender.MsgIsZero() {
+	if (*z).StateProofTxnFields.StateProof.MsgIsZero() {
 		zb0009Len--
 		zb0009Mask |= 0x1000000000000
 	}
-	if (*z).StateProofTxnFields.StateProof.MsgIsZero() {
+	if (*z).StateProofTxnFields.Message.MsgIsZero() {
 		zb0009Len--
 		zb0009Mask |= 0x2000000000000
 	}
-	if (*z).StateProofTxnFields.Message.MsgIsZero() {
+	if (*z).KeyregTxnFields.StateProofPK.MsgIsZero() {
 		zb0009Len--
 		zb0009Mask |= 0x4000000000000
 	}
-	if (*z).KeyregTxnFields.StateProofPK.MsgIsZero() {
+	if (*z).Header.Sponsor.MsgIsZero() {
 		zb0009Len--
 		zb0009Mask |= 0x8000000000000
 	}
-	if (*z).Header.Sponsor.MsgIsZero() {
+	if (*z).StateProofTxnFields.StateProofType.MsgIsZero() {
 		zb0009Len--
 		zb0009Mask |= 0x10000000000000
 	}
-	if (*z).StateProofTxnFields.StateProofType.MsgIsZero() {
+	if (*z).Type.MsgIsZero() {
 		zb0009Len--
 		zb0009Mask |= 0x20000000000000
 	}
-	if (*z).Type.MsgIsZero() {
+	if (*z).KeyregTxnFields.VoteFirst.MsgIsZero() {
 		zb0009Len--
 		zb0009Mask |= 0x40000000000000
 	}
-	if (*z).KeyregTxnFields.VoteFirst.MsgIsZero() {
+	if (*z).KeyregTxnFields.VoteKeyDilution == 0 {
 		zb0009Len--
 		zb0009Mask |= 0x80000000000000
 	}
-	if (*z).KeyregTxnFields.VoteKeyDilution == 0 {
+	if (*z).KeyregTxnFields.VotePK.MsgIsZero() {
 		zb0009Len--
 		zb0009Mask |= 0x100000000000000
 	}
-	if (*z).KeyregTxnFields.VotePK.MsgIsZero() {
+	if (*z).KeyregTxnFields.VoteLast.MsgIsZero() {
 		zb0009Len--
 		zb0009Mask |= 0x200000000000000
 	}
-	if (*z).KeyregTxnFields.VoteLast.MsgIsZero() {
+	if (*z).AssetTransferTxnFields.XferAsset.MsgIsZero() {
 		zb0009Len--
 		zb0009Mask |= 0x400000000000000
 	}
-	if (*z).AssetTransferTxnFields.XferAsset.MsgIsZero() {
+	if len((*z).Header.Extras) == 0 {
 		zb0009Len--
 		zb0009Mask |= 0x800000000000000
 	}
@@ -7471,53 +7471,41 @@ func (z *Transaction) MarshalMsg(b []byte) (o []byte) {
 			o = (*z).PaymentTxnFields.CloseRemainderTo.MarshalMsg(o)
 		}
 		if (zb0009Mask & 0x100000000) == 0 { // if not empty
-			// string "enf"
-			o = append(o, 0xa3, 0x65, 0x6e, 0x66)
-			if (*z).Header.Enforcements == nil {
-				o = msgp.AppendNil(o)
-			} else {
-				o = msgp.AppendArrayHeader(o, uint32(len((*z).Header.Enforcements)))
-			}
-			for zb0002 := range (*z).Header.Enforcements {
-				o = msgp.AppendUint8(o, uint8((*z).Header.Enforcements[zb0002]))
-			}
-		}
-		if (zb0009Mask & 0x200000000) == 0 { // if not empty
 			// string "fadd"
 			o = append(o, 0xa4, 0x66, 0x61, 0x64, 0x64)
 			o = (*z).AssetFreezeTxnFields.FreezeAccount.MarshalMsg(o)
 		}
-		if (zb0009Mask & 0x400000000) == 0 { // if not empty
+		if (zb0009Mask & 0x200000000) == 0 { // if not empty
 			// string "faid"
 			o = append(o, 0xa4, 0x66, 0x61, 0x69, 0x64)
 			o = (*z).AssetFreezeTxnFields.FreezeAsset.MarshalMsg(o)
 		}
-		if (zb0009Mask & 0x800000000) == 0 { // if not empty
+		if (zb0009Mask & 0x400000000) == 0 { // if not empty
 			// string "fee"
 			o = append(o, 0xa3, 0x66, 0x65, 0x65)
 			o = (*z).Header.Fee.MarshalMsg(o)
 		}
-		if (zb0009Mask & 0x1000000000) == 0 { // if not empty
+		if (zb0009Mask & 0x800000000) == 0 { // if not empty
 			// string "fv"
 			o = append(o, 0xa2, 0x66, 0x76)
 			o = (*z).Header.FirstValid.MarshalMsg(o)
 		}
-		if (zb0009Mask & 0x2000000000) == 0 { // if not empty
+		if (zb0009Mask & 0x1000000000) == 0 { // if not empty
 			// string "gen"
 			o = append(o, 0xa3, 0x67, 0x65, 0x6e)
 			o = msgp.AppendString(o, (*z).Header.GenesisID)
 		}
-		if (zb0009Mask & 0x4000000000) == 0 { // if not empty
+		if (zb0009Mask & 0x2000000000) == 0 { // if not empty
 			// string "gh"
 			o = append(o, 0xa2, 0x67, 0x68)
 			o = (*z).Header.GenesisHash.MarshalMsg(o)
 		}
-		if (zb0009Mask & 0x8000000000) == 0 { // if not empty
+		if (zb0009Mask & 0x4000000000) == 0 { // if not empty
 			// string "grp"
 			o = append(o, 0xa3, 0x67, 0x72, 0x70)
 			o = (*z).Header.Group.MarshalMsg(o)
 		}
-		if (zb0009Mask & 0x10000000000) == 0 { // if not empty
+		if (zb0009Mask & 0x8000000000) == 0 { // if not empty
 			// string "hb"
 			o = append(o, 0xa2, 0x68, 0x62)
 			if (*z).HeartbeatTxnFields == nil {
@@ -7526,100 +7514,112 @@ func (z *Transaction) MarshalMsg(b []byte) (o []byte) {
 				o = (*z).HeartbeatTxnFields.MarshalMsg(o)
 			}
 		}
-		if (zb0009Mask & 0x20000000000) == 0 { // if not empty
+		if (zb0009Mask & 0x10000000000) == 0 { // if not empty
 			// string "lv"
 			o = append(o, 0xa2, 0x6c, 0x76)
 			o = (*z).Header.LastValid.MarshalMsg(o)
 		}
-		if (zb0009Mask & 0x40000000000) == 0 { // if not empty
+		if (zb0009Mask & 0x20000000000) == 0 { // if not empty
 			// string "lx"
 			o = append(o, 0xa2, 0x6c, 0x78)
 			o = msgp.AppendBytes(o, ((*z).Header.Lease)[:])
 		}
-		if (zb0009Mask & 0x80000000000) == 0 { // if not empty
+		if (zb0009Mask & 0x40000000000) == 0 { // if not empty
 			// string "nonpart"
 			o = append(o, 0xa7, 0x6e, 0x6f, 0x6e, 0x70, 0x61, 0x72, 0x74)
 			o = msgp.AppendBool(o, (*z).KeyregTxnFields.Nonparticipation)
 		}
-		if (zb0009Mask & 0x100000000000) == 0 { // if not empty
+		if (zb0009Mask & 0x80000000000) == 0 { // if not empty
 			// string "note"
 			o = append(o, 0xa4, 0x6e, 0x6f, 0x74, 0x65)
 			o = msgp.AppendBytes(o, (*z).Header.Note)
 		}
-		if (zb0009Mask & 0x200000000000) == 0 { // if not empty
+		if (zb0009Mask & 0x100000000000) == 0 { // if not empty
 			// string "rcv"
 			o = append(o, 0xa3, 0x72, 0x63, 0x76)
 			o = (*z).PaymentTxnFields.Receiver.MarshalMsg(o)
 		}
-		if (zb0009Mask & 0x400000000000) == 0 { // if not empty
+		if (zb0009Mask & 0x200000000000) == 0 { // if not empty
 			// string "rekey"
 			o = append(o, 0xa5, 0x72, 0x65, 0x6b, 0x65, 0x79)
 			o = (*z).Header.RekeyTo.MarshalMsg(o)
 		}
-		if (zb0009Mask & 0x800000000000) == 0 { // if not empty
+		if (zb0009Mask & 0x400000000000) == 0 { // if not empty
 			// string "selkey"
 			o = append(o, 0xa6, 0x73, 0x65, 0x6c, 0x6b, 0x65, 0x79)
 			o = (*z).KeyregTxnFields.SelectionPK.MarshalMsg(o)
 		}
-		if (zb0009Mask & 0x1000000000000) == 0 { // if not empty
+		if (zb0009Mask & 0x800000000000) == 0 { // if not empty
 			// string "snd"
 			o = append(o, 0xa3, 0x73, 0x6e, 0x64)
 			o = (*z).Header.Sender.MarshalMsg(o)
 		}
-		if (zb0009Mask & 0x2000000000000) == 0 { // if not empty
+		if (zb0009Mask & 0x1000000000000) == 0 { // if not empty
 			// string "sp"
 			o = append(o, 0xa2, 0x73, 0x70)
 			o = (*z).StateProofTxnFields.StateProof.MarshalMsg(o)
 		}
-		if (zb0009Mask & 0x4000000000000) == 0 { // if not empty
+		if (zb0009Mask & 0x2000000000000) == 0 { // if not empty
 			// string "spmsg"
 			o = append(o, 0xa5, 0x73, 0x70, 0x6d, 0x73, 0x67)
 			o = (*z).StateProofTxnFields.Message.MarshalMsg(o)
 		}
-		if (zb0009Mask & 0x8000000000000) == 0 { // if not empty
+		if (zb0009Mask & 0x4000000000000) == 0 { // if not empty
 			// string "sprfkey"
 			o = append(o, 0xa7, 0x73, 0x70, 0x72, 0x66, 0x6b, 0x65, 0x79)
 			o = (*z).KeyregTxnFields.StateProofPK.MarshalMsg(o)
 		}
-		if (zb0009Mask & 0x10000000000000) == 0 { // if not empty
+		if (zb0009Mask & 0x8000000000000) == 0 { // if not empty
 			// string "spsr"
 			o = append(o, 0xa4, 0x73, 0x70, 0x73, 0x72)
 			o = (*z).Header.Sponsor.MarshalMsg(o)
 		}
-		if (zb0009Mask & 0x20000000000000) == 0 { // if not empty
+		if (zb0009Mask & 0x10000000000000) == 0 { // if not empty
 			// string "sptype"
 			o = append(o, 0xa6, 0x73, 0x70, 0x74, 0x79, 0x70, 0x65)
 			o = (*z).StateProofTxnFields.StateProofType.MarshalMsg(o)
 		}
-		if (zb0009Mask & 0x40000000000000) == 0 { // if not empty
+		if (zb0009Mask & 0x20000000000000) == 0 { // if not empty
 			// string "type"
 			o = append(o, 0xa4, 0x74, 0x79, 0x70, 0x65)
 			o = (*z).Type.MarshalMsg(o)
 		}
-		if (zb0009Mask & 0x80000000000000) == 0 { // if not empty
+		if (zb0009Mask & 0x40000000000000) == 0 { // if not empty
 			// string "votefst"
 			o = append(o, 0xa7, 0x76, 0x6f, 0x74, 0x65, 0x66, 0x73, 0x74)
 			o = (*z).KeyregTxnFields.VoteFirst.MarshalMsg(o)
 		}
-		if (zb0009Mask & 0x100000000000000) == 0 { // if not empty
+		if (zb0009Mask & 0x80000000000000) == 0 { // if not empty
 			// string "votekd"
 			o = append(o, 0xa6, 0x76, 0x6f, 0x74, 0x65, 0x6b, 0x64)
 			o = msgp.AppendUint64(o, (*z).KeyregTxnFields.VoteKeyDilution)
 		}
-		if (zb0009Mask & 0x200000000000000) == 0 { // if not empty
+		if (zb0009Mask & 0x100000000000000) == 0 { // if not empty
 			// string "votekey"
 			o = append(o, 0xa7, 0x76, 0x6f, 0x74, 0x65, 0x6b, 0x65, 0x79)
 			o = (*z).KeyregTxnFields.VotePK.MarshalMsg(o)
 		}
-		if (zb0009Mask & 0x400000000000000) == 0 { // if not empty
+		if (zb0009Mask & 0x200000000000000) == 0 { // if not empty
 			// string "votelst"
 			o = append(o, 0xa7, 0x76, 0x6f, 0x74, 0x65, 0x6c, 0x73, 0x74)
 			o = (*z).KeyregTxnFields.VoteLast.MarshalMsg(o)
 		}
-		if (zb0009Mask & 0x800000000000000) == 0 { // if not empty
+		if (zb0009Mask & 0x400000000000000) == 0 { // if not empty
 			// string "xaid"
 			o = append(o, 0xa4, 0x78, 0x61, 0x69, 0x64)
 			o = (*z).AssetTransferTxnFields.XferAsset.MarshalMsg(o)
+		}
+		if (zb0009Mask & 0x800000000000000) == 0 { // if not empty
+			// string "xtr"
+			o = append(o, 0xa3, 0x78, 0x74, 0x72)
+			if (*z).Header.Extras == nil {
+				o = msgp.AppendNil(o)
+			} else {
+				o = msgp.AppendArrayHeader(o, uint32(len((*z).Header.Extras)))
+			}
+			for zb0002 := range (*z).Header.Extras {
+				o = msgp.AppendUint8(o, uint8((*z).Header.Extras[zb0002]))
+			}
 		}
 	}
 	return
@@ -7770,30 +7770,30 @@ func (z *Transaction) UnmarshalMsgWithState(bts []byte, st msgp.UnmarshalState) 
 			var zb0014 bool
 			zb0013, zb0014, bts, err = msgp.ReadArrayHeaderBytes(bts)
 			if err != nil {
-				err = msgp.WrapError(err, "struct-from-array", "Enforcements")
+				err = msgp.WrapError(err, "struct-from-array", "Extras")
 				return
 			}
-			if zb0013 > bounds.MaxTxnEnforcements {
-				err = msgp.ErrOverflow(uint64(zb0013), uint64(bounds.MaxTxnEnforcements))
-				err = msgp.WrapError(err, "struct-from-array", "Enforcements")
+			if zb0013 > bounds.MaxTxnExtras {
+				err = msgp.ErrOverflow(uint64(zb0013), uint64(bounds.MaxTxnExtras))
+				err = msgp.WrapError(err, "struct-from-array", "Extras")
 				return
 			}
 			if zb0014 {
-				(*z).Header.Enforcements = nil
-			} else if (*z).Header.Enforcements != nil && cap((*z).Header.Enforcements) >= zb0013 {
-				(*z).Header.Enforcements = ((*z).Header.Enforcements)[:zb0013]
+				(*z).Header.Extras = nil
+			} else if (*z).Header.Extras != nil && cap((*z).Header.Extras) >= zb0013 {
+				(*z).Header.Extras = ((*z).Header.Extras)[:zb0013]
 			} else {
-				(*z).Header.Enforcements = make([]Enforcement, zb0013)
+				(*z).Header.Extras = make([]Extra, zb0013)
 			}
-			for zb0002 := range (*z).Header.Enforcements {
+			for zb0002 := range (*z).Header.Extras {
 				{
 					var zb0015 uint8
 					zb0015, bts, err = msgp.ReadUint8Bytes(bts)
 					if err != nil {
-						err = msgp.WrapError(err, "struct-from-array", "Enforcements", zb0002)
+						err = msgp.WrapError(err, "struct-from-array", "Extras", zb0002)
 						return
 					}
-					(*z).Header.Enforcements[zb0002] = Enforcement(zb0015)
+					(*z).Header.Extras[zb0002] = Extra(zb0015)
 				}
 			}
 		}
@@ -8461,35 +8461,35 @@ func (z *Transaction) UnmarshalMsgWithState(bts []byte, st msgp.UnmarshalState) 
 					err = msgp.WrapError(err, "Sponsor")
 					return
 				}
-			case "enf":
+			case "xtr":
 				var zb0037 int
 				var zb0038 bool
 				zb0037, zb0038, bts, err = msgp.ReadArrayHeaderBytes(bts)
 				if err != nil {
-					err = msgp.WrapError(err, "Enforcements")
+					err = msgp.WrapError(err, "Extras")
 					return
 				}
-				if zb0037 > bounds.MaxTxnEnforcements {
-					err = msgp.ErrOverflow(uint64(zb0037), uint64(bounds.MaxTxnEnforcements))
-					err = msgp.WrapError(err, "Enforcements")
+				if zb0037 > bounds.MaxTxnExtras {
+					err = msgp.ErrOverflow(uint64(zb0037), uint64(bounds.MaxTxnExtras))
+					err = msgp.WrapError(err, "Extras")
 					return
 				}
 				if zb0038 {
-					(*z).Header.Enforcements = nil
-				} else if (*z).Header.Enforcements != nil && cap((*z).Header.Enforcements) >= zb0037 {
-					(*z).Header.Enforcements = ((*z).Header.Enforcements)[:zb0037]
+					(*z).Header.Extras = nil
+				} else if (*z).Header.Extras != nil && cap((*z).Header.Extras) >= zb0037 {
+					(*z).Header.Extras = ((*z).Header.Extras)[:zb0037]
 				} else {
-					(*z).Header.Enforcements = make([]Enforcement, zb0037)
+					(*z).Header.Extras = make([]Extra, zb0037)
 				}
-				for zb0002 := range (*z).Header.Enforcements {
+				for zb0002 := range (*z).Header.Extras {
 					{
 						var zb0039 uint8
 						zb0039, bts, err = msgp.ReadUint8Bytes(bts)
 						if err != nil {
-							err = msgp.WrapError(err, "Enforcements", zb0002)
+							err = msgp.WrapError(err, "Extras", zb0002)
 							return
 						}
-						(*z).Header.Enforcements[zb0002] = Enforcement(zb0039)
+						(*z).Header.Extras[zb0002] = Extra(zb0039)
 					}
 				}
 			case "votekey":
@@ -8988,7 +8988,7 @@ func (_ *Transaction) CanUnmarshalMsg(z interface{}) bool {
 
 // Msgsize returns an upper bound estimate of the number of bytes occupied by the serialized message
 func (z *Transaction) Msgsize() (s int) {
-	s = 3 + 5 + (*z).Type.Msgsize() + 4 + (*z).Header.Sender.Msgsize() + 4 + (*z).Header.Fee.Msgsize() + 3 + (*z).Header.FirstValid.Msgsize() + 3 + (*z).Header.LastValid.Msgsize() + 5 + msgp.BytesPrefixSize + len((*z).Header.Note) + 4 + msgp.StringPrefixSize + len((*z).Header.GenesisID) + 3 + (*z).Header.GenesisHash.Msgsize() + 4 + (*z).Header.Group.Msgsize() + 3 + msgp.ArrayHeaderSize + (32 * (msgp.ByteSize)) + 6 + (*z).Header.RekeyTo.Msgsize() + 5 + (*z).Header.Sponsor.Msgsize() + 4 + msgp.ArrayHeaderSize + (len((*z).Header.Enforcements) * (msgp.Uint8Size)) + 8 + (*z).KeyregTxnFields.VotePK.Msgsize() + 7 + (*z).KeyregTxnFields.SelectionPK.Msgsize() + 8 + (*z).KeyregTxnFields.StateProofPK.Msgsize() + 8 + (*z).KeyregTxnFields.VoteFirst.Msgsize() + 8 + (*z).KeyregTxnFields.VoteLast.Msgsize() + 7 + msgp.Uint64Size + 8 + msgp.BoolSize + 4 + (*z).PaymentTxnFields.Receiver.Msgsize() + 4 + (*z).PaymentTxnFields.Amount.Msgsize() + 6 + (*z).PaymentTxnFields.CloseRemainderTo.Msgsize() + 5 + (*z).AssetConfigTxnFields.ConfigAsset.Msgsize() + 5 + (*z).AssetConfigTxnFields.AssetParams.Msgsize() + 5 + (*z).AssetTransferTxnFields.XferAsset.Msgsize() + 5 + msgp.Uint64Size + 5 + (*z).AssetTransferTxnFields.AssetSender.Msgsize() + 5 + (*z).AssetTransferTxnFields.AssetReceiver.Msgsize() + 7 + (*z).AssetTransferTxnFields.AssetCloseTo.Msgsize() + 5 + (*z).AssetFreezeTxnFields.FreezeAccount.Msgsize() + 5 + (*z).AssetFreezeTxnFields.FreezeAsset.Msgsize() + 5 + msgp.BoolSize + 5 + (*z).ApplicationCallTxnFields.ApplicationID.Msgsize() + 5 + msgp.Uint64Size + 5 + msgp.ArrayHeaderSize
+	s = 3 + 5 + (*z).Type.Msgsize() + 4 + (*z).Header.Sender.Msgsize() + 4 + (*z).Header.Fee.Msgsize() + 3 + (*z).Header.FirstValid.Msgsize() + 3 + (*z).Header.LastValid.Msgsize() + 5 + msgp.BytesPrefixSize + len((*z).Header.Note) + 4 + msgp.StringPrefixSize + len((*z).Header.GenesisID) + 3 + (*z).Header.GenesisHash.Msgsize() + 4 + (*z).Header.Group.Msgsize() + 3 + msgp.ArrayHeaderSize + (32 * (msgp.ByteSize)) + 6 + (*z).Header.RekeyTo.Msgsize() + 5 + (*z).Header.Sponsor.Msgsize() + 4 + msgp.ArrayHeaderSize + (len((*z).Header.Extras) * (msgp.Uint8Size)) + 8 + (*z).KeyregTxnFields.VotePK.Msgsize() + 7 + (*z).KeyregTxnFields.SelectionPK.Msgsize() + 8 + (*z).KeyregTxnFields.StateProofPK.Msgsize() + 8 + (*z).KeyregTxnFields.VoteFirst.Msgsize() + 8 + (*z).KeyregTxnFields.VoteLast.Msgsize() + 7 + msgp.Uint64Size + 8 + msgp.BoolSize + 4 + (*z).PaymentTxnFields.Receiver.Msgsize() + 4 + (*z).PaymentTxnFields.Amount.Msgsize() + 6 + (*z).PaymentTxnFields.CloseRemainderTo.Msgsize() + 5 + (*z).AssetConfigTxnFields.ConfigAsset.Msgsize() + 5 + (*z).AssetConfigTxnFields.AssetParams.Msgsize() + 5 + (*z).AssetTransferTxnFields.XferAsset.Msgsize() + 5 + msgp.Uint64Size + 5 + (*z).AssetTransferTxnFields.AssetSender.Msgsize() + 5 + (*z).AssetTransferTxnFields.AssetReceiver.Msgsize() + 7 + (*z).AssetTransferTxnFields.AssetCloseTo.Msgsize() + 5 + (*z).AssetFreezeTxnFields.FreezeAccount.Msgsize() + 5 + (*z).AssetFreezeTxnFields.FreezeAsset.Msgsize() + 5 + msgp.BoolSize + 5 + (*z).ApplicationCallTxnFields.ApplicationID.Msgsize() + 5 + msgp.Uint64Size + 5 + msgp.ArrayHeaderSize
 	for zb0003 := range (*z).ApplicationCallTxnFields.ApplicationArgs {
 		s += msgp.BytesPrefixSize + len((*z).ApplicationCallTxnFields.ApplicationArgs[zb0003])
 	}
@@ -9023,7 +9023,7 @@ func (z *Transaction) Msgsize() (s int) {
 
 // MsgIsZero returns whether this is a zero value
 func (z *Transaction) MsgIsZero() bool {
-	return ((*z).Type.MsgIsZero()) && ((*z).Header.Sender.MsgIsZero()) && ((*z).Header.Fee.MsgIsZero()) && ((*z).Header.FirstValid.MsgIsZero()) && ((*z).Header.LastValid.MsgIsZero()) && (len((*z).Header.Note) == 0) && ((*z).Header.GenesisID == "") && ((*z).Header.GenesisHash.MsgIsZero()) && ((*z).Header.Group.MsgIsZero()) && ((*z).Header.Lease == ([32]byte{})) && ((*z).Header.RekeyTo.MsgIsZero()) && ((*z).Header.Sponsor.MsgIsZero()) && (len((*z).Header.Enforcements) == 0) && ((*z).KeyregTxnFields.VotePK.MsgIsZero()) && ((*z).KeyregTxnFields.SelectionPK.MsgIsZero()) && ((*z).KeyregTxnFields.StateProofPK.MsgIsZero()) && ((*z).KeyregTxnFields.VoteFirst.MsgIsZero()) && ((*z).KeyregTxnFields.VoteLast.MsgIsZero()) && ((*z).KeyregTxnFields.VoteKeyDilution == 0) && ((*z).KeyregTxnFields.Nonparticipation == false) && ((*z).PaymentTxnFields.Receiver.MsgIsZero()) && ((*z).PaymentTxnFields.Amount.MsgIsZero()) && ((*z).PaymentTxnFields.CloseRemainderTo.MsgIsZero()) && ((*z).AssetConfigTxnFields.ConfigAsset.MsgIsZero()) && ((*z).AssetConfigTxnFields.AssetParams.MsgIsZero()) && ((*z).AssetTransferTxnFields.XferAsset.MsgIsZero()) && ((*z).AssetTransferTxnFields.AssetAmount == 0) && ((*z).AssetTransferTxnFields.AssetSender.MsgIsZero()) && ((*z).AssetTransferTxnFields.AssetReceiver.MsgIsZero()) && ((*z).AssetTransferTxnFields.AssetCloseTo.MsgIsZero()) && ((*z).AssetFreezeTxnFields.FreezeAccount.MsgIsZero()) && ((*z).AssetFreezeTxnFields.FreezeAsset.MsgIsZero()) && ((*z).AssetFreezeTxnFields.AssetFrozen == false) && ((*z).ApplicationCallTxnFields.ApplicationID.MsgIsZero()) && ((*z).ApplicationCallTxnFields.OnCompletion == 0) && (len((*z).ApplicationCallTxnFields.ApplicationArgs) == 0) && (len((*z).ApplicationCallTxnFields.Accounts) == 0) && (len((*z).ApplicationCallTxnFields.ForeignAssets) == 0) && (len((*z).ApplicationCallTxnFields.ForeignApps) == 0) && (len((*z).ApplicationCallTxnFields.Access) == 0) && (len((*z).ApplicationCallTxnFields.Boxes) == 0) && ((*z).ApplicationCallTxnFields.LocalStateSchema.MsgIsZero()) && ((*z).ApplicationCallTxnFields.GlobalStateSchema.MsgIsZero()) && (len((*z).ApplicationCallTxnFields.ApprovalProgram) == 0) && (len((*z).ApplicationCallTxnFields.ClearStateProgram) == 0) && ((*z).ApplicationCallTxnFields.ExtraProgramPages == 0) && ((*z).ApplicationCallTxnFields.RejectVersion == 0) && ((*z).StateProofTxnFields.StateProofType.MsgIsZero()) && ((*z).StateProofTxnFields.StateProof.MsgIsZero()) && ((*z).StateProofTxnFields.Message.MsgIsZero()) && ((*z).HeartbeatTxnFields == nil)
+	return ((*z).Type.MsgIsZero()) && ((*z).Header.Sender.MsgIsZero()) && ((*z).Header.Fee.MsgIsZero()) && ((*z).Header.FirstValid.MsgIsZero()) && ((*z).Header.LastValid.MsgIsZero()) && (len((*z).Header.Note) == 0) && ((*z).Header.GenesisID == "") && ((*z).Header.GenesisHash.MsgIsZero()) && ((*z).Header.Group.MsgIsZero()) && ((*z).Header.Lease == ([32]byte{})) && ((*z).Header.RekeyTo.MsgIsZero()) && ((*z).Header.Sponsor.MsgIsZero()) && (len((*z).Header.Extras) == 0) && ((*z).KeyregTxnFields.VotePK.MsgIsZero()) && ((*z).KeyregTxnFields.SelectionPK.MsgIsZero()) && ((*z).KeyregTxnFields.StateProofPK.MsgIsZero()) && ((*z).KeyregTxnFields.VoteFirst.MsgIsZero()) && ((*z).KeyregTxnFields.VoteLast.MsgIsZero()) && ((*z).KeyregTxnFields.VoteKeyDilution == 0) && ((*z).KeyregTxnFields.Nonparticipation == false) && ((*z).PaymentTxnFields.Receiver.MsgIsZero()) && ((*z).PaymentTxnFields.Amount.MsgIsZero()) && ((*z).PaymentTxnFields.CloseRemainderTo.MsgIsZero()) && ((*z).AssetConfigTxnFields.ConfigAsset.MsgIsZero()) && ((*z).AssetConfigTxnFields.AssetParams.MsgIsZero()) && ((*z).AssetTransferTxnFields.XferAsset.MsgIsZero()) && ((*z).AssetTransferTxnFields.AssetAmount == 0) && ((*z).AssetTransferTxnFields.AssetSender.MsgIsZero()) && ((*z).AssetTransferTxnFields.AssetReceiver.MsgIsZero()) && ((*z).AssetTransferTxnFields.AssetCloseTo.MsgIsZero()) && ((*z).AssetFreezeTxnFields.FreezeAccount.MsgIsZero()) && ((*z).AssetFreezeTxnFields.FreezeAsset.MsgIsZero()) && ((*z).AssetFreezeTxnFields.AssetFrozen == false) && ((*z).ApplicationCallTxnFields.ApplicationID.MsgIsZero()) && ((*z).ApplicationCallTxnFields.OnCompletion == 0) && (len((*z).ApplicationCallTxnFields.ApplicationArgs) == 0) && (len((*z).ApplicationCallTxnFields.Accounts) == 0) && (len((*z).ApplicationCallTxnFields.ForeignAssets) == 0) && (len((*z).ApplicationCallTxnFields.ForeignApps) == 0) && (len((*z).ApplicationCallTxnFields.Access) == 0) && (len((*z).ApplicationCallTxnFields.Boxes) == 0) && ((*z).ApplicationCallTxnFields.LocalStateSchema.MsgIsZero()) && ((*z).ApplicationCallTxnFields.GlobalStateSchema.MsgIsZero()) && (len((*z).ApplicationCallTxnFields.ApprovalProgram) == 0) && (len((*z).ApplicationCallTxnFields.ClearStateProgram) == 0) && ((*z).ApplicationCallTxnFields.ExtraProgramPages == 0) && ((*z).ApplicationCallTxnFields.RejectVersion == 0) && ((*z).StateProofTxnFields.StateProofType.MsgIsZero()) && ((*z).StateProofTxnFields.StateProof.MsgIsZero()) && ((*z).StateProofTxnFields.Message.MsgIsZero()) && ((*z).HeartbeatTxnFields == nil)
 }
 
 // TransactionMaxSize returns a maximum valid message size for this message type
@@ -9032,8 +9032,8 @@ func TransactionMaxSize() (s int) {
 	// Calculating size of array: z.Header.Lease
 	s += msgp.ArrayHeaderSize + ((32) * (msgp.ByteSize))
 	s += 6 + basics.AddressMaxSize() + 5 + basics.AddressMaxSize() + 4
-	// Calculating size of slice: z.Header.Enforcements
-	s += msgp.ArrayHeaderSize + ((bounds.MaxTxnEnforcements) * (msgp.Uint8Size))
+	// Calculating size of slice: z.Header.Extras
+	s += msgp.ArrayHeaderSize + ((bounds.MaxTxnExtras) * (msgp.Uint8Size))
 	s += 8 + crypto.OneTimeSignatureVerifierMaxSize() + 7 + crypto.VRFVerifierMaxSize() + 8 + merklesignature.CommitmentMaxSize() + 8 + basics.RoundMaxSize() + 8 + basics.RoundMaxSize() + 7 + msgp.Uint64Size + 8 + msgp.BoolSize + 4 + basics.AddressMaxSize() + 4 + basics.MicroAlgosMaxSize() + 6 + basics.AddressMaxSize() + 5 + basics.AssetIndexMaxSize() + 5 + basics.AssetParamsMaxSize() + 5 + basics.AssetIndexMaxSize() + 5 + msgp.Uint64Size + 5 + basics.AddressMaxSize() + 5 + basics.AddressMaxSize() + 7 + basics.AddressMaxSize() + 5 + basics.AddressMaxSize() + 5 + basics.AssetIndexMaxSize() + 5 + msgp.BoolSize + 5 + basics.AppIndexMaxSize() + 5 + msgp.Uint64Size + 5
 	// Calculating size of slice: z.ApplicationCallTxnFields.ApplicationArgs
 	s += msgp.ArrayHeaderSize + bounds.MaxAppTotalArgLen + 5

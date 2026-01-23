@@ -129,8 +129,8 @@ func (s SignedTxn) SponsorAuthorizer() basics.Address {
 
 // Benefactor returns the address of the Sender or Sponsor.
 func (s SignedTxn) Benefactor() basics.Address {
-	if _, bFound := slices.BinarySearch(s.Txn.Enforcements, Benefactor); bFound {
-		if _, sFound := slices.BinarySearch(s.Txn.Enforcements, Sponsored); sFound {
+	if _, bFound := slices.BinarySearch(s.Txn.Extras, AssetSponsored); bFound {
+		if _, sFound := slices.BinarySearch(s.Txn.Extras, FeeSponsored); sFound {
 			return s.Txn.Sponsor
 		}
 		return s.Txn.Sender

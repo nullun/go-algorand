@@ -244,7 +244,6 @@ func GetStateProofTransactionForRound(ctx context.Context, txnFetcher LedgerForA
 // (GET /v2/participation)
 func (v2 *Handlers) GetParticipationKeys(ctx echo.Context) error {
 	partKeys, err := v2.Node.ListParticipationKeys()
-
 	if err != nil {
 		return badRequest(ctx, err, err.Error(), v2.Log)
 	}
@@ -315,28 +314,23 @@ func (v2 *Handlers) AddParticipationKey(ctx echo.Context) error {
 	}
 
 	partID, err := v2.Node.InstallParticipationKey(partKeyBinary)
-
 	if err != nil {
 		return badRequest(ctx, err, err.Error(), v2.Log)
 	}
 
 	response := model.PostParticipationResponse{PartId: partID.String()}
 	return ctx.JSON(http.StatusOK, response)
-
 }
 
 // DeleteParticipationKeyByID Delete a given participation key by id
 // (DELETE /v2/participation/{participation-id})
 func (v2 *Handlers) DeleteParticipationKeyByID(ctx echo.Context, participationID string) error {
-
 	decodedParticipationID, err := account.ParseParticipationID(participationID)
-
 	if err != nil {
 		return badRequest(ctx, err, err.Error(), v2.Log)
 	}
 
 	err = v2.Node.RemoveParticipationKey(decodedParticipationID)
-
 	if err != nil {
 		if errors.Is(err, account.ErrParticipationIDNotFound) {
 			return notFound(ctx, account.ErrParticipationIDNotFound, "participation id not found", v2.Log)
@@ -351,15 +345,12 @@ func (v2 *Handlers) DeleteParticipationKeyByID(ctx echo.Context, participationID
 // GetParticipationKeyByID Get participation key info by id
 // (GET /v2/participation/{participation-id})
 func (v2 *Handlers) GetParticipationKeyByID(ctx echo.Context, participationID string) error {
-
 	decodedParticipationID, err := account.ParseParticipationID(participationID)
-
 	if err != nil {
 		return badRequest(ctx, err, err.Error(), v2.Log)
 	}
 
 	participationRecord, err := v2.Node.GetParticipationKey(decodedParticipationID)
-
 	if err != nil {
 		return internalError(ctx, err, err.Error(), v2.Log)
 	}
@@ -541,12 +532,13 @@ func (v2 *Handlers) basicAccountInformation(ctx echo.Context, addr basics.Addres
 			NumByteSlice: record.TotalAppSchema.NumByteSlice,
 			NumUint:      record.TotalAppSchema.NumUint,
 		},
-		AppsTotalExtraPages: omitEmpty(uint64(record.TotalExtraAppPages)),
-		TotalBoxes:          omitEmpty(record.TotalBoxes),
-		TotalBoxBytes:       omitEmpty(record.TotalBoxBytes),
-		MinBalance:          record.MinBalance(&consensus).Raw,
-		LastProposed:        omitEmpty(record.LastProposed),
-		LastHeartbeat:       omitEmpty(record.LastHeartbeat),
+		AppsTotalExtraPages:   omitEmpty(uint64(record.TotalExtraAppPages)),
+		TotalBoxes:            omitEmpty(record.TotalBoxes),
+		TotalBoxBytes:         omitEmpty(record.TotalBoxBytes),
+		MinBalance:            record.MinBalance(&consensus).Raw,
+		LastProposed:          omitEmpty(record.LastProposed),
+		LastHeartbeat:         omitEmpty(record.LastHeartbeat),
+		SponsoredAssetsOffset: omitEmpty(record.SponsoredAssetsOffset),
 	}
 	response := model.AccountResponse(account)
 	return ctx.JSON(http.StatusOK, response)
@@ -788,7 +780,6 @@ func getAppIndexFromTxn(txn transactions.SignedTxnWithAD) basics.AppIndex {
 }
 
 func appendLogsFromTxns(blockLogs []model.AppCallLogs, txns []transactions.SignedTxnWithAD, outerTxnID string) []model.AppCallLogs {
-
 	for _, txn := range txns {
 		if len(txn.EvalDelta.Logs) > 0 {
 			blockLogs = append(
@@ -1173,7 +1164,6 @@ func (v2 *Handlers) AccountAssetsInformation(ctx echo.Context, address basics.Ad
 
 	// We intentionally request one more than the limit to determine if there are more assets.
 	records, lookupRound, err := ledger.LookupAssets(address, basics.AssetIndex(assetGreaterThan), *params.Limit+1)
-
 	if err != nil {
 		return internalError(ctx, err, errFailedLookingUpLedger, v2.Log)
 	}
@@ -1507,7 +1497,6 @@ type PreEncodedTxInfo struct {
 // last proto.MaxTxnLife rounds
 // (GET /v2/transactions/pending/{txid})
 func (v2 *Handlers) PendingTransactionInformation(ctx echo.Context, txid string, params model.PendingTransactionInformationParams) error {
-
 	stat, err := v2.Node.Status()
 	if err != nil {
 		return internalError(ctx, err, errFailedRetrievingNodeStatus, v2.Log)
@@ -1566,7 +1555,6 @@ func (v2 *Handlers) PendingTransactionInformation(ctx echo.Context, txid string,
 
 // getPendingTransactions returns to the provided context a list of uncomfirmed transactions currently in the transaction pool with optional Max/Address filters.
 func (v2 *Handlers) getPendingTransactions(ctx echo.Context, max *uint64, format *string, addrFilter *basics.Address) error {
-
 	stat, err := v2.Node.Status()
 	if err != nil {
 		return internalError(ctx, err, errFailedRetrievingNodeStatus, v2.Log)

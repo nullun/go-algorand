@@ -534,15 +534,12 @@ func MinBalance(
 
 	// MinBalance for each Asset, adjusted for sponsors
 	adjustedTotalAssets := totalAssets
-	fmt.Printf("totalAssets: %d\n", totalAssets)
-	fmt.Printf("sponsoredAssetsOffset: %d\n", sponsoredAssetsOffset)
 	if sponsoredAssetsOffset > 0 {
 		adjustedTotalAssets += uint64(sponsoredAssetsOffset)
 	} else if sponsoredAssetsOffset < 0 {
 		// Handle math.MinInt64
 		adjustedTotalAssets -= uint64(-(sponsoredAssetsOffset + 1)) + 1
 	}
-	fmt.Printf("adjustedTotalAssets: %d\n", adjustedTotalAssets)
 	assetCost := MulSaturate(reqs.MinBalance, adjustedTotalAssets)
 	min = AddSaturate(min, assetCost)
 

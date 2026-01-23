@@ -1097,6 +1097,11 @@
             ],
             "type": "string"
           },
+          "sponsored-assets-offset": {
+            "description": "\\[sao\\] An offset identifying how many assets you're sponsoring minus how many have sponsored you.",
+            "type": "integer",
+            "x-go-type": "int64"
+          },
           "status": {
             "description": "\\[onl\\] delegation status of the account's MicroAlgos\n* Offline - indicates that the associated account is delegated.\n*  Online  - indicates that the associated account used as part of the delegation pool.\n*   NotParticipating - indicates that the associated account is neither a delegator nor a delegate.",
             "type": "string"
@@ -1506,6 +1511,11 @@
           "is-frozen": {
             "description": "\\[f\\] whether or not the holding is frozen.",
             "type": "boolean"
+          },
+          "sponsor": {
+            "description": "\\[s\\] Address of the sponsoring account for this asset holding. If empty, the asset holding is not sponsored.",
+            "type": "string",
+            "x-algorand-format": "Address"
           }
         },
         "required": [

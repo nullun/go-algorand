@@ -213,6 +213,9 @@ type Account struct {
 	// * lsig
 	SigType *AccountSigType `json:"sig-type,omitempty"`
 
+	// SponsoredAssetsOffset \[sao\] An offset identifying how many assets you're sponsoring minus how many have sponsored you.
+	SponsoredAssetsOffset *int64 `json:"sponsored-assets-offset,omitempty"`
+
 	// Status \[onl\] delegation status of the account's MicroAlgos
 	// * Offline - indicates that the associated account is delegated.
 	// *  Online  - indicates that the associated account used as part of the delegation pool.
@@ -441,8 +444,8 @@ type AssetHolding struct {
 	// IsFrozen \[f\] whether or not the holding is frozen.
 	IsFrozen bool `json:"is-frozen"`
 
-	// Sponsor \[s\] address that's providing the minimum balance requirement allocation.
-	Sponsor basics.Address `json:"sponsor"`
+	// Sponsor \[s\] Address of the sponsoring account for this asset holding. If empty, the asset holding is not sponsored.
+	Sponsor *string `json:"sponsor,omitempty"`
 }
 
 // AssetHoldingReference References an asset held by an account.

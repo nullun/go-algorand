@@ -688,12 +688,19 @@ func printAccountInfo(client libgoal.Client, address string, onlyShowAssetIDs bo
 			frozen = " (frozen)"
 		}
 
-		sponsored := ""
-		if !assetHolding.Sponsor.IsZero() {
-			sponsored = fmt.Sprintf(" (Sponsor: %s)", assetHolding.Sponsor)
+		derefString := func(s *string) string {
+			if s == nil {
+				return ""
+			}
+			return *s
 		}
 
-		fmt.Fprintf(report, "\tID %d, %s, balance %s %s%s%s\n", assetHolding.AssetID, assetName, amount, unitName, frozen, sponsored)
+		sponsor := derefString(assetHolding.Sponsor)
+		if sponsor != "" {
+			sponsor = fmt.Sprintf(" (Sponsor: %s)", sponsor)
+		}
+
+		fmt.Fprintf(report, "\tID %d, %s, balance %s %s%s%s\n", assetHolding.AssetID, assetName, amount, unitName, frozen, sponsor)
 	}
 
 	fmt.Fprintln(report, "Created Apps:")

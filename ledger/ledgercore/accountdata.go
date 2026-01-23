@@ -114,6 +114,8 @@ func AssignAccountData(a *basics.AccountData, acct AccountData) {
 
 	a.LastProposed = acct.LastProposed
 	a.LastHeartbeat = acct.LastHeartbeat
+
+	a.SponsoredAssetsOffset = acct.SponsoredAssetsOffset
 }
 
 // WithUpdatedRewards calls basics account data WithUpdatedRewards

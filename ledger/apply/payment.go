@@ -90,6 +90,11 @@ func Payment(payment transactions.PaymentTxnFields, header transactions.Header, 
 			return fmt.Errorf("cannot close: %d outstanding box bytes", rec.TotalBoxBytes)
 		}
 
+		// Confirm that there are no sponsored asset holdings by the account.
+		if rec.SponsoredAssetsOffset != 0 {
+			return fmt.Errorf("cannot close: %d outstanding assets sponsored", rec.SponsoredAssetsOffset)
+		}
+
 		// Can't have created apps remaining either
 		totalAppParams := rec.TotalAppParams
 		if totalAppParams > 0 {

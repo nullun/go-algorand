@@ -36,7 +36,7 @@ func AssetHolding(ah basics.AssetHolding, ai basics.AssetIndex) model.AssetHoldi
 		Amount:   ah.Amount,
 		AssetID:  ai,
 		IsFrozen: ah.Frozen,
-		Sponsor:  ah.Sponsor,
+		Sponsor:  addrOrNil(ah.Sponsor),
 	}
 }
 
@@ -141,6 +141,7 @@ func AccountDataToAccount(
 		MinBalance:                  minBalance.Raw,
 		LastProposed:                omitEmpty(record.LastProposed),
 		LastHeartbeat:               omitEmpty(record.LastHeartbeat),
+		SponsoredAssetsOffset:       omitEmpty(record.SponsoredAssetsOffset),
 	}, nil
 }
 
@@ -264,10 +265,14 @@ func AccountToAccountData(a *model.Account) (basics.AccountData, error) {
 	if a.Assets != nil && len(*a.Assets) > 0 {
 		assets = make(map[basics.AssetIndex]basics.AssetHolding, len(*a.Assets))
 		for _, h := range *a.Assets {
+			sponsor, err := nilToZeroAddr(h.Sponsor)
+			if err != nil {
+				return basics.AccountData{}, err
+			}
 			assets[h.AssetID] = basics.AssetHolding{
 				Amount:  h.Amount,
 				Frozen:  h.IsFrozen,
-				Sponsor: h.Sponsor,
+				Sponsor: sponsor,
 			}
 		}
 	}
@@ -322,26 +327,27 @@ func AccountToAccountData(a *model.Account) (basics.AccountData, error) {
 	}
 
 	ad := basics.AccountData{
-		Status:             status,
-		MicroAlgos:         basics.MicroAlgos{Raw: a.Amount},
-		RewardsBase:        rewardsBase,
-		RewardedMicroAlgos: basics.MicroAlgos{Raw: a.Rewards},
-		IncentiveEligible:  nilToZero(a.IncentiveEligible),
-		VoteID:             voteID,
-		SelectionID:        selID,
-		VoteFirstValid:     voteFirstValid,
-		VoteLastValid:      voteLastValid,
-		VoteKeyDilution:    voteKeyDilution,
-		StateProofID:       stateProofID,
-		Assets:             assets,
-		AppLocalStates:     appLocalStates,
-		AppParams:          appParams,
-		TotalAppSchema:     totalSchema,
-		TotalExtraAppPages: totalExtraPages,
-		TotalBoxes:         nilToZero(a.TotalBoxes),
-		TotalBoxBytes:      nilToZero(a.TotalBoxBytes),
-		LastProposed:       nilToZero(a.LastProposed),
-		LastHeartbeat:      nilToZero(a.LastHeartbeat),
+		Status:                status,
+		MicroAlgos:            basics.MicroAlgos{Raw: a.Amount},
+		RewardsBase:           rewardsBase,
+		RewardedMicroAlgos:    basics.MicroAlgos{Raw: a.Rewards},
+		IncentiveEligible:     nilToZero(a.IncentiveEligible),
+		VoteID:                voteID,
+		SelectionID:           selID,
+		VoteFirstValid:        voteFirstValid,
+		VoteLastValid:         voteLastValid,
+		VoteKeyDilution:       voteKeyDilution,
+		StateProofID:          stateProofID,
+		Assets:                assets,
+		AppLocalStates:        appLocalStates,
+		AppParams:             appParams,
+		TotalAppSchema:        totalSchema,
+		TotalExtraAppPages:    totalExtraPages,
+		TotalBoxes:            nilToZero(a.TotalBoxes),
+		TotalBoxBytes:         nilToZero(a.TotalBoxBytes),
+		LastProposed:          nilToZero(a.LastProposed),
+		LastHeartbeat:         nilToZero(a.LastHeartbeat),
+		SponsoredAssetsOffset: nilToZero(a.SponsoredAssetsOffset),
 	}
 
 	ad.AuthAddr, err = nilToZeroAddr(a.AuthAddr)

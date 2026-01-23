@@ -2635,6 +2635,11 @@
           "description": "The round in which this account last went online, or explicitly renewed their online status.",
           "type": "integer",
           "x-go-type": "basics.Round"
+        },
+        "sponsored-assets-offset": {
+          "description": "\\[sao\\] An offset identifying how many assets you're sponsoring minus how many have sponsored you.",
+          "type": "integer",
+          "x-go-type": "int64"
         }
       }
     },
@@ -2731,6 +2736,11 @@
         "is-frozen": {
           "description": "\\[f\\] whether or not the holding is frozen.",
           "type": "boolean"
+        },
+        "sponsor": {
+          "description": "\\[s\\] Address of the sponsoring account for this asset holding. If empty, the asset holding is not sponsored.",
+          "type": "string",
+          "x-algorand-format": "Address"
         }
       }
     },

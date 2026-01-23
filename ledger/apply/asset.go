@@ -318,8 +318,9 @@ func AssetTransfer(ct transactions.AssetTransferTxnFields, header transactions.H
 	}
 
 	// Perform Benefactor Enforcement for AssetTransfer.
-	// This results in the sender (not AssetSender) paying the Minimum
-	// Balance Requirement to the AssetReceiver if required.
+	// This results in the sender (not AssetSender) increasing their own Minimum
+	// Balance Requirement and Opting In the AssetReceiver into to the asset
+	// rather than failing and only if required.
 	if ct.AssetReceiver != header.Sender && slices.Contains(header.Enforcements, transactions.Benefactor) {
 		rcvHolding, ok, err := balances.GetAssetHolding(ct.AssetReceiver, ct.XferAsset)
 		if err != nil {
@@ -347,12 +348,6 @@ func AssetTransfer(ct transactions.AssetTransferTxnFields, header transactions.H
 			rcvHolding.Frozen = params.DefaultFrozen
 			rcvHolding.Sponsor = header.Sender
 
-			// // OLD FIRST IMP
-			// beneficiaryAlgos := basics.MicroAlgos{Raw: 100000} // 0.1 Algo minimum balance for asset holding
-			// if rcvRecord.IsZero() {
-			// 	beneficiaryAlgos = basics.MicroAlgos{Raw: 100000 + 100000} // extra 0.1 Algo for account creation
-			// }
-
 			totalRcvAssets := rcvRecord.TotalAssets
 			maxAssetsPerAccount := balances.ConsensusParams().MaxAssetsPerAccount
 			if maxAssetsPerAccount > 0 && totalRcvAssets >= uint64(maxAssetsPerAccount) {
@@ -371,18 +366,11 @@ func AssetTransfer(ct transactions.AssetTransferTxnFields, header transactions.H
 			if err != nil {
 				return err
 			}
-
 			sndRecord.SponsoredAssetsOffset = sndRecord.SponsoredAssetsOffset + 1
 			err = balances.Put(header.Sender, sndRecord)
 			if err != nil {
 				return err
 			}
-			// // OLD FIRST IMP
-			// // Benefactor provides MBR to beneficiary.
-			// err = balances.Move(header.Sender, ct.AssetReceiver, beneficiaryAlgos, &ad.SenderRewards, &ad.ReceiverRewards)
-			// if err != nil {
-			// 	return err
-			// }
 
 			err = balances.PutAssetHolding(ct.AssetReceiver, ct.XferAsset, rcvHolding)
 			if err != nil {

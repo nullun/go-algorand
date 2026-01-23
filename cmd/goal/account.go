@@ -226,7 +226,6 @@ func init() {
 	// deletePartkeyCmd flags
 	deletePartKeyCmd.Flags().StringVarP(&partKeyIDToDelete, "partkeyid", "", "", "Participation Key ID to delete")
 	rewardsCmd.MarkFlagRequired("partkeyid")
-
 }
 
 func scLeaseBytes(cmd *cobra.Command) (leaseBytes [32]byte) {
@@ -372,7 +371,6 @@ var deletePartKeyCmd = &cobra.Command{
 		if err != nil {
 			reportErrorf(errorRequestFail, err)
 		}
-
 	},
 }
 
@@ -560,15 +558,14 @@ var assetDetailsCmd = &cobra.Command{
 			limitPtr = &limit
 		}
 		response, err := client.AccountAssetsInformation(accountAddress, nextPtr, limitPtr)
-
 		if err != nil {
 			reportErrorf(errorRequestFail, err)
 		}
 
 		printAccountAssetsInformation(accountAddress, response)
-
 	},
 }
+
 var infoCmd = &cobra.Command{
 	Use:   "info",
 	Short: "Retrieve information about the assets and applications belonging to the specified account",
@@ -691,7 +688,12 @@ func printAccountInfo(client libgoal.Client, address string, onlyShowAssetIDs bo
 			frozen = " (frozen)"
 		}
 
-		fmt.Fprintf(report, "\tID %d, %s, balance %s %s%s\n", assetHolding.AssetID, assetName, amount, unitName, frozen)
+		sponsored := ""
+		if !assetHolding.Sponsor.IsZero() {
+			sponsored = fmt.Sprintf(" (Sponsor: %s)", assetHolding.Sponsor)
+		}
+
+		fmt.Fprintf(report, "\tID %d, %s, balance %s %s%s%s\n", assetHolding.AssetID, assetName, amount, unitName, frozen, sponsored)
 	}
 
 	fmt.Fprintln(report, "Created Apps:")
@@ -845,7 +847,7 @@ var dumpCmd = &cobra.Command{
 		br := basics.BalanceRecord{Addr: rawAddress, AccountData: accountData}
 		if len(dumpOutFile) > 0 {
 			data := protocol.Encode(&br)
-			writeFile(dumpOutFile, data, 0644)
+			writeFile(dumpOutFile, data, 0o644)
 		} else {
 			data := protocol.EncodeJSONStrict(&br)
 			fmt.Println(string(data))
@@ -1304,7 +1306,7 @@ var importCmd = &cobra.Command{
 
 		client := ensureKmdClient(dataDir)
 		wh := ensureWalletHandle(dataDir, walletName)
-		//wh, pw := ensureWalletHandleMaybePassword(dataDir, walletName, true)
+		// wh, pw := ensureWalletHandleMaybePassword(dataDir, walletName, true)
 
 		if mnemonic == "" {
 			fmt.Println(infoRecoveryPrompt)
@@ -1348,19 +1350,16 @@ var exportCmd = &cobra.Command{
 		passwordString := string(pw)
 
 		response, err := client.ExportKey(wh, passwordString, accountAddress)
-
 		if err != nil {
 			reportErrorf(errorRequestFail, err)
 		}
 
 		seed, err := crypto.SecretKeyToSeed(response.PrivateKey)
-
 		if err != nil {
 			reportErrorf(errorSeedConversion, accountAddress, err)
 		}
 
 		privKeyAsMnemonic, err := passphrase.KeyToMnemonic(seed[:])
-
 		if err != nil {
 			reportErrorf(errorMnemonicConversion, accountAddress, err)
 		}
@@ -1484,7 +1483,7 @@ var partkeyInfoCmd = &cobra.Command{
 				fmt.Printf("Last vote round:           %s\n", roundOrNA(part.LastVote))
 				fmt.Printf("Last block proposal round: %s\n", roundOrNA(part.LastBlockProposal))
 				// PKI TODO: enable with state proof support.
-				//fmt.Printf("Last state proof round:    %s\n", strOrNA(part.LastStateProof))
+				// fmt.Printf("Last state proof round:    %s\n", strOrNA(part.LastStateProof))
 				fmt.Printf("Effective first round:     %s\n", roundOrNA(part.EffectiveFirstValid))
 				fmt.Printf("Effective last round:      %s\n", roundOrNA(part.EffectiveLastValid))
 				fmt.Printf("First round:               %d\n", part.Key.VoteFirstValid)
@@ -1506,7 +1505,6 @@ var markNonparticipatingCmd = &cobra.Command{
 	Long:  "Permanently mark an account as not participating (as opposed to Online or Offline). Once marked, the account can never go online or offline, it is forever nonparticipating, and it will never earn rewards on its balance.",
 	Args:  validateNoPosArgsFn,
 	Run: func(cmd *cobra.Command, args []string) {
-
 		checkTxValidityPeriodCmdFlags(cmd)
 
 		dataDir := datadir.EnsureSingleDataDir()

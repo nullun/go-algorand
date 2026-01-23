@@ -50,6 +50,8 @@ type AccountBaseData struct {
 
 	LastProposed  basics.Round // The last round that this account proposed the winning block.
 	LastHeartbeat basics.Round // The last round that this account sent a heartbeat to show it was online.
+
+	SponsoredAssetsOffset int64 // Signed number of asset holdings the account is responsible for.
 }
 
 // ToAccountData returns ledgercore.AccountData from basics.AccountData
@@ -74,6 +76,8 @@ func ToAccountData(acct basics.AccountData) AccountData {
 
 			LastProposed:  acct.LastProposed,
 			LastHeartbeat: acct.LastHeartbeat,
+
+			SponsoredAssetsOffset: acct.SponsoredAssetsOffset,
 		},
 		VotingData: basics.VotingData{
 			VoteID:          acct.VoteID,
@@ -155,6 +159,7 @@ func (u AccountData) MinBalance(proto *config.ConsensusParams) basics.MicroAlgos
 		u.TotalAppParams, u.TotalAppLocalStates,
 		uint64(u.TotalExtraAppPages),
 		u.TotalBoxes, u.TotalBoxBytes,
+		u.SponsoredAssetsOffset,
 	)
 }
 

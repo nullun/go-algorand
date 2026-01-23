@@ -57,6 +57,9 @@ type BaseAccountData struct {
 	// consensus parameter is being set. Once the above consensus takes place, this field would be populated with the
 	// correct round number.
 	UpdateRound uint64 `codec:"z"`
+
+	// TODO: Consider using a uint64 and boolean to indicate negative values
+	SponsoredAssetsOffset int64 `codec:"r"`
 }
 
 // ResourceFlags are bitmask used to indicate which portions ofa resources are used.
@@ -135,6 +138,8 @@ type ResourcesData struct {
 	Version uint64 `codec:"A"`
 
 	SizeSponsor basics.Address `codec:"B"`
+
+	Sponsor basics.Address `codec:"C"`
 }
 
 // BaseVotingData is the base struct used to store voting data
@@ -304,6 +309,7 @@ func (ba *BaseAccountData) SetCoreAccountData(ad *ledgercore.AccountData) {
 	ba.TotalBoxes = ad.TotalBoxes
 	ba.TotalBoxBytes = ad.TotalBoxBytes
 	ba.IncentiveEligible = ad.IncentiveEligible
+	ba.SponsoredAssetsOffset = ad.SponsoredAssetsOffset
 
 	ba.LastProposed = ad.LastProposed
 	ba.LastHeartbeat = ad.LastHeartbeat
@@ -328,6 +334,7 @@ func (ba *BaseAccountData) SetAccountData(ad *basics.AccountData) {
 	ba.TotalBoxes = ad.TotalBoxes
 	ba.TotalBoxBytes = ad.TotalBoxBytes
 	ba.IncentiveEligible = ad.IncentiveEligible
+	ba.SponsoredAssetsOffset = ad.SponsoredAssetsOffset
 
 	ba.LastProposed = ad.LastProposed
 	ba.LastHeartbeat = ad.LastHeartbeat
@@ -371,6 +378,8 @@ func (ba *BaseAccountData) GetLedgerCoreAccountBaseData() ledgercore.AccountBase
 
 		LastProposed:  ba.LastProposed,
 		LastHeartbeat: ba.LastHeartbeat,
+
+		SponsoredAssetsOffset: ba.SponsoredAssetsOffset,
 	}
 }
 
@@ -412,6 +421,8 @@ func (ba *BaseAccountData) GetAccountData() basics.AccountData {
 
 		LastProposed:  ba.LastProposed,
 		LastHeartbeat: ba.LastHeartbeat,
+
+		SponsoredAssetsOffset: ba.SponsoredAssetsOffset,
 	}
 }
 
@@ -434,7 +445,8 @@ func (ba *BaseAccountData) IsEmpty() bool {
 		ba.TotalBoxBytes == 0 &&
 		ba.LastProposed == 0 &&
 		ba.LastHeartbeat == 0 &&
-		ba.BaseVotingData.IsEmpty()
+		ba.BaseVotingData.IsEmpty() &&
+		ba.SponsoredAssetsOffset == 0
 }
 
 // IsEmpty returns true if all of the fields are zero.
@@ -582,7 +594,8 @@ func (rd *ResourcesData) IsEmptyAssetFields() bool {
 		rd.Manager.IsZero() &&
 		rd.Reserve.IsZero() &&
 		rd.Freeze.IsZero() &&
-		rd.Clawback.IsZero()
+		rd.Clawback.IsZero() &&
+		rd.Sponsor.IsZero()
 }
 
 // IsAsset returns true if the flag is ResourceFlagsEmptyAsset and the fields are not empty.
@@ -659,6 +672,7 @@ func (rd *ResourcesData) GetAssetParams() basics.AssetParams {
 func (rd *ResourcesData) ClearAssetHolding() {
 	rd.Amount = 0
 	rd.Frozen = false
+	rd.Sponsor = basics.Address{}
 
 	rd.ResourceFlags |= ResourceFlagsNotHolding
 	hadParams := (rd.ResourceFlags & ResourceFlagsOwnership) == ResourceFlagsOwnership
@@ -673,6 +687,7 @@ func (rd *ResourcesData) ClearAssetHolding() {
 func (rd *ResourcesData) SetAssetHolding(ah basics.AssetHolding) {
 	rd.Amount = ah.Amount
 	rd.Frozen = ah.Frozen
+	rd.Sponsor = ah.Sponsor
 	rd.ResourceFlags &= ^(ResourceFlagsNotHolding + ResourceFlagsEmptyAsset)
 	// ResourceFlagsHolding is set implicitly since it is zero
 	if rd.IsEmptyAssetFields() {
@@ -683,8 +698,9 @@ func (rd *ResourcesData) SetAssetHolding(ah basics.AssetHolding) {
 // GetAssetHolding getter for asset holding.
 func (rd *ResourcesData) GetAssetHolding() basics.AssetHolding {
 	return basics.AssetHolding{
-		Amount: rd.Amount,
-		Frozen: rd.Frozen,
+		Amount:  rd.Amount,
+		Frozen:  rd.Frozen,
+		Sponsor: rd.Sponsor,
 	}
 }
 

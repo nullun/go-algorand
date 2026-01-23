@@ -36,6 +36,7 @@ func AssetHolding(ah basics.AssetHolding, ai basics.AssetIndex) model.AssetHoldi
 		Amount:   ah.Amount,
 		AssetID:  ai,
 		IsFrozen: ah.Frozen,
+		Sponsor:  ah.Sponsor,
 	}
 }
 
@@ -45,7 +46,6 @@ func AccountDataToAccount(
 	lastRound basics.Round, consensus *config.ConsensusParams,
 	amountWithoutPendingRewards basics.MicroAlgos,
 ) (model.Account, error) {
-
 	assets := make([]model.AssetHolding, 0, len(record.Assets))
 	for curid, holding := range record.Assets {
 		// Empty is ok, asset may have been deleted, so we can no
@@ -265,8 +265,9 @@ func AccountToAccountData(a *model.Account) (basics.AccountData, error) {
 		assets = make(map[basics.AssetIndex]basics.AssetHolding, len(*a.Assets))
 		for _, h := range *a.Assets {
 			assets[h.AssetID] = basics.AssetHolding{
-				Amount: h.Amount,
-				Frozen: h.IsFrozen,
+				Amount:  h.Amount,
+				Frozen:  h.IsFrozen,
+				Sponsor: h.Sponsor,
 			}
 		}
 	}

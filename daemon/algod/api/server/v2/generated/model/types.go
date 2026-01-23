@@ -440,6 +440,9 @@ type AssetHolding struct {
 
 	// IsFrozen \[f\] whether or not the holding is frozen.
 	IsFrozen bool `json:"is-frozen"`
+
+	// Sponsor \[s\] address that's providing the minimum balance requirement allocation.
+	Sponsor basics.Address `json:"sponsor"`
 }
 
 // AssetHoldingReference References an asset held by an account.

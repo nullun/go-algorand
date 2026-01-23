@@ -345,7 +345,9 @@ func AssetTransfer(ct transactions.AssetTransferTxnFields, header transactions.H
 			}
 
 			rcvHolding.Frozen = params.DefaultFrozen
+			rcvHolding.Sponsor = header.Sender
 
+			// // OLD FIRST IMP
 			// beneficiaryAlgos := basics.MicroAlgos{Raw: 100000} // 0.1 Algo minimum balance for asset holding
 			// if rcvRecord.IsZero() {
 			// 	beneficiaryAlgos = basics.MicroAlgos{Raw: 100000 + 100000} // extra 0.1 Algo for account creation
@@ -358,11 +360,24 @@ func AssetTransfer(ct transactions.AssetTransferTxnFields, header transactions.H
 			}
 
 			rcvRecord.TotalAssets = basics.AddSaturate(rcvRecord.TotalAssets, 1)
+			// TODO: Overflow check? OverflowTracker is for unsigned only
+			rcvRecord.SponsoredAssetsOffset = rcvRecord.SponsoredAssetsOffset - 1
 			err = balances.Put(ct.AssetReceiver, rcvRecord)
 			if err != nil {
 				return err
 			}
 
+			sndRecord, err := balances.Get(header.Sender, false)
+			if err != nil {
+				return err
+			}
+
+			sndRecord.SponsoredAssetsOffset = sndRecord.SponsoredAssetsOffset + 1
+			err = balances.Put(header.Sender, sndRecord)
+			if err != nil {
+				return err
+			}
+			// // OLD FIRST IMP
 			// // Benefactor provides MBR to beneficiary.
 			// err = balances.Move(header.Sender, ct.AssetReceiver, beneficiaryAlgos, &ad.SenderRewards, &ad.ReceiverRewards)
 			// if err != nil {
@@ -383,13 +398,14 @@ func AssetTransfer(ct transactions.AssetTransferTxnFields, header transactions.H
 			fmt.Println("New min balance:", newMinBalance)
 			differenceMinBalance, overflow := basics.OSubA(newMinBalance, currentMinBalance)
 			fmt.Println("Difference min balance:", differenceMinBalance, "Overflow:", overflow)
-			if !overflow {
-				// Benefactor provides MBR to beneficiary.
-				err = balances.Move(header.Sender, ct.AssetReceiver, differenceMinBalance, &ad.SenderRewards, &ad.ReceiverRewards)
-				if err != nil {
-					return err
-				}
-			}
+			// // NEWER IMP, but instead of move, we just inc/dec TotalAssets & SponsoredAssetsOffset
+			// if !overflow {
+			// 	// Benefactor provides MBR to beneficiary.
+			// 	err = balances.Move(header.Sender, ct.AssetReceiver, differenceMinBalance, &ad.SenderRewards, &ad.ReceiverRewards)
+			// 	if err != nil {
+			// 		return err
+			// 	}
+			// }
 		}
 	}
 

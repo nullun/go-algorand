@@ -332,12 +332,6 @@ func AssetTransfer(ct transactions.AssetTransferTxnFields, header transactions.H
 			if err != nil {
 				return err
 			}
-			currentMinBalance := basics.MicroAlgos{}
-			proto := balances.ConsensusParams()
-			if !rcvRecord.IsZero() {
-				currentMinBalance = rcvRecord.MinBalance(&proto)
-			}
-			fmt.Println("Current min balance:", currentMinBalance)
 
 			// Initialize holding with default Frozen value.
 			params, _, err := getParams(balances, ct.XferAsset)
@@ -362,16 +356,6 @@ func AssetTransfer(ct transactions.AssetTransferTxnFields, header transactions.H
 				return err
 			}
 
-			sndRecord, err := balances.Get(header.Sender, false)
-			if err != nil {
-				return err
-			}
-			sndRecord.SponsoredAssetsOffset = sndRecord.SponsoredAssetsOffset + 1
-			err = balances.Put(header.Sender, sndRecord)
-			if err != nil {
-				return err
-			}
-
 			err = balances.PutAssetHolding(ct.AssetReceiver, ct.XferAsset, rcvHolding)
 			if err != nil {
 				return err
@@ -382,18 +366,16 @@ func AssetTransfer(ct transactions.AssetTransferTxnFields, header transactions.H
 				return err
 			}
 
-			newMinBalance := rcvRecord.MinBalance(&proto)
-			fmt.Println("New min balance:", newMinBalance)
-			differenceMinBalance, overflow := basics.OSubA(newMinBalance, currentMinBalance)
-			fmt.Println("Difference min balance:", differenceMinBalance, "Overflow:", overflow)
-			// // NEWER IMP, but instead of move, we just inc/dec TotalAssets & SponsoredAssetsOffset
-			// if !overflow {
-			// 	// Benefactor provides MBR to beneficiary.
-			// 	err = balances.Move(header.Sender, ct.AssetReceiver, differenceMinBalance, &ad.SenderRewards, &ad.ReceiverRewards)
-			// 	if err != nil {
-			// 		return err
-			// 	}
-			// }
+			// Allocate MBR on Sender by incrementing their SponsoredAssetsOffset.
+			sndRecord, err := balances.Get(header.Sender, false)
+			if err != nil {
+				return err
+			}
+			sndRecord.SponsoredAssetsOffset = sndRecord.SponsoredAssetsOffset + 1
+			err = balances.Put(header.Sender, sndRecord)
+			if err != nil {
+				return err
+			}
 		}
 	}
 
@@ -491,6 +473,21 @@ func AssetTransfer(ct transactions.AssetTransferTxnFields, header transactions.H
 
 		if sndHolding.Amount != 0 {
 			return fmt.Errorf("asset %v not zero (%d) after closing", ct.XferAsset, sndHolding.Amount)
+		}
+
+		// Update SponsoredAssetsOffsets if holding was sponsored.
+		if !sndHolding.Sponsor.IsZero() {
+			record.SponsoredAssetsOffset = record.SponsoredAssetsOffset + 1
+
+			sponsorRecord, err2 := balances.Get(sndHolding.Sponsor, false)
+			if err2 != nil {
+				return err2
+			}
+			sponsorRecord.SponsoredAssetsOffset = sponsorRecord.SponsoredAssetsOffset - 1
+			err = balances.Put(sndHolding.Sponsor, sponsorRecord)
+			if err != nil {
+				return err
+			}
 		}
 
 		record.TotalAssets = basics.SubSaturate(record.TotalAssets, 1)

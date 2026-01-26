@@ -141,10 +141,7 @@ func (s SignedTxn) Benefactor() basics.Address {
 
 // IsSponsored returns true if the transaction is sponsored.
 func (s SignedTxn) IsSponsored() bool {
-	if !s.Txn.Sponsor.IsZero() && !s.Sponsor.Blank() {
-		return true
-	}
-	return false
+	return !s.Txn.Sponsor.IsZero()
 }
 
 // AssembleSignedTxn assembles a multisig-signed transaction from a transaction an optional sig, and an optional multisig.

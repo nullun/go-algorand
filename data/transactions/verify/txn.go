@@ -86,6 +86,7 @@ var errTxnSigNotWellFormed = errors.New("signedtxn should only have one of Sig o
 var errRekeyingNotSupported = errors.New("nonempty AuthAddr but rekeying is not supported")
 var errAuthAddrEqualsSender = errors.New("AuthAddr must be different from Sender")
 var errSponsoredFeeNotSupported = errors.New("nonempty Sponsor but sponsoring is not supported")
+var errTxnSigHasNoSponsorSig = errors.New("signedtxn has no sponsor sig")
 var errUnknownSignature = errors.New("has one mystery sig. WAT?")
 
 // TxGroupErrorReason is reason code for ErrTxGroupError
@@ -232,7 +233,7 @@ func txnGroupBatchPrep(stxs []transactions.SignedTxn, contextHdr *bookkeeping.Bl
 			return nil, prepErr
 		}
 		feesPaid = basics.AddSaturate(feesPaid, stxn.Txn.Fee.Raw)
-		lSigPooledSize += stxn.Lsig.Len()
+		lSigPooledSize += stxn.Lsig.Len() + stxn.Sponsor.Lsig.Len()
 		if stxn.Txn.Type == protocol.StateProofTx {
 			// State proofs are free, bail before incrementing
 			continue
@@ -336,10 +337,15 @@ func stxnCoreChecks(gi int, groupCtx *GroupContext, batchVerifier crypto.BatchVe
 	}
 
 	if stxn.IsSponsored() {
-		sponsorSigType, err := checkTxnSigTypeCounts(&stxn.SignatureFields, gi)
+		sponsorSigType, err := checkTxnSigTypeCounts(&stxn.Sponsor.SignatureFields, gi)
 		if err != nil {
 			return err
 		}
+
+		if sponsorSigType == missingSig {
+			return &TxGroupError{err: errTxnSigHasNoSponsorSig, GroupIndex: gi, Reason: TxGroupErrorReasonHasNoSig}
+		}
+
 		return enqueueAuthSigVerify(stxn.SponsorAuthorizer(), &stxn.Sponsor.SignatureFields, &stxn.Txn, gi, groupCtx, sponsorSigType, batchVerifier)
 	}
 
@@ -551,6 +557,7 @@ func PaysetGroups(ctx context.Context, payset [][]transactions.SignedTxn, blkHea
 					txnGroups := arg.([][]transactions.SignedTxn)
 					groupCtxs := make([]*GroupContext, len(txnGroups))
 
+					// TODO: Do we want to assume a percentage of transactions contain sponsors? Or include the exact number in the count somehow?
 					batchVerifier := crypto.MakeBatchVerifierWithHint(len(payset))
 					for i, signTxnsGrp := range txnGroups {
 						groupCtxs[i], grpErr = txnGroupBatchPrep(signTxnsGrp, &blkHeader, ledger, batchVerifier, nil)

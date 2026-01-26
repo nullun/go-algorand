@@ -314,6 +314,44 @@ func AssetTransfer(ct transactions.AssetTransferTxnFields, header transactions.H
 			if err != nil {
 				return err
 			}
+		} else {
+			// When an account performs an Asset "OptIn" transaction whilst a holding
+			// already exists for the asset and it's sponsored, the account is
+			// discharging the sponsor from their MBR responsibility. The required MBR
+			// must now be maintained on the asset holding's account itself.
+			if sponsor := sndHolding.Sponsor; !sponsor.IsZero() {
+
+				// Deallocate MBR from Sponsor
+				// -1 to their SponsoredAssetsOffset
+				sponsorRecord, err := balances.Get(sponsor, false)
+				if err != nil {
+					return err
+				}
+				sponsorRecord.SponsoredAssetsOffset = sponsorRecord.SponsoredAssetsOffset - 1
+				err = balances.Put(sponsor, sponsorRecord)
+				if err != nil {
+					return err
+				}
+
+				// Allocate MBR to Holder
+				// +1 from their SponsoredAssetsOffset
+				sndRecord, err := balances.Get(source, false)
+				if err != nil {
+					return err
+				}
+				sndRecord.SponsoredAssetsOffset = sndRecord.SponsoredAssetsOffset + 1
+				err = balances.Put(source, sndRecord)
+				if err != nil {
+					return err
+				}
+
+				// Remove Sponsor from the holdings
+				sndHolding.Sponsor = basics.Address{}
+				err = balances.PutAssetHolding(source, ct.XferAsset, sndHolding)
+				if err != nil {
+					return err
+				}
+			}
 		}
 	}
 

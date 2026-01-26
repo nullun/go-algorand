@@ -35,14 +35,14 @@ import (
 var emptySchema = basics.StateSchema{}
 
 // SignTransactionWithWallet signs the passed transaction with keys from the wallet associated with the passed walletHandle
-func (c *Client) SignTransactionWithWallet(walletHandle, pw []byte, utx transactions.Transaction) (stx transactions.SignedTxn, err error) {
+func (c *Client) SignTransactionWithWallet(walletHandle, pw []byte, utx transactions.Transaction, sponsored bool) (stx transactions.SignedTxn, err error) {
 	kmd, err := c.ensureKmdClient()
 	if err != nil {
 		return
 	}
 
 	// Sign the transaction
-	resp, err := kmd.SignTransaction(walletHandle, pw, crypto.PublicKey{}, utx)
+	resp, err := kmd.SignTransaction(walletHandle, pw, crypto.PublicKey{}, utx, sponsored)
 	if err != nil {
 		return
 	}
@@ -56,7 +56,7 @@ func (c *Client) SignTransactionWithWallet(walletHandle, pw []byte, utx transact
 // If signerAddr is the empty string, just infer spending key from the sender address.
 func (c *Client) SignTransactionWithWalletAndSigner(walletHandle, pw []byte, signerAddr string, utx transactions.Transaction) (stx transactions.SignedTxn, err error) {
 	if signerAddr == "" {
-		return c.SignTransactionWithWallet(walletHandle, pw, utx)
+		return c.SignTransactionWithWallet(walletHandle, pw, utx, false)
 	}
 
 	kmd, err := c.ensureKmdClient()
@@ -69,13 +69,44 @@ func (c *Client) SignTransactionWithWalletAndSigner(walletHandle, pw []byte, sig
 		return
 	}
 	// Sign the transaction
-	resp, err := kmd.SignTransaction(walletHandle, pw, crypto.PublicKey(authaddr), utx)
+	resp, err := kmd.SignTransaction(walletHandle, pw, crypto.PublicKey(authaddr), utx, false)
 	if err != nil {
 		return
 	}
 
 	// Decode the SignedTxn
 	err = protocol.Decode(resp.SignedTransaction, &stx)
+	return
+}
+
+// SignTransactionWithWalletAndSponsor signs the passed transaction under a specific sponsor (which may differ from the sender's address). This is necessary after an account has been rekeyed.
+// If sponsorAddr is the empty string, just infer spending key from the sender address.
+func (c *Client) SignTransactionWithWalletAndSponsor(walletHandle, pw []byte, sponsorAddr string, utx transactions.Transaction) (stx transactions.SignedTxn, err error) {
+	stxn, err := c.SignTransactionWithWallet(walletHandle, pw, utx, false)
+
+	if sponsorAddr == "" {
+		return stxn, err
+	}
+
+	kmd, err := c.ensureKmdClient()
+	if err != nil {
+		return
+	}
+
+	spsrAddr, err := basics.UnmarshalChecksumAddress(sponsorAddr)
+	if err != nil {
+		return
+	}
+	// Sign the transaction
+	resp, err := kmd.SignTransaction(walletHandle, pw, crypto.PublicKey(spsrAddr), utx, true)
+	if err != nil {
+		return
+	}
+
+	// Decode the SignedTxn
+	err = protocol.Decode(resp.SignedTransaction, &stx)
+	stx.SignatureFields = stxn.SignatureFields
+
 	return
 }
 
@@ -199,7 +230,7 @@ func (c *Client) BroadcastTransactionGroup(txgroup []transactions.SignedTxn) err
 // SignAndBroadcastTransaction signs the unsigned transaction with keys from the default wallet, and broadcasts it
 func (c *Client) SignAndBroadcastTransaction(walletHandle, pw []byte, utx transactions.Transaction) (txid string, err error) {
 	// Sign the transaction
-	stx, err := c.SignTransactionWithWallet(walletHandle, pw, utx)
+	stx, err := c.SignTransactionWithWallet(walletHandle, pw, utx, false)
 	if err != nil {
 		return
 	}
@@ -274,7 +305,6 @@ func generateRegistrationTransaction(part model.ParticipationKey, fee basics.Mic
 
 // MakeRegistrationTransactionWithGenesisID Generates a Registration transaction with the genesis ID set from the suggested parameters of the client
 func (c *Client) MakeRegistrationTransactionWithGenesisID(part account.Participation, fee uint64, txnFirstValid, txnLastValid basics.Round, leaseBytes [32]byte, includeStateProofKeys bool) (transactions.Transaction, error) {
-
 	// Get current round, protocol, genesis ID
 	params, err := c.cachedSuggestedParams()
 	if err != nil {

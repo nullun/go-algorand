@@ -176,6 +176,7 @@ type APIV1POSTTransactionSignRequest struct {
 	Transaction    []byte           `json:"transaction"`
 	PublicKey      crypto.PublicKey `json:"public_key"`
 	WalletPassword string           `json:"wallet_password"`
+	Sponsored      bool             `json:"sponsored"`
 }
 
 // APIV1POSTProgramSignRequest is the request for `POST /v1/program/sign`

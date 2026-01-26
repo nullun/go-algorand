@@ -99,7 +99,6 @@ func (lwd *LedgerWalletDriver) FetchWallet(id []byte) (w wallet.Wallet, err erro
 // scanWalletsLocked enumerates attached ledger devices and stores them.
 // lwd.mu must be held
 func (lwd *LedgerWalletDriver) scanWalletsLocked() error {
-
 	if os.Getenv("KMD_NOUSB") != "" {
 		return nil
 	}
@@ -321,7 +320,7 @@ func (lw *LedgerWallet) DeleteMultisigAddr(addr crypto.Digest, pw []byte) error 
 }
 
 // SignTransaction implements the Wallet interface.
-func (lw *LedgerWallet) SignTransaction(tx transactions.Transaction, pk crypto.PublicKey, pw []byte) ([]byte, error) {
+func (lw *LedgerWallet) SignTransaction(tx transactions.Transaction, pk crypto.PublicKey, pw []byte, sponsored bool) ([]byte, error) {
 	pks, err := lw.ListKeys()
 	if err != nil {
 		return nil, err
@@ -344,11 +343,23 @@ func (lw *LedgerWallet) SignTransaction(tx transactions.Transaction, pk crypto.P
 		return nil, err
 	}
 
-	stxn := transactions.SignedTxn{
-		Txn: tx,
-		SignatureFields: transactions.SignatureFields{
-			Sig: sig,
-		},
+	var stxn transactions.SignedTxn
+	if sponsored {
+		stxn = transactions.SignedTxn{
+			Txn: tx,
+			Sponsor: transactions.SponsorSig{
+				SignatureFields: transactions.SignatureFields{
+					Sig: sig,
+				},
+			},
+		}
+	} else {
+		stxn = transactions.SignedTxn{
+			Txn: tx,
+			SignatureFields: transactions.SignatureFields{
+				Sig: sig,
+			},
+		}
 	}
 
 	// Set the AuthAddr if the key we signed with doesn't match the txn sender

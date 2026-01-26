@@ -341,12 +341,14 @@ func parseAppInputs(inputs appCallInputs) ([][]byte, libgoal.RefBundle) {
 	locals := util.Map(inputs.Locals, func(hr localRef) basics.LocalRef {
 		return basics.LocalRef{
 			App:     basics.AppIndex(hr.appID),
-			Address: cliAddress(hr.address)}
+			Address: cliAddress(hr.address),
+		}
 	})
 	holdings := util.Map(inputs.Holdings, func(hr holdingRef) basics.HoldingRef {
 		return basics.HoldingRef{
 			Asset:   basics.AssetIndex(hr.assetID),
-			Address: cliAddress(hr.address)}
+			Address: cliAddress(hr.address),
+		}
 	})
 	boxes := util.Map(inputs.Boxes, func(br boxRef) basics.BoxRef {
 		rawName, err := br.name.Raw()
@@ -1439,7 +1441,6 @@ var methodAppCmd = &cobra.Command{
 		appCallTxn, err := client.MakeUnsignedApplicationCallTx(
 			appIdx, applicationArgs, refs,
 			onCompletionEnum, approvalProg, clearProg, globalSchema, localSchema, extraPages, rejectVersion)
-
 		if err != nil {
 			reportErrorf("Cannot create application txn: %v", err)
 		}
@@ -1500,7 +1501,7 @@ var methodAppCmd = &cobra.Command{
 				continue
 			}
 
-			signedTxn, signErr := createSignedTransaction(client, shouldSign, dataDir, walletName, unsignedTxn, txnFromArgs.AuthAddr)
+			signedTxn, signErr := createSignedTransaction(client, shouldSign, dataDir, walletName, unsignedTxn, txnFromArgs.AuthAddr, basics.Address{})
 			if signErr != nil {
 				reportErrorf(errorSigningTX, signErr)
 			}
@@ -1564,7 +1565,7 @@ var methodAppCmd = &cobra.Command{
 			}
 
 			// the 4-byte prefix for logged return values, from https://github.com/algorandfoundation/ARCs/blob/main/ARCs/arc-0004.md#standard-format
-			var abiReturnHash = []byte{0x15, 0x1f, 0x7c, 0x75}
+			abiReturnHash := []byte{0x15, 0x1f, 0x7c, 0x75}
 
 			if resp.Logs == nil || len(*resp.Logs) == 0 {
 				reportErrorf("method %s succeed but did not log a return value", method)

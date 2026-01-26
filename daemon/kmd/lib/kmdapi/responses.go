@@ -72,7 +72,7 @@ type APIV1GETWalletsResponse struct {
 // Response to `GET /v1/wallets`
 // swagger:response ListWalletsResponse
 type listWalletsResponse struct {
-	//in: body
+	// in: body
 	Body *APIV1GETWalletsResponse
 }
 
@@ -238,7 +238,7 @@ type APIV1POSTKeyListResponse struct {
 // Response to `POST /v1/key/list`
 // swagger:response ListKeysResponse
 type listKeysResponse struct {
-	//in: body
+	// in: body
 	Body *APIV1POSTKeyListResponse
 }
 

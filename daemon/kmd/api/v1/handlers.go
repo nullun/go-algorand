@@ -835,7 +835,6 @@ func postTransactionSignHandler(ctx reqContext, w http.ResponseWriter, r *http.R
 	// Decode the transaction
 	var tx transactions.Transaction
 	err = protocol.Decode(req.Transaction, &tx)
-
 	// Ensure we were able to decode the transaction
 	if err != nil {
 		errorResponse(w, http.StatusBadRequest, errCouldNotDecodeTx)
@@ -843,7 +842,7 @@ func postTransactionSignHandler(ctx reqContext, w http.ResponseWriter, r *http.R
 	}
 
 	// Sign the transaction
-	stx, err := wallet.SignTransaction(tx, req.PublicKey, []byte(req.WalletPassword))
+	stx, err := wallet.SignTransaction(tx, req.PublicKey, []byte(req.WalletPassword), req.Sponsored)
 	if err != nil {
 		errorResponse(w, http.StatusBadRequest, err)
 		return
@@ -1119,7 +1118,6 @@ func postMultisigTransactionSignHandler(ctx reqContext, w http.ResponseWriter, r
 	// Decode the transaction
 	var tx transactions.Transaction
 	err = protocol.Decode(req.Transaction, &tx)
-
 	// Ensure we were able to decode the transaction
 	if err != nil {
 		errorResponse(w, http.StatusBadRequest, errCouldNotDecodeTx)

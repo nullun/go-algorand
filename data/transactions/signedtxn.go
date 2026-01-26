@@ -38,6 +38,7 @@ type SignedTxn struct {
 	Txn     Transaction `codec:"txn"`
 }
 
+// SignatureFields contain the different type of signatures
 type SignatureFields struct {
 	_struct struct{} `codec:",omitempty,omitemptyarray"`
 

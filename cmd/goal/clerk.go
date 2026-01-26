@@ -66,6 +66,7 @@ var (
 	protoVersion       string
 	rekeyToAddress     string
 	signerAddress      string
+	sponsorAddress     string
 	rawOutput          bool
 	requestFilename    string
 	requestOutFilename string
@@ -109,6 +110,7 @@ func init() {
 	sendCmd.Flags().Uint64VarP(&amount, "amount", "a", 0, "The amount to be transferred (required), in microAlgos")
 	sendCmd.Flags().StringVarP(&closeToAddress, "close-to", "c", "", "Close account and send remainder to this address")
 	sendCmd.Flags().StringVar(&rekeyToAddress, "rekey-to", "", "Rekey account to the given spending key/address. (Future transactions from this account will need to be signed with the new key.)")
+	sendCmd.Flags().StringVar(&sponsorAddress, "sponsor", "", "Address of sponsor to sign with and deduct transaction fee from. Must be different from transaction \"from\" address")
 	sendCmd.Flags().StringVarP(&programSource, "from-program", "F", "", "Program source file to use as account logic")
 	sendCmd.Flags().StringVarP(&progByteFile, "from-program-bytes", "P", "", "Program binary to use as account logic")
 	sendCmd.Flags().StringSliceVar(&argB64Strings, "argb64", nil, "Base64 encoded args to pass to transaction logic")
@@ -129,6 +131,7 @@ func init() {
 	signCmd.Flags().StringVarP(&txFilename, "infile", "i", "", "Partially-signed transaction file to add signature to")
 	signCmd.Flags().StringVarP(&outFilename, "outfile", "o", "", "Filename for writing the signed transaction")
 	signCmd.Flags().StringVarP(&signerAddress, "signer", "S", "", "Address of key to sign with, if different from transaction \"from\" address due to rekeying")
+	signCmd.Flags().StringVar(&sponsorAddress, "sponsor", "", "Address of sponsor to sign with and deduct transaction fee from. Must be different from transaction \"from\" address")
 	signCmd.Flags().StringVarP(&programSource, "program", "p", "", "Program source file to use as account logic")
 	signCmd.Flags().StringVarP(&logicSigFile, "logic-sig", "L", "", "LogicSig to apply to transaction")
 	signCmd.Flags().StringSliceVar(&argB64Strings, "argb64", nil, "Base64 encoded args to pass to transaction logic")
@@ -190,7 +193,7 @@ var clerkCmd = &cobra.Command{
 	Long:  `Collection of commands to support the management of transaction information.`,
 	Args:  validateNoPosArgsFn,
 	Run: func(cmd *cobra.Command, args []string) {
-		//If no arguments passed, we should fallback to help
+		// If no arguments passed, we should fallback to help
 		cmd.HelpFunc()(cmd, args)
 	},
 }
@@ -234,14 +237,18 @@ func waitForCommit(client libgoal.Client, txid string, transactionLastValidRound
 	return
 }
 
-func createSignedTransaction(client libgoal.Client, signTx bool, dataDir string, walletName string, tx transactions.Transaction, signer basics.Address) (stxn transactions.SignedTxn, err error) {
+func createSignedTransaction(client libgoal.Client, signTx bool, dataDir string, walletName string, tx transactions.Transaction, signer basics.Address, sponsor basics.Address) (stxn transactions.SignedTxn, err error) {
 	if signTx {
 		// Sign the transaction
 		wh, pw := ensureWalletHandleMaybePassword(dataDir, walletName, true)
-		if signer.IsZero() {
-			stxn, err = client.SignTransactionWithWallet(wh, pw, tx)
-		} else {
+		if signer.IsZero() && sponsor.IsZero() {
+			stxn, err = client.SignTransactionWithWallet(wh, pw, tx, false)
+		} else if !signer.IsZero() && sponsor.IsZero() {
 			stxn, err = client.SignTransactionWithWalletAndSigner(wh, pw, signer.String(), tx)
+		} else if signer.IsZero() && !sponsor.IsZero() {
+			stxn, err = client.SignTransactionWithWalletAndSponsor(wh, pw, sponsor.String(), tx)
+		} else {
+			reportErrorf("Signer and Sponsor are mutually exclusive, only use one")
 		}
 		return
 	}
@@ -263,11 +270,12 @@ func writeSignedTxnsToFile(stxns []transactions.SignedTxn, filename string) erro
 		outData = append(outData, protocol.Encode(&stxns[i])...)
 	}
 
-	return writeFile(filename, outData, 0600)
+	return writeFile(filename, outData, 0o600)
 }
 
 func writeTxnToFile(client libgoal.Client, signTx bool, dataDir string, walletName string, tx transactions.Transaction, filename string) error {
 	var authAddr basics.Address
+	var sponsor basics.Address
 	var err error
 	if signerAddress != "" {
 		authAddr, err = basics.UnmarshalChecksumAddress(signerAddress)
@@ -279,7 +287,17 @@ func writeTxnToFile(client libgoal.Client, signTx bool, dataDir string, walletNa
 		}
 	}
 
-	stxn, err := createSignedTransaction(client, signTx, dataDir, walletName, tx, authAddr)
+	if sponsorAddress != "" {
+		sponsor, err = basics.UnmarshalChecksumAddress(sponsorAddress)
+		if err != nil {
+			reportErrorf("Sponsor invalid (%s): %v", signerAddress, err)
+		}
+		if authAddr == tx.Sender {
+			reportErrorf("Sponsor cannot be the same as the transaction sender")
+		}
+	}
+
+	stxn, err := createSignedTransaction(client, signTx, dataDir, walletName, tx, authAddr, sponsor)
 	if err != nil {
 		return err
 	}
@@ -304,7 +322,6 @@ func getB64Args(args []string) [][]byte {
 		}
 	}
 	return programArgs
-
 }
 
 func getProgramArgs() [][]byte {
@@ -457,6 +474,18 @@ var sendCmd = &cobra.Command{
 			}
 		}
 
+		var sponsor basics.Address
+		if sponsorAddress != "" {
+			sponsor, err = basics.UnmarshalChecksumAddress(sponsorAddress)
+			if err != nil {
+				reportErrorf("Sponsor invalid (%s): %v", sponsorAddress, err)
+			}
+			if sponsor == payment.Sender {
+				reportErrorf("Sponsor cannot be the same as the transaction sender")
+			}
+			payment.Sponsor = sponsor
+		}
+
 		var stx transactions.SignedTxn
 		if lsig.Logic != nil {
 
@@ -502,7 +531,7 @@ var sendCmd = &cobra.Command{
 					reportErrorf("Signer specified when txn won't be signed")
 				}
 			}
-			stx, err = createSignedTransaction(client, signTx, dataDir, walletName, payment, authAddr)
+			stx, err = createSignedTransaction(client, signTx, dataDir, walletName, payment, authAddr, sponsor)
 			if err != nil {
 				reportErrorf(errorSigningTX, err)
 			}
@@ -570,7 +599,7 @@ var sendCmd = &cobra.Command{
 			if dumpForDryrun {
 				err = writeDryrunReqToFile(client, stx, outFilename)
 			} else {
-				err = writeFile(outFilename, protocol.Encode(&stx), 0600)
+				err = writeFile(outFilename, protocol.Encode(&stx), 0o600)
 			}
 			if err != nil {
 				reportErrorln(err)
@@ -696,7 +725,7 @@ var rawsendCmd = &cobra.Command{
 				rejectsData = append(rejectsData, protocol.Encode(&txn)...)
 			}
 
-			f, err := os.OpenFile(rejectsFilename, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0666)
+			f, err := os.OpenFile(rejectsFilename, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o666)
 			if err != nil {
 				reportErrorf(fileWriteError, rejectsFilename, err.Error())
 			}
@@ -852,7 +881,6 @@ var signCmd = &cobra.Command{
 			if _, hasGroup := txnGroups[group]; !hasGroup {
 				// add a new group as needed.
 				groupsOrder = append(groupsOrder, group)
-
 			}
 			txnGroups[group] = append(txnGroups[group], uncheckedTxn)
 			txnIndex[uncheckedTxn] = count
@@ -907,7 +935,7 @@ var signCmd = &cobra.Command{
 			}
 		}
 
-		err = writeFile(outFilename, outData, 0600)
+		err = writeFile(outFilename, outData, 0o600)
 		if err != nil {
 			reportErrorf(fileWriteError, outFilename, err)
 		}
@@ -977,7 +1005,7 @@ var splitCmd = &cobra.Command{
 		outBase := outFilename[:len(outFilename)-len(outExt)]
 		for idx := range txns {
 			fn := fmt.Sprintf("%s-%d%s", outBase, idx, outExt)
-			err := writeFile(fn, protocol.Encode(&txns[idx]), 0600)
+			err := writeFile(fn, protocol.Encode(&txns[idx]), 0o600)
 			if err != nil {
 				reportErrorf(fileWriteError, outFilename, err)
 			}
@@ -1084,7 +1112,7 @@ func disassembleFile(fname, outname string) {
 	if outname == "" {
 		os.Stdout.Write([]byte(text))
 	} else {
-		err = writeFile(outname, []byte(text), 0666)
+		err = writeFile(outname, []byte(text), 0o666)
 		if err != nil {
 			reportErrorf("%s: %s", outname, err)
 		}
@@ -1139,7 +1167,7 @@ var compileCmd = &cobra.Command{
 				outblob = protocol.Encode(&ls)
 			}
 			if !noProgramOutput {
-				err := writeFile(outname, outblob, 0666)
+				err := writeFile(outname, outblob, 0o666)
 				if err != nil {
 					reportErrorf("%s: %s", outname, err)
 				}
@@ -1153,7 +1181,7 @@ var compileCmd = &cobra.Command{
 				if err != nil {
 					reportErrorf("%s: %s", mapname, err)
 				}
-				err = writeFile(mapname, pcblob, 0666)
+				err = writeFile(mapname, pcblob, 0o666)
 				if err != nil {
 					reportErrorf("%s: %s", mapname, err)
 				}
@@ -1185,7 +1213,7 @@ var dryrunCmd = &cobra.Command{
 			if err != nil {
 				reportErrorln(err)
 			}
-			writeFile(outFilename, data, 0600)
+			writeFile(outFilename, data, 0o600)
 			return
 		}
 
@@ -1226,7 +1254,6 @@ var dryrunCmd = &cobra.Command{
 		if params.EnableLogicSigSizePooling && lSigPooledSize > lSigMaxPooledSize {
 			reportErrorf("total lsigs size too large: %d > %d", lSigPooledSize, lSigMaxPooledSize)
 		}
-
 	},
 }
 
@@ -1347,7 +1374,7 @@ var simulateCmd = &cobra.Command{
 				ExtraOpcodeBudget:     simulateExtraOpcodeBudget,
 				ExecTraceConfig:       traceCmdOptionToSimulateTraceConfigModel(),
 			}
-			err := writeFile(requestOutFilename, protocol.EncodeJSON(simulateRequest), 0600)
+			err := writeFile(requestOutFilename, protocol.EncodeJSON(simulateRequest), 0o600)
 			if err != nil {
 				reportErrorf("write file error: %s", err.Error())
 			}
@@ -1388,7 +1415,7 @@ var simulateCmd = &cobra.Command{
 
 		encodedResponse := protocol.EncodeJSON(&simulateResponse)
 		if outFilename != "" {
-			err := writeFile(outFilename, encodedResponse, 0600)
+			err := writeFile(outFilename, encodedResponse, 0o600)
 			if err != nil {
 				reportErrorf("write file error: %s", err.Error())
 			}

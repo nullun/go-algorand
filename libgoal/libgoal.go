@@ -271,7 +271,6 @@ func (c *Client) ensureGenesisID() (string, error) {
 // GenesisID fetches the genesis ID for the running algod node
 func (c *Client) GenesisID() (string, error) {
 	response, err := c.ensureGenesisID()
-
 	if err != nil {
 		return "", err
 	}
@@ -473,7 +472,7 @@ func (c *Client) signAndBroadcastTransactionWithWallet(walletHandle, pw []byte, 
 		return transactions.Transaction{}, err
 	}
 	// TODO(rekeying) probably libgoal should allow passing in different public key to sign with
-	resp0, err := kmd.SignTransaction(walletHandle, pw, crypto.PublicKey{}, tx)
+	resp0, err := kmd.SignTransaction(walletHandle, pw, crypto.PublicKey{}, tx, false)
 	if err != nil {
 		return transactions.Transaction{}, err
 	}

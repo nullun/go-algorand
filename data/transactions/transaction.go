@@ -87,7 +87,7 @@ type Header struct {
 	Sponsor basics.Address `codec:"spsr"`
 
 	// Extras specifies a list of protocol level requirements or actions
-	// that must be adhered to to be considered a valid transaction. Failing an
+	// that must be adhered to, to be considered a valid transaction. Failing an
 	// enforcement is considered invalid transaction.
 	Extras []Extra `codec:"xtr,allocbound=bounds.MaxTxnExtras"`
 }

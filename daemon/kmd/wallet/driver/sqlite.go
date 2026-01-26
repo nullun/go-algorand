@@ -42,7 +42,7 @@ const (
 	sqliteWalletDriverName      = "sqlite"
 	sqliteWalletDriverVersion   = 1
 	sqliteWalletsDirName        = "sqlite_wallets"
-	sqliteWalletsDirPermissions = 0700
+	sqliteWalletsDirPermissions = 0o700
 	sqliteWalletDBOptions       = "_secure_delete=on&_txlock=exclusive"
 	sqliteMaxWalletNameLen      = 64
 	sqliteMaxWalletIDLen        = 64
@@ -51,9 +51,11 @@ const (
 	sqliteWalletHasMasterKey    = true
 )
 
-var sqliteWalletSupportedTxs = []protocol.TxType{protocol.PaymentTx, protocol.KeyRegistrationTx}
-var disallowedFilenameRegex = regexp.MustCompile("[^a-zA-Z0-9_-]*")
-var databaseFilenameRegex = regexp.MustCompile(`^.*\.db$`)
+var (
+	sqliteWalletSupportedTxs = []protocol.TxType{protocol.PaymentTx, protocol.KeyRegistrationTx}
+	disallowedFilenameRegex  = regexp.MustCompile("[^a-zA-Z0-9_-]*")
+	databaseFilenameRegex    = regexp.MustCompile(`^.*\.db$`)
+)
 
 var walletSchema = `
 CREATE TABLE IF NOT EXISTS metadata (
@@ -1110,7 +1112,7 @@ func (sw *SQLiteWallet) ListMultisigAddrs() (addrs []crypto.Digest, err error) {
 
 // SignTransaction signs the passed transaction with the private key whose public key is provided, or
 // if the provided public key is zero, inferring the required private key from the transaction itself
-func (sw *SQLiteWallet) SignTransaction(tx transactions.Transaction, pk crypto.PublicKey, pw []byte) (stx []byte, err error) {
+func (sw *SQLiteWallet) SignTransaction(tx transactions.Transaction, pk crypto.PublicKey, pw []byte, sponsor bool) (stx []byte, err error) {
 	// Check the password
 	err = sw.CheckPassword(pw)
 	if err != nil {
@@ -1136,7 +1138,12 @@ func (sw *SQLiteWallet) SignTransaction(tx transactions.Transaction, pk crypto.P
 	}
 
 	// Sign the transaction
-	stxn := tx.Sign(secrets)
+	var stxn transactions.SignedTxn
+	if sponsor {
+		stxn = tx.SignAsSponsor(secrets)
+	} else {
+		stxn = tx.Sign(secrets)
+	}
 	stx = protocol.Encode(&stxn)
 	return
 }

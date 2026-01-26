@@ -24,6 +24,7 @@ import (
 
 	"github.com/algorand/go-algorand/cmd/util/datadir"
 	"github.com/algorand/go-algorand/data/basics"
+	"github.com/algorand/go-algorand/data/transactions"
 	"github.com/algorand/go-algorand/libgoal"
 )
 
@@ -45,6 +46,7 @@ var (
 	assetNoReserve          bool
 	assetNoFreezer          bool
 	assetNoClawback         bool
+	assetSponsor            bool
 
 	assetNewManager  string
 	assetNewReserve  string
@@ -105,6 +107,7 @@ func init() {
 	sendAssetCmd.Flags().StringVarP(&toAddress, "to", "t", "", "Address to send to money to (required)")
 	sendAssetCmd.Flags().Uint64VarP(&amount, "amount", "a", 0, "The amount to be transferred (required), in base units of the asset.")
 	sendAssetCmd.Flags().StringVarP(&closeToAddress, "close-to", "c", "", "Close asset account and send remainder to this address")
+	sendAssetCmd.Flags().BoolVar(&assetSponsor, "sponsor-asset", false, "Sponsor the asset holding if recipient isn't already holding the asset")
 	sendAssetCmd.MarkFlagRequired("to")
 	sendAssetCmd.MarkFlagRequired("amount")
 
@@ -539,6 +542,10 @@ var sendAssetCmd = &cobra.Command{
 
 		tx.Note = parseNoteField(cmd)
 		tx.Lease = parseLease(cmd)
+
+		if assetSponsor {
+			tx.Extras = append(tx.Extras, transactions.AssetSponsored)
+		}
 
 		firstValid, lastValid, _, err = client.ComputeValidityRounds(firstValid, lastValid, numValidRounds)
 		if err != nil {

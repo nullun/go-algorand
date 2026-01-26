@@ -959,7 +959,7 @@ func changeAccountOnlineStatus(
 
 	// Sign & broadcast the transaction
 	wh, pw := ensureWalletHandleMaybePassword(dataDir, wallet, true)
-	signedTxn, err := client.SignTransactionWithWalletAndSigner(wh, pw, signerAddress, utx)
+	signedTxn, err := client.SignTransactionWithWalletAndSigner(wh, pw, signerAddress, sponsorAddress, utx)
 	if err != nil {
 		return fmt.Errorf(errorSigningTX, err)
 	}
@@ -1535,7 +1535,7 @@ var markNonparticipatingCmd = &cobra.Command{
 
 		// Sign & broadcast the transaction
 		wh, pw := ensureWalletHandleMaybePassword(dataDir, walletName, true)
-		signedTxn, err := client.SignTransactionWithWalletAndSigner(wh, pw, signerAddress, utx)
+		signedTxn, err := client.SignTransactionWithWalletAndSigner(wh, pw, signerAddress, sponsorAddress, utx)
 		if err != nil {
 			reportErrorf(errorSigningTX, err)
 		}

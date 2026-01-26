@@ -110,7 +110,7 @@ func init() {
 	sendCmd.Flags().Uint64VarP(&amount, "amount", "a", 0, "The amount to be transferred (required), in microAlgos")
 	sendCmd.Flags().StringVarP(&closeToAddress, "close-to", "c", "", "Close account and send remainder to this address")
 	sendCmd.Flags().StringVar(&rekeyToAddress, "rekey-to", "", "Rekey account to the given spending key/address. (Future transactions from this account will need to be signed with the new key.)")
-	sendCmd.Flags().StringVar(&sponsorAddress, "sponsor", "", "Address of sponsor to sign with and deduct transaction fee from. Must be different from transaction \"from\" address")
+	// sendCmd.Flags().StringVar(&sponsorAddress, "sponsor", "", "Address of sponsor to sign with and deduct transaction fee from. Must be different from transaction \"from\" address")
 	sendCmd.Flags().StringVarP(&programSource, "from-program", "F", "", "Program source file to use as account logic")
 	sendCmd.Flags().StringVarP(&progByteFile, "from-program-bytes", "P", "", "Program binary to use as account logic")
 	sendCmd.Flags().StringSliceVar(&argB64Strings, "argb64", nil, "Base64 encoded args to pass to transaction logic")
@@ -241,15 +241,14 @@ func createSignedTransaction(client libgoal.Client, signTx bool, dataDir string,
 	if signTx {
 		// Sign the transaction
 		wh, pw := ensureWalletHandleMaybePassword(dataDir, walletName, true)
-		if signer.IsZero() && sponsor.IsZero() {
-			stxn, err = client.SignTransactionWithWallet(wh, pw, tx, false)
-		} else if !signer.IsZero() && sponsor.IsZero() {
-			stxn, err = client.SignTransactionWithWalletAndSigner(wh, pw, signer.String(), tx)
-		} else if signer.IsZero() && !sponsor.IsZero() {
-			stxn, err = client.SignTransactionWithWalletAndSponsor(wh, pw, sponsor.String(), tx)
-		} else {
-			reportErrorf("Signer and Sponsor are mutually exclusive, only use one")
+		var signerAddr, sponsorAddr string
+		if !signer.IsZero() {
+			signerAddr = signer.String()
 		}
+		if !sponsor.IsZero() {
+			sponsorAddr = sponsor.String()
+		}
+		stxn, err = client.SignTransactionWithWalletAndSigner(wh, pw, signerAddr, sponsorAddr, tx)
 		return
 	}
 
@@ -926,7 +925,7 @@ var signCmd = &cobra.Command{
 					signedTxn = txnGroup[i]
 				} else {
 					// sign the usual way
-					signedTxn, err = client.SignTransactionWithWalletAndSigner(wh, pw, signerAddress, txnGroup[i].Txn)
+					signedTxn, err = client.SignTransactionWithWalletAndSigner(wh, pw, signerAddress, sponsorAddress, txnGroup[i].Txn)
 					if err != nil {
 						reportErrorf(errorSigningTX, err)
 					}

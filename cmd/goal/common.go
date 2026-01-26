@@ -69,4 +69,5 @@ func addTxnFlags(cmd *cobra.Command) {
 	cmd.Flags().Var(&dumpForDryrunFormat, "dryrun-dump-format", "Dryrun dump format: "+dumpForDryrunFormat.AllowedString())
 	cmd.Flags().StringSliceVar(&dumpForDryrunAccts, "dryrun-accounts", nil, "additional accounts to include into dryrun request obj")
 	cmd.Flags().StringVarP(&signerAddress, "signer", "S", "", "Address of key to sign with, if different from transaction \"from\" address due to rekeying")
+	cmd.Flags().StringVar(&sponsorAddress, "sponsor", "", "Address of sponsor to sign with and deduct transaction fee from. Must be different from transaction \"from\" address")
 }

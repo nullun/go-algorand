@@ -516,6 +516,7 @@ var createAppCmd = &cobra.Command{
 		// Fill in note and lease
 		tx.Note = parseNoteField(cmd)
 		tx.Lease = parseLease(cmd)
+		tx.Sponsor = cliAddress(sponsorAddress)
 
 		// Fill in rounds, fee, etc.
 		fv, lv, _, err := client.ComputeValidityRounds(firstValid, lastValid, numValidRounds)
@@ -535,7 +536,7 @@ var createAppCmd = &cobra.Command{
 		if outFilename == "" {
 			// Broadcast
 			wh, pw := ensureWalletHandleMaybePassword(dataDir, walletName, true)
-			signedTxn, err2 := client.SignTransactionWithWalletAndSigner(wh, pw, signerAddress, tx)
+			signedTxn, err2 := client.SignTransactionWithWalletAndSigner(wh, pw, signerAddress, sponsorAddress, tx)
 			if err2 != nil {
 				reportErrorf(errorSigningTX, err2)
 			}
@@ -596,6 +597,7 @@ var updateAppCmd = &cobra.Command{
 		// Fill in note and lease
 		tx.Note = parseNoteField(cmd)
 		tx.Lease = parseLease(cmd)
+		tx.Sponsor = cliAddress(sponsorAddress)
 
 		// Fill in rounds, fee, etc.
 		fv, lv, _, err := client.ComputeValidityRounds(firstValid, lastValid, numValidRounds)
@@ -615,7 +617,7 @@ var updateAppCmd = &cobra.Command{
 		// Broadcast or write transaction to file
 		if outFilename == "" {
 			wh, pw := ensureWalletHandleMaybePassword(dataDir, walletName, true)
-			signedTxn, err2 := client.SignTransactionWithWalletAndSigner(wh, pw, signerAddress, tx)
+			signedTxn, err2 := client.SignTransactionWithWalletAndSigner(wh, pw, signerAddress, sponsorAddress, tx)
 			if err2 != nil {
 				reportErrorf(errorSigningTX, err2)
 			}
@@ -666,6 +668,7 @@ var optInAppCmd = &cobra.Command{
 		// Fill in note and lease
 		tx.Note = parseNoteField(cmd)
 		tx.Lease = parseLease(cmd)
+		tx.Sponsor = cliAddress(sponsorAddress)
 
 		// Fill in rounds, fee, etc.
 		fv, lv, _, err := client.ComputeValidityRounds(firstValid, lastValid, numValidRounds)
@@ -685,7 +688,7 @@ var optInAppCmd = &cobra.Command{
 		// Broadcast or write transaction to file
 		if outFilename == "" {
 			wh, pw := ensureWalletHandleMaybePassword(dataDir, walletName, true)
-			signedTxn, err2 := client.SignTransactionWithWalletAndSigner(wh, pw, signerAddress, tx)
+			signedTxn, err2 := client.SignTransactionWithWalletAndSigner(wh, pw, signerAddress, sponsorAddress, tx)
 			if err2 != nil {
 				reportErrorf(errorSigningTX, err2)
 			}
@@ -736,6 +739,7 @@ var closeOutAppCmd = &cobra.Command{
 		// Fill in note and lease
 		tx.Note = parseNoteField(cmd)
 		tx.Lease = parseLease(cmd)
+		tx.Sponsor = cliAddress(sponsorAddress)
 
 		// Fill in rounds, fee, etc.
 		fv, lv, _, err := client.ComputeValidityRounds(firstValid, lastValid, numValidRounds)
@@ -755,7 +759,7 @@ var closeOutAppCmd = &cobra.Command{
 		// Broadcast or write transaction to file
 		if outFilename == "" {
 			wh, pw := ensureWalletHandleMaybePassword(dataDir, walletName, true)
-			signedTxn, err2 := client.SignTransactionWithWalletAndSigner(wh, pw, signerAddress, tx)
+			signedTxn, err2 := client.SignTransactionWithWalletAndSigner(wh, pw, signerAddress, sponsorAddress, tx)
 			if err2 != nil {
 				reportErrorf(errorSigningTX, err2)
 			}
@@ -806,6 +810,7 @@ var clearAppCmd = &cobra.Command{
 		// Fill in note and lease
 		tx.Note = parseNoteField(cmd)
 		tx.Lease = parseLease(cmd)
+		tx.Sponsor = cliAddress(sponsorAddress)
 
 		// Fill in rounds, fee, etc.
 		fv, lv, _, err := client.ComputeValidityRounds(firstValid, lastValid, numValidRounds)
@@ -825,7 +830,7 @@ var clearAppCmd = &cobra.Command{
 		// Broadcast or write transaction to file
 		if outFilename == "" {
 			wh, pw := ensureWalletHandleMaybePassword(dataDir, walletName, true)
-			signedTxn, err2 := client.SignTransactionWithWalletAndSigner(wh, pw, signerAddress, tx)
+			signedTxn, err2 := client.SignTransactionWithWalletAndSigner(wh, pw, signerAddress, sponsorAddress, tx)
 			if err2 != nil {
 				reportErrorf(errorSigningTX, err2)
 			}
@@ -875,6 +880,7 @@ var callAppCmd = &cobra.Command{
 		// Fill in note and lease
 		tx.Note = parseNoteField(cmd)
 		tx.Lease = parseLease(cmd)
+		tx.Sponsor = cliAddress(sponsorAddress)
 
 		// Fill in rounds, fee, etc.
 		fv, lv, _, err := client.ComputeValidityRounds(firstValid, lastValid, numValidRounds)
@@ -894,7 +900,7 @@ var callAppCmd = &cobra.Command{
 		// Broadcast or write transaction to file
 		if outFilename == "" {
 			wh, pw := ensureWalletHandleMaybePassword(dataDir, walletName, true)
-			signedTxn, err2 := client.SignTransactionWithWalletAndSigner(wh, pw, signerAddress, tx)
+			signedTxn, err2 := client.SignTransactionWithWalletAndSigner(wh, pw, signerAddress, sponsorAddress, tx)
 			if err2 != nil {
 				reportErrorf(errorSigningTX, err2)
 			}
@@ -945,6 +951,7 @@ var deleteAppCmd = &cobra.Command{
 		// Fill in note and lease
 		tx.Note = parseNoteField(cmd)
 		tx.Lease = parseLease(cmd)
+		tx.Sponsor = cliAddress(sponsorAddress)
 
 		// Fill in rounds, fee, etc.
 		fv, lv, _, err := client.ComputeValidityRounds(firstValid, lastValid, numValidRounds)
@@ -964,7 +971,7 @@ var deleteAppCmd = &cobra.Command{
 		// Broadcast or write transaction to file
 		if outFilename == "" {
 			wh, pw := ensureWalletHandleMaybePassword(dataDir, walletName, true)
-			signedTxn, err2 := client.SignTransactionWithWalletAndSigner(wh, pw, signerAddress, tx)
+			signedTxn, err2 := client.SignTransactionWithWalletAndSigner(wh, pw, signerAddress, sponsorAddress, tx)
 			if err2 != nil {
 				reportErrorf(errorSigningTX, err2)
 			}
@@ -1448,6 +1455,7 @@ var methodAppCmd = &cobra.Command{
 		// Fill in note and lease
 		appCallTxn.Note = parseNoteField(cmd)
 		appCallTxn.Lease = parseLease(cmd)
+		appCallTxn.Sponsor = cliAddress(sponsorAddress)
 
 		// Fill in rounds, fee, etc.
 		fv, lv, _, err := client.ComputeValidityRounds(firstValid, lastValid, numValidRounds)

@@ -301,7 +301,7 @@ var createAssetCmd = &cobra.Command{
 
 		if outFilename == "" {
 			wh, pw := ensureWalletHandleMaybePassword(dataDir, walletName, true)
-			signedTxn, err2 := client.SignTransactionWithWalletAndSigner(wh, pw, signerAddress, tx)
+			signedTxn, err2 := client.SignTransactionWithWalletAndSigner(wh, pw, signerAddress, sponsorAddress, tx)
 			if err2 != nil {
 				reportErrorf(errorSigningTX, err2)
 			}
@@ -380,7 +380,7 @@ var destroyAssetCmd = &cobra.Command{
 
 		if outFilename == "" {
 			wh, pw := ensureWalletHandleMaybePassword(dataDir, walletName, true)
-			signedTxn, err2 := client.SignTransactionWithWalletAndSigner(wh, pw, signerAddress, tx)
+			signedTxn, err2 := client.SignTransactionWithWalletAndSigner(wh, pw, signerAddress, sponsorAddress, tx)
 			if err2 != nil {
 				reportErrorf(errorSigningTX, err2)
 			}
@@ -473,7 +473,7 @@ var configAssetCmd = &cobra.Command{
 
 		if outFilename == "" {
 			wh, pw := ensureWalletHandleMaybePassword(dataDir, walletName, true)
-			signedTxn, err2 := client.SignTransactionWithWalletAndSigner(wh, pw, signerAddress, tx)
+			signedTxn, err2 := client.SignTransactionWithWalletAndSigner(wh, pw, signerAddress, sponsorAddress, tx)
 			if err2 != nil {
 				reportErrorf(errorSigningTX, err2)
 			}
@@ -564,7 +564,7 @@ var sendAssetCmd = &cobra.Command{
 
 		if outFilename == "" {
 			wh, pw := ensureWalletHandleMaybePassword(dataDir, walletName, true)
-			signedTxn, err2 := client.SignTransactionWithWalletAndSigner(wh, pw, signerAddress, tx)
+			signedTxn, err2 := client.SignTransactionWithWalletAndSigner(wh, pw, signerAddress, sponsorAddress, tx)
 			if err2 != nil {
 				reportErrorf(errorSigningTX, err2)
 			}
@@ -633,7 +633,7 @@ var freezeAssetCmd = &cobra.Command{
 
 		if outFilename == "" {
 			wh, pw := ensureWalletHandleMaybePassword(dataDir, walletName, true)
-			signedTxn, err2 := client.SignTransactionWithWalletAndSigner(wh, pw, signerAddress, tx)
+			signedTxn, err2 := client.SignTransactionWithWalletAndSigner(wh, pw, signerAddress, sponsorAddress, tx)
 			if err2 != nil {
 				reportErrorf(errorSigningTX, err2)
 			}
@@ -722,7 +722,7 @@ var optinAssetCmd = &cobra.Command{
 
 		if outFilename == "" {
 			wh, pw := ensureWalletHandleMaybePassword(dataDir, walletName, true)
-			signedTxn, err2 := client.SignTransactionWithWalletAndSigner(wh, pw, signerAddress, tx)
+			signedTxn, err2 := client.SignTransactionWithWalletAndSigner(wh, pw, signerAddress, sponsorAddress, tx)
 			if err2 != nil {
 				reportErrorf(errorSigningTX, err2)
 			}

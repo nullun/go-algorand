@@ -304,8 +304,8 @@ func (tx Transaction) SignAsSponsor(secrets *crypto.SignatureSecrets) SignedTxn 
 			},
 		},
 	}
-	// Set the Sponsor AuthAddr if the signing key doesn't match the transaction sender
-	if basics.Address(secrets.SignatureVerifier) != tx.Sender {
+	// Set the Sponsor AuthAddr if the signing key doesn't match the transaction sponsor
+	if basics.Address(secrets.SignatureVerifier) != tx.Sponsor {
 		s.Sponsor.AuthAddr = basics.Address(secrets.SignatureVerifier)
 	}
 	return s

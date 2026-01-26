@@ -54,9 +54,17 @@ func (c *Client) SignTransactionWithWallet(walletHandle, pw []byte, utx transact
 
 // SignTransactionWithWalletAndSigner signs the passed transaction under a specific signer (which may differ from the sender's address). This is necessary after an account has been rekeyed.
 // If signerAddr is the empty string, just infer spending key from the sender address.
-func (c *Client) SignTransactionWithWalletAndSigner(walletHandle, pw []byte, signerAddr string, utx transactions.Transaction) (stx transactions.SignedTxn, err error) {
-	if signerAddr == "" {
-		return c.SignTransactionWithWallet(walletHandle, pw, utx, false)
+func (c *Client) SignTransactionWithWalletAndSigner(walletHandle, pw []byte, signerAddr string, sponsorAddr string, utx transactions.Transaction) (stx transactions.SignedTxn, err error) {
+	if sponsorAddr != "" {
+		utx.Sponsor, err = basics.UnmarshalChecksumAddress(sponsorAddr)
+		if err != nil {
+			return
+		}
+	}
+
+	stx, err = c.SignTransactionWithWallet(walletHandle, pw, utx, false)
+	if err != nil {
+		return
 	}
 
 	kmd, err := c.ensureKmdClient()
@@ -64,48 +72,37 @@ func (c *Client) SignTransactionWithWalletAndSigner(walletHandle, pw []byte, sig
 		return
 	}
 
-	authaddr, err := basics.UnmarshalChecksumAddress(signerAddr)
-	if err != nil {
-		return
-	}
-	// Sign the transaction
-	resp, err := kmd.SignTransaction(walletHandle, pw, crypto.PublicKey(authaddr), utx, false)
-	if err != nil {
-		return
-	}
-
-	// Decode the SignedTxn
-	err = protocol.Decode(resp.SignedTransaction, &stx)
-	return
-}
-
-// SignTransactionWithWalletAndSponsor signs the passed transaction under a specific sponsor (which may differ from the sender's address). This is necessary after an account has been rekeyed.
-// If sponsorAddr is the empty string, just infer spending key from the sender address.
-func (c *Client) SignTransactionWithWalletAndSponsor(walletHandle, pw []byte, sponsorAddr string, utx transactions.Transaction) (stx transactions.SignedTxn, err error) {
-	stxn, err := c.SignTransactionWithWallet(walletHandle, pw, utx, false)
-
-	if sponsorAddr == "" {
-		return stxn, err
+	if signerAddr != "" {
+		authaddr, err2 := basics.UnmarshalChecksumAddress(signerAddr)
+		if err2 != nil {
+			return stx, err2
+		}
+		// Sign the transaction
+		resp, err2 := kmd.SignTransaction(walletHandle, pw, crypto.PublicKey(authaddr), utx, false)
+		if err2 != nil {
+			return stx, err2
+		}
+		// Decode the SignedTxn
+		var signerStx transactions.SignedTxn
+		err = protocol.Decode(resp.SignedTransaction, &signerStx)
+		stx.SignatureFields = signerStx.SignatureFields
 	}
 
-	kmd, err := c.ensureKmdClient()
-	if err != nil {
-		return
+	if sponsorAddr != "" {
+		spsraddr, err2 := basics.UnmarshalChecksumAddress(sponsorAddr)
+		if err2 != nil {
+			return stx, err2
+		}
+		// Sign the transaction
+		resp, err2 := kmd.SignTransaction(walletHandle, pw, crypto.PublicKey(spsraddr), utx, true)
+		if err2 != nil {
+			return stx, err2
+		}
+		// Decode the SignedTxn
+		var sponsorStx transactions.SignedTxn
+		err = protocol.Decode(resp.SignedTransaction, &sponsorStx)
+		stx.Sponsor.SignatureFields = sponsorStx.Sponsor.SignatureFields
 	}
-
-	spsrAddr, err := basics.UnmarshalChecksumAddress(sponsorAddr)
-	if err != nil {
-		return
-	}
-	// Sign the transaction
-	resp, err := kmd.SignTransaction(walletHandle, pw, crypto.PublicKey(spsrAddr), utx, true)
-	if err != nil {
-		return
-	}
-
-	// Decode the SignedTxn
-	err = protocol.Decode(resp.SignedTransaction, &stx)
-	stx.SignatureFields = stxn.SignatureFields
 
 	return
 }

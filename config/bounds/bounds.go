@@ -157,4 +157,4 @@ const MaxConsensusVersionLen = 128
 const MaxTxnExtras = 1
 
 // MaxTxnDirectives is the maximum number of transaction directives
-const MaxTxnDirectives = 2
+const MaxTxnDirectives = 3

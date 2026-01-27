@@ -563,6 +563,10 @@ var sendAssetCmd = &cobra.Command{
 			tx.Directives = append(tx.Directives, transactions.AssetSponsor)
 		}
 
+		if dirAssetRevoke {
+			tx.Directives = append(tx.Directives, transactions.AssetRevoke)
+		}
+
 		firstValid, lastValid, _, err = client.ComputeValidityRounds(firstValid, lastValid, numValidRounds)
 		if err != nil {
 			reportErrorf("Cannot determine last valid round: %s", err)

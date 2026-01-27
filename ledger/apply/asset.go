@@ -417,6 +417,63 @@ func AssetTransfer(ct transactions.AssetTransferTxnFields, header transactions.H
 		}
 	}
 
+	// Allow a Sponsor to revoke their sponsorship for accounts that hold zero
+	// units of the sponsored assed.
+	// This results in the Sponsor decreasing their Minimum Balance Requirement
+	// and Closing Out the asset of the AssetReceiver.
+	// Must not contain an AssetCloseTo field, since no assets should actually
+	// be getting moved.
+	if ct.AssetCloseTo.IsZero() && ct.AssetReceiver != header.Sender && slices.Contains(header.Directives, transactions.AssetRevoke) {
+		rcvHolding, ok, err := balances.GetAssetHolding(ct.AssetReceiver, ct.XferAsset)
+		if err != nil {
+			return err
+		}
+
+		if ok {
+			rcvRecord, err := balances.Get(ct.AssetReceiver, false)
+			if err != nil {
+				return err
+			}
+
+			if rcvHolding.Amount != 0 {
+				return fmt.Errorf("cannot revoke sponsorship from an asset holding with non-zero balance: %d", rcvHolding.Amount)
+			}
+
+			if rcvHolding.Sponsor != header.Sender {
+				return fmt.Errorf("only the sponsor can revoke their sponsorship: sender %v, sponsor: %v", header.Sender, rcvHolding.Sponsor)
+			}
+
+			rcvRecord.TotalAssets = basics.SubSaturate(rcvRecord.TotalAssets, 1)
+			// TODO: Overflow check? OverflowTracker is for unsigned only
+			rcvRecord.SponsoredAssetsOffset = rcvRecord.SponsoredAssetsOffset + 1
+			err = balances.Put(ct.AssetReceiver, rcvRecord)
+			if err != nil {
+				return err
+			}
+
+			err = balances.DeleteAssetHolding(ct.AssetReceiver, ct.XferAsset)
+			if err != nil {
+				return err
+			}
+
+			err = balances.DeallocateAsset(ct.AssetReceiver, ct.XferAsset, false)
+			if err != nil {
+				return err
+			}
+
+			// Deallocate MBR on Sender by decrementing their SponsoredAssetsOffset.
+			sndRecord, err := balances.Get(header.Sender, false)
+			if err != nil {
+				return err
+			}
+			sndRecord.SponsoredAssetsOffset = sndRecord.SponsoredAssetsOffset - 1
+			err = balances.Put(header.Sender, sndRecord)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
 	// Actually move the asset.  Zero transfers return right away
 	// without looking up accounts, so it's fine to have a zero transfer
 	// to an all-zero address (e.g., when the only meaningful part of

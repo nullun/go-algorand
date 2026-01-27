@@ -73,6 +73,7 @@ var (
 	inspectTxid        bool
 	dirFeeSponsor      bool
 	dirAssetSponsor    bool
+	dirAssetRevoke     bool
 
 	simulateStartRound            basics.Round
 	simulateAllowEmptySignatures  bool

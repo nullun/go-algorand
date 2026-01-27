@@ -27,3 +27,10 @@ const FeeSponsored Directive = 1
 // AssetSponsor allows for an Asset's OptIn and Minimum Balance Requirement to
 // be allocated to the transaction Sender.
 const AssetSponsor Directive = 2
+
+// AssetRevoke will remove an existing Asset sponsorship from the
+// AssetReceiver, if the sender is the Sponsor and the AssetReceiver's holdings
+// are zero. If the AssetReceiver holds a non-zero amount, then the Sponsor can
+// only be removed by the sponsored party Opting In or Closing Out of the asset
+// themselves.
+const AssetRevoke Directive = 3

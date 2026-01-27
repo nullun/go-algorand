@@ -19,9 +19,9 @@ package transactions
 // Extra includes additional requirements that are enforced at the protocol level.
 type Extra uint8
 
-// FeeSponsored enforces the transaction fee to be paid by a sponsor and not
-// the sender.
-const FeeSponsored Extra = 1
+// // FeeSponsored enforces the transaction fee to be paid by a sponsor and not
+// // the sender.
+// const FeeSponsored Extra = 1
 
 // AssetSponsored allows for an Asset's OptIn and Minimum Balance Requirement
 // to be allocated to the transaction Sender.

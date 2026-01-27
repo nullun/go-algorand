@@ -286,6 +286,10 @@ var createAssetCmd = &cobra.Command{
 		tx.Note = parseNoteField(cmd)
 		tx.Lease = parseLease(cmd)
 
+		if dirFeeSponsor {
+			tx.Directives = append(tx.Directives, transactions.FeeSponsored)
+		}
+
 		fv, lv, _, err := client.ComputeValidityRounds(firstValid, lastValid, numValidRounds)
 		if err != nil {
 			reportErrorf("Cannot determine last valid round: %s", err)
@@ -364,6 +368,10 @@ var destroyAssetCmd = &cobra.Command{
 
 		tx.Note = parseNoteField(cmd)
 		tx.Lease = parseLease(cmd)
+
+		if dirFeeSponsor {
+			tx.Directives = append(tx.Directives, transactions.FeeSponsored)
+		}
 
 		firstValid, lastValid, _, err = client.ComputeValidityRounds(firstValid, lastValid, numValidRounds)
 		if err != nil {
@@ -458,6 +466,10 @@ var configAssetCmd = &cobra.Command{
 		tx.Note = parseNoteField(cmd)
 		tx.Lease = parseLease(cmd)
 
+		if dirFeeSponsor {
+			tx.Directives = append(tx.Directives, transactions.FeeSponsored)
+		}
+
 		firstValid, lastValid, _, err = client.ComputeValidityRounds(firstValid, lastValid, numValidRounds)
 		if err != nil {
 			reportErrorf("Cannot determine last valid round: %s", err)
@@ -543,8 +555,12 @@ var sendAssetCmd = &cobra.Command{
 		tx.Note = parseNoteField(cmd)
 		tx.Lease = parseLease(cmd)
 
-		if assetSponsor {
-			tx.Extras = append(tx.Extras, transactions.AssetSponsored)
+		if dirFeeSponsor {
+			tx.Directives = append(tx.Directives, transactions.FeeSponsored)
+		}
+
+		if dirAssetSponsor {
+			tx.Directives = append(tx.Directives, transactions.AssetSponsor)
 		}
 
 		firstValid, lastValid, _, err = client.ComputeValidityRounds(firstValid, lastValid, numValidRounds)
@@ -617,6 +633,10 @@ var freezeAssetCmd = &cobra.Command{
 
 		tx.Note = parseNoteField(cmd)
 		tx.Lease = parseLease(cmd)
+
+		if dirFeeSponsor {
+			tx.Directives = append(tx.Directives, transactions.FeeSponsored)
+		}
 
 		firstValid, lastValid, _, err = client.ComputeValidityRounds(firstValid, lastValid, numValidRounds)
 		if err != nil {
@@ -704,6 +724,10 @@ var optinAssetCmd = &cobra.Command{
 
 		tx.Note = parseNoteField(cmd)
 		tx.Lease = parseLease(cmd)
+
+		if dirFeeSponsor {
+			tx.Directives = append(tx.Directives, transactions.FeeSponsored)
+		}
 
 		firstValid, lastValid, _, err = client.ComputeValidityRounds(firstValid, lastValid, numValidRounds)
 		if err != nil {

@@ -55,13 +55,6 @@ func (c *Client) SignTransactionWithWallet(walletHandle, pw []byte, utx transact
 // SignTransactionWithWalletAndSigner signs the passed transaction under a specific signer (which may differ from the sender's address). This is necessary after an account has been rekeyed.
 // If signerAddr is the empty string, just infer spending key from the sender address.
 func (c *Client) SignTransactionWithWalletAndSigner(walletHandle, pw []byte, signerAddr string, sponsorAddr string, utx transactions.Transaction) (stx transactions.SignedTxn, err error) {
-	if sponsorAddr != "" {
-		utx.Sponsor, err = basics.UnmarshalChecksumAddress(sponsorAddr)
-		if err != nil {
-			return
-		}
-	}
-
 	stx, err = c.SignTransactionWithWallet(walletHandle, pw, utx, false)
 	if err != nil {
 		return
@@ -101,7 +94,7 @@ func (c *Client) SignTransactionWithWalletAndSigner(walletHandle, pw []byte, sig
 		// Decode the SignedTxn
 		var sponsorStx transactions.SignedTxn
 		err = protocol.Decode(resp.SignedTransaction, &sponsorStx)
-		stx.Sponsor.SignatureFields = sponsorStx.Sponsor.SignatureFields
+		stx.Sponsor = sponsorStx.Sponsor
 	}
 
 	return

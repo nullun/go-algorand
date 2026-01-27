@@ -16,7 +16,7 @@
 
 package transactions
 
-// Directives provide additional constraints and effects for transactions.
+// Directive provides additional constraints and effects for transactions.
 type Directive uint8
 
 // FeeSponsored enforces the transaction fee to be paid by a sponsor and not

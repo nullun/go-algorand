@@ -518,6 +518,10 @@ var createAppCmd = &cobra.Command{
 		tx.Lease = parseLease(cmd)
 		tx.Sponsor = cliAddress(sponsorAddress)
 
+		if dirFeeSponsor {
+			tx.Directives = append(tx.Directives, transactions.FeeSponsored)
+		}
+
 		// Fill in rounds, fee, etc.
 		fv, lv, _, err := client.ComputeValidityRounds(firstValid, lastValid, numValidRounds)
 		if err != nil {
@@ -599,6 +603,10 @@ var updateAppCmd = &cobra.Command{
 		tx.Lease = parseLease(cmd)
 		tx.Sponsor = cliAddress(sponsorAddress)
 
+		if dirFeeSponsor {
+			tx.Directives = append(tx.Directives, transactions.FeeSponsored)
+		}
+
 		// Fill in rounds, fee, etc.
 		fv, lv, _, err := client.ComputeValidityRounds(firstValid, lastValid, numValidRounds)
 		if err != nil {
@@ -669,6 +677,10 @@ var optInAppCmd = &cobra.Command{
 		tx.Note = parseNoteField(cmd)
 		tx.Lease = parseLease(cmd)
 		tx.Sponsor = cliAddress(sponsorAddress)
+
+		if dirFeeSponsor {
+			tx.Directives = append(tx.Directives, transactions.FeeSponsored)
+		}
 
 		// Fill in rounds, fee, etc.
 		fv, lv, _, err := client.ComputeValidityRounds(firstValid, lastValid, numValidRounds)
@@ -741,6 +753,10 @@ var closeOutAppCmd = &cobra.Command{
 		tx.Lease = parseLease(cmd)
 		tx.Sponsor = cliAddress(sponsorAddress)
 
+		if dirFeeSponsor {
+			tx.Directives = append(tx.Directives, transactions.FeeSponsored)
+		}
+
 		// Fill in rounds, fee, etc.
 		fv, lv, _, err := client.ComputeValidityRounds(firstValid, lastValid, numValidRounds)
 		if err != nil {
@@ -812,6 +828,10 @@ var clearAppCmd = &cobra.Command{
 		tx.Lease = parseLease(cmd)
 		tx.Sponsor = cliAddress(sponsorAddress)
 
+		if dirFeeSponsor {
+			tx.Directives = append(tx.Directives, transactions.FeeSponsored)
+		}
+
 		// Fill in rounds, fee, etc.
 		fv, lv, _, err := client.ComputeValidityRounds(firstValid, lastValid, numValidRounds)
 		if err != nil {
@@ -881,6 +901,10 @@ var callAppCmd = &cobra.Command{
 		tx.Note = parseNoteField(cmd)
 		tx.Lease = parseLease(cmd)
 		tx.Sponsor = cliAddress(sponsorAddress)
+
+		if dirFeeSponsor {
+			tx.Directives = append(tx.Directives, transactions.FeeSponsored)
+		}
 
 		// Fill in rounds, fee, etc.
 		fv, lv, _, err := client.ComputeValidityRounds(firstValid, lastValid, numValidRounds)
@@ -952,6 +976,10 @@ var deleteAppCmd = &cobra.Command{
 		tx.Note = parseNoteField(cmd)
 		tx.Lease = parseLease(cmd)
 		tx.Sponsor = cliAddress(sponsorAddress)
+
+		if dirFeeSponsor {
+			tx.Directives = append(tx.Directives, transactions.FeeSponsored)
+		}
 
 		// Fill in rounds, fee, etc.
 		fv, lv, _, err := client.ComputeValidityRounds(firstValid, lastValid, numValidRounds)
@@ -1456,6 +1484,10 @@ var methodAppCmd = &cobra.Command{
 		appCallTxn.Note = parseNoteField(cmd)
 		appCallTxn.Lease = parseLease(cmd)
 		appCallTxn.Sponsor = cliAddress(sponsorAddress)
+
+		if dirFeeSponsor {
+			appCallTxn.Directives = append(appCallTxn.Directives, transactions.FeeSponsored)
+		}
 
 		// Fill in rounds, fee, etc.
 		fv, lv, _, err := client.ComputeValidityRounds(firstValid, lastValid, numValidRounds)

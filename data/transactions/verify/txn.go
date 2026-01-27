@@ -33,16 +33,18 @@ import (
 	"github.com/algorand/go-algorand/util/metrics"
 )
 
-var logicGoodTotal = metrics.MakeCounter(metrics.MetricName{Name: "algod_ledger_logic_ok", Description: "Total transaction scripts executed and accepted"})
-var logicRejTotal = metrics.MakeCounter(metrics.MetricName{Name: "algod_ledger_logic_rej", Description: "Total transaction scripts executed and rejected"})
-var logicErrTotal = metrics.MakeCounter(metrics.MetricName{Name: "algod_ledger_logic_err", Description: "Total transaction scripts executed and errored"})
-var logicCostTotal = metrics.MakeCounter(metrics.MetricName{Name: "algod_ledger_logic_cost", Description: "Total cost of transaction scripts executed"})
-var msigLessOrEqual4 = metrics.MakeCounter(metrics.MetricName{Name: "algod_verify_msig_4", Description: "Total transactions with 1-4 msigs"})
-var msigLessOrEqual10 = metrics.MakeCounter(metrics.MetricName{Name: "algod_verify_msig_5_10", Description: "Total transactions with 5-10 msigs"})
-var msigMore10 = metrics.MakeCounter(metrics.MetricName{Name: "algod_verify_msig_11", Description: "Total transactions with 11+ msigs"})
-var msigLsigLessOrEqual4 = metrics.MakeCounter(metrics.MetricName{Name: "algod_verify_msig_lsig_4", Description: "Total transaction scripts with 1-4 msigs"})
-var msigLsigLessOrEqual10 = metrics.MakeCounter(metrics.MetricName{Name: "algod_verify_msig_lsig_5_10", Description: "Total transaction scripts with 5-10 msigs"})
-var msigLsigMore10 = metrics.MakeCounter(metrics.MetricName{Name: "algod_verify_msig_lsig_10", Description: "Total transaction scripts with 11+ msigs"})
+var (
+	logicGoodTotal        = metrics.MakeCounter(metrics.MetricName{Name: "algod_ledger_logic_ok", Description: "Total transaction scripts executed and accepted"})
+	logicRejTotal         = metrics.MakeCounter(metrics.MetricName{Name: "algod_ledger_logic_rej", Description: "Total transaction scripts executed and rejected"})
+	logicErrTotal         = metrics.MakeCounter(metrics.MetricName{Name: "algod_ledger_logic_err", Description: "Total transaction scripts executed and errored"})
+	logicCostTotal        = metrics.MakeCounter(metrics.MetricName{Name: "algod_ledger_logic_cost", Description: "Total cost of transaction scripts executed"})
+	msigLessOrEqual4      = metrics.MakeCounter(metrics.MetricName{Name: "algod_verify_msig_4", Description: "Total transactions with 1-4 msigs"})
+	msigLessOrEqual10     = metrics.MakeCounter(metrics.MetricName{Name: "algod_verify_msig_5_10", Description: "Total transactions with 5-10 msigs"})
+	msigMore10            = metrics.MakeCounter(metrics.MetricName{Name: "algod_verify_msig_11", Description: "Total transactions with 11+ msigs"})
+	msigLsigLessOrEqual4  = metrics.MakeCounter(metrics.MetricName{Name: "algod_verify_msig_lsig_4", Description: "Total transaction scripts with 1-4 msigs"})
+	msigLsigLessOrEqual10 = metrics.MakeCounter(metrics.MetricName{Name: "algod_verify_msig_lsig_5_10", Description: "Total transaction scripts with 5-10 msigs"})
+	msigLsigMore10        = metrics.MakeCounter(metrics.MetricName{Name: "algod_verify_msig_lsig_10", Description: "Total transaction scripts with 11+ msigs"})
+)
 
 // The PaysetGroups is taking large set of transaction groups and attempt to verify their validity using multiple go-routines.
 // When doing so, it attempts to break these into smaller "worksets" where each workset takes about 2ms of execution time in order
@@ -80,14 +82,16 @@ type GroupContext struct {
 	evalParams      *logic.EvalParams
 }
 
-var errTxGroupInvalidFee = errors.New("txgroup fee requirement overflow")
-var errTxnSigHasNoSig = errors.New("signedtxn has no sig")
-var errTxnSigNotWellFormed = errors.New("signedtxn should only have one of Sig or Msig or LogicSig")
-var errRekeyingNotSupported = errors.New("nonempty AuthAddr but rekeying is not supported")
-var errAuthAddrEqualsSender = errors.New("AuthAddr must be different from Sender")
-var errSponsoredFeeNotSupported = errors.New("nonempty Sponsor but sponsoring is not supported")
-var errTxnSigHasNoSponsorSig = errors.New("signedtxn has no sponsor sig")
-var errUnknownSignature = errors.New("has one mystery sig. WAT?")
+var (
+	errTxGroupInvalidFee                      = errors.New("txgroup fee requirement overflow")
+	errTxnSigHasNoSig                         = errors.New("signedtxn has no sig")
+	errTxnSigNotWellFormed                    = errors.New("signedtxn should only have one of Sig or Msig or LogicSig")
+	errRekeyingNotSupported                   = errors.New("nonempty AuthAddr but rekeying is not supported")
+	errAuthAddrEqualsSender                   = errors.New("AuthAddr must be different from Sender")
+	errSponsoredFeeNotSupported               = errors.New("nonempty Sponsor but sponsoring is not supported")
+	errTxnSigHasIncompleteOrMissingSponsorSig = errors.New("signedtxn has incomplete or missing sponsor sig")
+	errUnknownSignature                       = errors.New("has one mystery sig. WAT?")
+)
 
 // TxGroupErrorReason is reason code for ErrTxGroupError
 type TxGroupErrorReason int
@@ -107,6 +111,8 @@ const (
 	TxGroupErrorReasonMsigNotWellFormed
 	// TxGroupErrorReasonLogicSigFailed defines logic sig validation errors
 	TxGroupErrorReasonLogicSigFailed
+	// TxGroupErrorReasonSponsorSigFailed defines sponsor sig validation errors
+	TxGroupErrorReasonSponsorSigFailed
 
 	// TxGroupErrorReasonNumValues is number of enum values
 	TxGroupErrorReasonNumValues
@@ -177,6 +183,26 @@ func txnBatchPrep(gi int, groupCtx *GroupContext, verifier crypto.BatchVerifier)
 
 	if groupCtx.consensusParams.EnforceAuthAddrSenderDiff && !s.AuthAddr.IsZero() && s.AuthAddr == s.Txn.Sender {
 		return &TxGroupError{err: errAuthAddrEqualsSender, GroupIndex: gi, Reason: TxGroupErrorReasonGeneric}
+	}
+
+	if len(s.Txn.Directives) > 0 {
+		if !groupCtx.consensusParams.SupportTransactionDirectives {
+			return &TxGroupError{err: fmt.Errorf("transaction has Directives set but directives not yet enabled"), GroupIndex: gi, Reason: TxGroupErrorReasonGeneric}
+		}
+
+		for _, dir := range s.Txn.Directives {
+			switch dir {
+			case transactions.FeeSponsored:
+				// Cannot check Sponsor Signature as it's outside of `tx`.
+				if s.Sponsor.Blank() {
+					return &TxGroupError{err: errTxnSigHasIncompleteOrMissingSponsorSig, GroupIndex: gi, Reason: TxGroupErrorReasonSponsorSigFailed}
+				}
+			case transactions.AssetSponsor:
+				if s.Txn.Type != protocol.AssetTransferTx {
+					return &TxGroupError{err: fmt.Errorf("AssetSponsor directive can only be used with AssetTransfer transactions"), GroupIndex: gi, Reason: TxGroupErrorReasonSponsorSigFailed}
+				}
+			}
+		}
 	}
 
 	if err := s.Txn.WellFormed(groupCtx.specAddrs, groupCtx.consensusParams); err != nil {
@@ -280,10 +306,12 @@ func txnGroupBatchPrep(stxs []transactions.SignedTxn, contextHdr *bookkeeping.Bl
 
 type sigType int
 
-const missingSig sigType = 0
-const singleSig sigType = 1
-const multiSig sigType = 2
-const logicSig sigType = 3
+const (
+	missingSig sigType = 0
+	singleSig  sigType = 1
+	multiSig   sigType = 2
+	logicSig   sigType = 3
+)
 
 // checkTxnSigTypeCounts checks the number of signature types and reports an error in case of a violation
 func checkTxnSigTypeCounts(s *transactions.SignatureFields, groupIndex int) (sigType sigType, err *TxGroupError) {
@@ -343,7 +371,7 @@ func stxnCoreChecks(gi int, groupCtx *GroupContext, batchVerifier crypto.BatchVe
 		}
 
 		if sponsorSigType == missingSig {
-			return &TxGroupError{err: errTxnSigHasNoSponsorSig, GroupIndex: gi, Reason: TxGroupErrorReasonHasNoSig}
+			return &TxGroupError{err: errTxnSigHasIncompleteOrMissingSponsorSig, GroupIndex: gi, Reason: TxGroupErrorReasonHasNoSig}
 		}
 
 		return enqueueAuthSigVerify(stxn.SponsorAuthorizer(), &stxn.Sponsor.SignatureFields, &stxn.Txn, gi, groupCtx, sponsorSigType, batchVerifier)

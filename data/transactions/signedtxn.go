@@ -19,7 +19,6 @@ package transactions
 import (
 	"crypto/sha256"
 	"errors"
-	"slices"
 
 	"github.com/algorand/go-algorand/crypto"
 	"github.com/algorand/go-algorand/data/basics"
@@ -123,25 +122,14 @@ func (s SignedTxn) Authorizer() basics.Address {
 // It's provided as a convenience method.
 func (s SignedTxn) SponsorAuthorizer() basics.Address {
 	if s.Sponsor.AuthAddr.IsZero() {
-		return s.Txn.Sponsor
+		return s.Sponsor.Address
 	}
 	return s.Sponsor.AuthAddr
 }
 
-// Benefactor returns the address of the Sender or Sponsor.
-func (s SignedTxn) Benefactor() basics.Address {
-	if _, bFound := slices.BinarySearch(s.Txn.Extras, AssetSponsored); bFound {
-		if _, sFound := slices.BinarySearch(s.Txn.Extras, FeeSponsored); sFound {
-			return s.Txn.Sponsor
-		}
-		return s.Txn.Sender
-	}
-	return basics.Address{}
-}
-
 // IsSponsored returns true if the transaction is sponsored.
 func (s SignedTxn) IsSponsored() bool {
-	return !s.Txn.Sponsor.IsZero()
+	return !s.Sponsor.Address.IsZero()
 }
 
 // AssembleSignedTxn assembles a multisig-signed transaction from a transaction an optional sig, and an optional multisig.

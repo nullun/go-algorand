@@ -71,6 +71,8 @@ var (
 	requestFilename    string
 	requestOutFilename string
 	inspectTxid        bool
+	dirFeeSponsor      bool
+	dirAssetSponsor    bool
 
 	simulateStartRound            basics.Round
 	simulateAllowEmptySignatures  bool
@@ -454,6 +456,10 @@ var sendCmd = &cobra.Command{
 			payment.RekeyTo = rekeyTo
 		}
 
+		if dirFeeSponsor {
+			payment.Directives = append(payment.Directives, transactions.FeeSponsored)
+		}
+
 		// ConstructPayment fills in the suggested fee when fee=0. But if the user actually used --fee=0 on the
 		// commandline, we ought to do what they asked (especially now that zero or low fees make sense in
 		// combination with other txns that cover the groups's fee.
@@ -473,17 +479,17 @@ var sendCmd = &cobra.Command{
 			}
 		}
 
-		var sponsor basics.Address
-		if sponsorAddress != "" {
-			sponsor, err = basics.UnmarshalChecksumAddress(sponsorAddress)
-			if err != nil {
-				reportErrorf("Sponsor invalid (%s): %v", sponsorAddress, err)
-			}
-			if sponsor == payment.Sender {
-				reportErrorf("Sponsor cannot be the same as the transaction sender")
-			}
-			payment.Sponsor = sponsor
-		}
+		// var sponsor basics.Address
+		// if sponsorAddress != "" {
+		// 	sponsor, err = basics.UnmarshalChecksumAddress(sponsorAddress)
+		// 	if err != nil {
+		// 		reportErrorf("Sponsor invalid (%s): %v", sponsorAddress, err)
+		// 	}
+		// 	if sponsor == payment.Sender {
+		// 		reportErrorf("Sponsor cannot be the same as the transaction sender")
+		// 	}
+		// 	payment.Sponsor = sponsor
+		// }
 
 		var stx transactions.SignedTxn
 		if lsig.Logic != nil {
@@ -528,6 +534,13 @@ var sendCmd = &cobra.Command{
 			if signerAddress != "" {
 				if !signTx {
 					reportErrorf("Signer specified when txn won't be signed")
+				}
+			}
+			var sponsor basics.Address
+			if sponsorAddress != "" {
+				sponsor, err = basics.UnmarshalChecksumAddress(sponsorAddress)
+				if err != nil {
+					reportErrorf("Sponsor invalid (%s): %v", sponsorAddress, err)
 				}
 			}
 			stx, err = createSignedTransaction(client, signTx, dataDir, walletName, payment, authAddr, sponsor)

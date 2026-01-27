@@ -154,4 +154,7 @@ const EncodedMaxKeyValueEntries = 1024
 const MaxConsensusVersionLen = 128
 
 // MaxTxnExtras is the maximum number of transaction enforcements
-const MaxTxnExtras = 2
+const MaxTxnExtras = 1
+
+// MaxTxnDirectives is the maximum number of transaction directives
+const MaxTxnDirectives = 2

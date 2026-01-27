@@ -304,15 +304,16 @@ func (tx Transaction) SignAsSponsor(secrets *crypto.SignatureSecrets) SignedTxn 
 	s := SignedTxn{
 		Txn: tx,
 		Sponsor: SponsorSig{
+			Address: basics.Address(secrets.SignatureVerifier),
 			SignatureFields: SignatureFields{
 				Sig: ssig,
 			},
 		},
 	}
-	// Set the Sponsor AuthAddr if the signing key doesn't match the transaction sponsor
-	if basics.Address(secrets.SignatureVerifier) != tx.Sponsor {
-		s.Sponsor.AuthAddr = basics.Address(secrets.SignatureVerifier)
-	}
+	// // Set the Sponsor AuthAddr if the signing key doesn't match the transaction sponsor
+	// if basics.Address(secrets.SignatureVerifier) != tx.Sponsor.Address {
+	// 	s.Sponsor.AuthAddr = basics.Address(secrets.SignatureVerifier)
+	// }
 	return s
 }
 
@@ -521,9 +522,6 @@ func (tx Transaction) WellFormed(spec SpecialAddresses, proto config.ConsensusPa
 	}
 	if !proto.SupportEnforcements && len(tx.Extras) > 0 {
 		return fmt.Errorf("transaction has Enforcements set but enforcements not yet enabled")
-	}
-	if !proto.SupportTransactionDirectives && len(tx.Directives) > 0 {
-		return fmt.Errorf("transaction has Directives set but directives not yet enabled")
 	}
 	return nil
 }

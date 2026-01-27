@@ -34,8 +34,10 @@ const (
 var validateNoPosArgsFn = cobra.NoArgs
 
 // transaction validity period margins
-var firstValid basics.Round
-var lastValid basics.Round
+var (
+	firstValid basics.Round
+	lastValid  basics.Round
+)
 
 // numValidRounds specifies validity period for a transaction and used to calculate last valid round
 var numValidRounds basics.Round // also used in account and asset
@@ -70,4 +72,6 @@ func addTxnFlags(cmd *cobra.Command) {
 	cmd.Flags().StringSliceVar(&dumpForDryrunAccts, "dryrun-accounts", nil, "additional accounts to include into dryrun request obj")
 	cmd.Flags().StringVarP(&signerAddress, "signer", "S", "", "Address of key to sign with, if different from transaction \"from\" address due to rekeying")
 	cmd.Flags().StringVar(&sponsorAddress, "sponsor", "", "Address of sponsor to sign with and deduct transaction fee from. Must be different from transaction \"from\" address")
+	cmd.Flags().BoolVar(&dirFeeSponsor, "dir-fee-sponsor", false, "Add Directive: \"Must Have Fee Sponsor\", requiring a sponsor signature")
+	cmd.Flags().BoolVar(&dirAssetSponsor, "dir-asset-sponsor", false, "Add Directive: \"Will Sponsor Asset\", places the Asset MBR increase on the asset transfer sender")
 }

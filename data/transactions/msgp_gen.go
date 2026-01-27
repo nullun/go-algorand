@@ -6880,43 +6880,52 @@ func SignedTxnWithADMaxSize() (s int) {
 func (z *SponsorSig) MarshalMsg(b []byte) (o []byte) {
 	o = msgp.Require(b, z.Msgsize())
 	// omitempty: check for empty values
-	zb0001Len := uint32(4)
-	var zb0001Mask uint8 /* 6 bits */
-	if (*z).SignatureFields.Lsig.MsgIsZero() {
+	zb0001Len := uint32(5)
+	var zb0001Mask uint8 /* 7 bits */
+	if (*z).Address.MsgIsZero() {
 		zb0001Len--
 		zb0001Mask |= 0x4
 	}
-	if (*z).SignatureFields.Msig.MsgIsZero() {
+	if (*z).SignatureFields.Lsig.MsgIsZero() {
 		zb0001Len--
 		zb0001Mask |= 0x8
 	}
-	if (*z).SignatureFields.AuthAddr.MsgIsZero() {
+	if (*z).SignatureFields.Msig.MsgIsZero() {
 		zb0001Len--
 		zb0001Mask |= 0x10
 	}
-	if (*z).SignatureFields.Sig.MsgIsZero() {
+	if (*z).SignatureFields.AuthAddr.MsgIsZero() {
 		zb0001Len--
 		zb0001Mask |= 0x20
+	}
+	if (*z).SignatureFields.Sig.MsgIsZero() {
+		zb0001Len--
+		zb0001Mask |= 0x40
 	}
 	// variable map header, size zb0001Len
 	o = append(o, 0x80|uint8(zb0001Len))
 	if zb0001Len != 0 {
 		if (zb0001Mask & 0x4) == 0 { // if not empty
+			// string "addr"
+			o = append(o, 0xa4, 0x61, 0x64, 0x64, 0x72)
+			o = (*z).Address.MarshalMsg(o)
+		}
+		if (zb0001Mask & 0x8) == 0 { // if not empty
 			// string "lsig"
 			o = append(o, 0xa4, 0x6c, 0x73, 0x69, 0x67)
 			o = (*z).SignatureFields.Lsig.MarshalMsg(o)
 		}
-		if (zb0001Mask & 0x8) == 0 { // if not empty
+		if (zb0001Mask & 0x10) == 0 { // if not empty
 			// string "msig"
 			o = append(o, 0xa4, 0x6d, 0x73, 0x69, 0x67)
 			o = (*z).SignatureFields.Msig.MarshalMsg(o)
 		}
-		if (zb0001Mask & 0x10) == 0 { // if not empty
+		if (zb0001Mask & 0x20) == 0 { // if not empty
 			// string "sgnr"
 			o = append(o, 0xa4, 0x73, 0x67, 0x6e, 0x72)
 			o = (*z).SignatureFields.AuthAddr.MarshalMsg(o)
 		}
-		if (zb0001Mask & 0x20) == 0 { // if not empty
+		if (zb0001Mask & 0x40) == 0 { // if not empty
 			// string "sig"
 			o = append(o, 0xa3, 0x73, 0x69, 0x67)
 			o = (*z).SignatureFields.Sig.MarshalMsg(o)
@@ -6947,6 +6956,14 @@ func (z *SponsorSig) UnmarshalMsgWithState(bts []byte, st msgp.UnmarshalState) (
 		if err != nil {
 			err = msgp.WrapError(err)
 			return
+		}
+		if zb0001 > 0 {
+			zb0001--
+			bts, err = (*z).Address.UnmarshalMsgWithState(bts, st)
+			if err != nil {
+				err = msgp.WrapError(err, "struct-from-array", "Address")
+				return
+			}
 		}
 		if zb0001 > 0 {
 			zb0001--
@@ -7003,6 +7020,12 @@ func (z *SponsorSig) UnmarshalMsgWithState(bts []byte, st msgp.UnmarshalState) (
 				return
 			}
 			switch string(field) {
+			case "addr":
+				bts, err = (*z).Address.UnmarshalMsgWithState(bts, st)
+				if err != nil {
+					err = msgp.WrapError(err, "Address")
+					return
+				}
 			case "sig":
 				bts, err = (*z).SignatureFields.Sig.UnmarshalMsgWithState(bts, st)
 				if err != nil {
@@ -7050,18 +7073,18 @@ func (_ *SponsorSig) CanUnmarshalMsg(z interface{}) bool {
 
 // Msgsize returns an upper bound estimate of the number of bytes occupied by the serialized message
 func (z *SponsorSig) Msgsize() (s int) {
-	s = 1 + 4 + (*z).SignatureFields.Sig.Msgsize() + 5 + (*z).SignatureFields.Msig.Msgsize() + 5 + (*z).SignatureFields.Lsig.Msgsize() + 5 + (*z).SignatureFields.AuthAddr.Msgsize()
+	s = 1 + 5 + (*z).Address.Msgsize() + 4 + (*z).SignatureFields.Sig.Msgsize() + 5 + (*z).SignatureFields.Msig.Msgsize() + 5 + (*z).SignatureFields.Lsig.Msgsize() + 5 + (*z).SignatureFields.AuthAddr.Msgsize()
 	return
 }
 
 // MsgIsZero returns whether this is a zero value
 func (z *SponsorSig) MsgIsZero() bool {
-	return ((*z).SignatureFields.Sig.MsgIsZero()) && ((*z).SignatureFields.Msig.MsgIsZero()) && ((*z).SignatureFields.Lsig.MsgIsZero()) && ((*z).SignatureFields.AuthAddr.MsgIsZero())
+	return ((*z).Address.MsgIsZero()) && ((*z).SignatureFields.Sig.MsgIsZero()) && ((*z).SignatureFields.Msig.MsgIsZero()) && ((*z).SignatureFields.Lsig.MsgIsZero()) && ((*z).SignatureFields.AuthAddr.MsgIsZero())
 }
 
 // SponsorSigMaxSize returns a maximum valid message size for this message type
 func SponsorSigMaxSize() (s int) {
-	s = 1 + 4 + crypto.SignatureMaxSize() + 5 + crypto.MultisigSigMaxSize() + 5 + LogicSigMaxSize() + 5 + basics.AddressMaxSize()
+	s = 1 + 5 + basics.AddressMaxSize() + 4 + crypto.SignatureMaxSize() + 5 + crypto.MultisigSigMaxSize() + 5 + LogicSigMaxSize() + 5 + basics.AddressMaxSize()
 	return
 }
 

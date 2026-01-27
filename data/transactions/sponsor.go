@@ -16,19 +16,23 @@
 
 package transactions
 
+import "github.com/algorand/go-algorand/data/basics"
+
 // SponsorSig contains a signature that sponsors a transaction fee payment.
 type SponsorSig struct {
 	_struct struct{} `codec:",omitempty,omitemptyarray"`
 
+	Address basics.Address `codec:"addr"`
 	SignatureFields
 }
 
-// Blank returns true if there is no content in this LogicSig
+// Blank returns true if there is no content in this SponsorSig.
+// AuthAddr on it's own is useless. So we don't care here.
 func (ssig *SponsorSig) Blank() bool {
-	return ssig.Sig.Blank() && ssig.Msig.Blank() && ssig.Lsig.Blank()
+	return ssig.Address.IsZero() && ssig.Sig.Blank() && ssig.Msig.Blank() && ssig.Lsig.Blank()
 }
 
-// Equal returns true if two SponsorSig are equal
+// Equal returns true if two SponsorSig are equal, including Address and AuthAddr.
 func (ssig *SponsorSig) Equal(b *SponsorSig) bool {
-	return ssig.Sig == b.Sig && ssig.Msig.Equal(b.Msig) && ssig.Lsig.Equal(&b.Lsig)
+	return ssig.Address == b.Address && ssig.Sig == b.Sig && ssig.Msig.Equal(b.Msig) && ssig.Lsig.Equal(&b.Lsig) && ssig.AuthAddr == b.AuthAddr
 }

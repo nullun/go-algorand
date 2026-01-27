@@ -86,6 +86,11 @@ type Header struct {
 	// The Sponsor cannot be the same as Sender.
 	Sponsor basics.Address `codec:"spsr"`
 
+	// Directives specifies a list of protocol-level constraints and effects that
+	// must be adhered to, to be considered a valid transaction. Failing a
+	// constraint or effect results in an invalid transaction.
+	Directives []Directive `codec:"dir,allocbound=bounds.MaxTxnDirectives"`
+
 	// Extras specifies a list of protocol level requirements or actions
 	// that must be adhered to, to be considered a valid transaction. Failing an
 	// enforcement is considered invalid transaction.
@@ -516,6 +521,9 @@ func (tx Transaction) WellFormed(spec SpecialAddresses, proto config.ConsensusPa
 	}
 	if !proto.SupportEnforcements && len(tx.Extras) > 0 {
 		return fmt.Errorf("transaction has Enforcements set but enforcements not yet enabled")
+	}
+	if !proto.SupportTransactionDirectives && len(tx.Directives) > 0 {
+		return fmt.Errorf("transaction has Directives set but directives not yet enabled")
 	}
 	return nil
 }

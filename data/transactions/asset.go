@@ -120,7 +120,7 @@ func (ac AssetConfigTxnFields) wellFormed(proto config.ConsensusParams) error {
 	return nil
 }
 
-func (ax AssetTransferTxnFields) wellFormed(proto config.ConsensusParams) error {
+func (ax AssetTransferTxnFields) wellFormed(header Header, proto config.ConsensusParams) error {
 	if ax.XferAsset == 0 && ax.AssetAmount != 0 {
 		return errors.New("asset ID cannot be zero")
 	}
@@ -131,6 +131,10 @@ func (ax AssetTransferTxnFields) wellFormed(proto config.ConsensusParams) error 
 
 	if !proto.SupportAssetSponsorship && ax.AssetSponsorship != 0 {
 		return errors.New("transaction tries to set asset sponsorship, but asset sponsorship is not supported")
+	}
+
+	if ax.AssetSponsorship != 0 && ax.AssetReceiver == header.Sender {
+		return errors.New("asset sponsorships cannot be performed on self")
 	}
 
 	return nil

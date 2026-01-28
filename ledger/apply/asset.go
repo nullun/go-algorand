@@ -411,6 +411,8 @@ func AssetTransfer(ct transactions.AssetTransferTxnFields, header transactions.H
 			if err != nil {
 				return err
 			}
+		} else {
+			return fmt.Errorf("cannot approve sponsorship for an existing asset holding")
 		}
 	}
 
@@ -467,6 +469,8 @@ func AssetTransfer(ct transactions.AssetTransferTxnFields, header transactions.H
 			if err != nil {
 				return err
 			}
+		} else {
+			return fmt.Errorf("cannot revoke sponsorship for a non-existent asset holding")
 		}
 	}
 

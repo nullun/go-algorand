@@ -383,7 +383,7 @@ func (tx Transaction) WellFormed(spec SpecialAddresses, proto config.ConsensusPa
 			return fmt.Errorf("asset transaction not supported")
 		}
 
-		err := tx.AssetTransferTxnFields.wellFormed(proto)
+		err := tx.AssetTransferTxnFields.wellFormed(tx.Header, proto)
 		if err != nil {
 			return err
 		}

@@ -127,9 +127,11 @@ func (s SignedTxn) SponsorAuthorizer() basics.Address {
 	return s.Ssig.AuthAddr
 }
 
-// IsSponsored returns true if the transaction is sponsored.
+// IsSponsored returns true if the signed transaction contains a sponsor
+// signature, as opposed to checking the transaction's "FeeSponsored" field,
+// which simply stats the transaction must be sponsored.
 func (s SignedTxn) IsSponsored() bool {
-	return !s.Ssig.Sponsor.IsZero()
+	return !s.Ssig.Blank()
 }
 
 // AssembleSignedTxn assembles a multisig-signed transaction from a transaction an optional sig, and an optional multisig.

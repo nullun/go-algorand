@@ -84,6 +84,11 @@ type Header struct {
 	// must be adhered to, to be considered a valid transaction. Failing a
 	// constraint or effect results in an invalid transaction.
 	Directives []Directive `codec:"dir,allocbound=bounds.MaxTxnDirectives"`
+
+	// FeeSponsored indicates whether the transaction fee MUST be paid by a sponsor.
+	// The absence of this field (false) doesn't prevent an opportunistic sponsor
+	// from providing their signature and paying the transaction fee.
+	FeeSponsored bool `codec:"fs"`
 }
 
 // Transaction describes a transaction that can appear in a block.
@@ -503,10 +508,12 @@ func (tx Transaction) WellFormed(spec SpecialAddresses, proto config.ConsensusPa
 	if !proto.SupportRekeying && (tx.RekeyTo != basics.Address{}) {
 		return fmt.Errorf("transaction has RekeyTo set but rekeying not yet enabled")
 	}
-	// TODO: Replace with FeeSponsored boolean
-	// if !proto.SupportSponsoredFee && (tx.Sponsor != basics.Address{}) {
-	// 	return fmt.Errorf("transaction has Sponsor set but sponsoring not yet enabled")
-	// }
+	// NOTE: Do we even get to this point, if the signed transaction does a
+	// similar check? Maybe it's useful for inner transactions, not sure how that
+	// should even work.
+	if !proto.SupportFeeSponsored && tx.FeeSponsored {
+		return fmt.Errorf("transaction has FeeSponsored set but fee sponsoring not yet enabled")
+	}
 	return nil
 }
 

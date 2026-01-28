@@ -581,9 +581,9 @@ type ConsensusParams struct {
 	// after the first consensus release in which it is set true.
 	AllowZeroLocalAppRef bool
 
-	// SupportSponsoredFee indicates support for a transaction's fee to
+	// SupportFeeSponsored indicates support for a transaction's fee to
 	// be paid by another account.
-	SupportSponsoredFee bool
+	SupportFeeSponsored bool
 
 	// SupportTransactionDirectives allows transactions to carry additional
 	// constraints and effects that can enforce further requirements and/or
@@ -1474,7 +1474,7 @@ func initConsensusProtocols() {
 	vFuture.AppSizeUpdates = true
 	vFuture.AllowZeroLocalAppRef = true
 	vFuture.EnforceAuthAddrSenderDiff = true
-	vFuture.SupportSponsoredFee = true
+	vFuture.SupportFeeSponsored = true
 	vFuture.SupportTransactionDirectives = true
 
 	Consensus[protocol.ConsensusFuture] = vFuture

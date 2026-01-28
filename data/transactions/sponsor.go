@@ -27,9 +27,8 @@ type SponsorSig struct {
 }
 
 // Blank returns true if there is no content in this SponsorSig.
-// AuthAddr on it's own is useless. So we don't care here.
 func (ssig *SponsorSig) Blank() bool {
-	return ssig.Sponsor.IsZero() && ssig.Sig.Blank() && ssig.Msig.Blank() && ssig.Lsig.Blank()
+	return ssig.Sponsor.IsZero() && ssig.Sig.Blank() && ssig.Msig.Blank() && ssig.Lsig.Blank() && ssig.AuthAddr.IsZero()
 }
 
 // Equal returns true if two SponsorSig are equal, including Address and AuthAddr.

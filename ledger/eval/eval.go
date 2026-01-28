@@ -983,6 +983,11 @@ func (eval *BlockEvaluator) testTransaction(txn transactions.SignedTxn) error {
 		return err
 	}
 
+	// Rudamentary well-formedness checks on the SignedTxn so we can fail fast.
+	if txn.Txn.FeeSponsored && txn.Ssig.Blank() {
+		return fmt.Errorf("transaction %v: fee sponsor required but no sponsor signature present", txn.ID())
+	}
+
 	err = txn.Txn.WellFormed(eval.specials, eval.proto)
 	if err != nil {
 		txnErr := ledgercore.TxnNotWellFormedError(fmt.Sprintf("transaction %v: malformed: %v", txn.ID(), err))
@@ -1160,6 +1165,12 @@ func (eval *BlockEvaluator) transaction(txn transactions.SignedTxn, evalParams *
 			return err
 		}
 
+		// Rudamentary well-formedness checks on the SignedTxn so we can fail fast.
+		// Note that applyTransaction will do more detailed checks later.
+		if txn.Txn.FeeSponsored && txn.Ssig.Blank() {
+			return fmt.Errorf("transaction %v: fee sponsor required but no sponsor signature present", txid)
+		}
+
 		err = txn.Txn.WellFormed(eval.specials, eval.proto)
 		if err != nil {
 			txnErr := ledgercore.TxnNotWellFormedError(fmt.Sprintf("transaction %v: malformed: %v", txn.ID(), err))
@@ -1187,17 +1198,17 @@ func (eval *BlockEvaluator) transaction(txn transactions.SignedTxn, evalParams *
 		}
 
 		// If Sponsor is present, similarly check if the correct authoratative address was used.
-		if !txn.Ssig.Sponsor.IsZero() {
+		if !txn.Ssig.Blank() {
 			acctspsrdata, lookupErr := cow.lookup(txn.Ssig.Sponsor)
 			if lookupErr != nil {
 				return lookupErr
 			}
 			correctSponsorAuthorizer := acctspsrdata.AuthAddr
-			if (correctSponsorAuthorizer == basics.Address{}) {
+			if correctSponsorAuthorizer.IsZero() {
 				correctSponsorAuthorizer = txn.Ssig.Sponsor
 			}
 			if txn.SponsorAuthorizer() != correctSponsorAuthorizer {
-				return fmt.Errorf("sponsored transaction %v: should have been authorized by sponsor %v but was actually authorized by sponsor %v", txn.ID(), correctSponsorAuthorizer, txn.SponsorAuthorizer())
+				return fmt.Errorf("transaction %v: should have been authorized by sponsor %v but was actually authorized by sponsor %v", txn.ID(), correctSponsorAuthorizer, txn.SponsorAuthorizer())
 			}
 		}
 	}

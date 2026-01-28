@@ -24,6 +24,23 @@ import (
 	"github.com/algorand/go-algorand/data/basics"
 )
 
+// AssetSponsorship indicates the type of sponsorship operation.
+type AssetSponsorship uint8
+
+// ApproveSponsorship indicates that the AssetReceiver's asset holdings will be
+// sponsored by the Sender. Placing the asset holdings minimum balance
+// requirement on the Sender.
+const ApproveSponsorship AssetSponsorship = 1
+
+// RevokeSponsorship indicates that the AssetReceiver's asset holdings will no
+// longer be sponsored by the Sender (who must be the current Sponsor). This
+// will only succeed if the AssetReceiver's asset holdings are zero.
+// TODO: Should it be possible for someone else takeover an existing Asset
+// Sponsorship? How would you prevent someone immediately taking over and
+// revoking someone who temporarily has zero units but may intend to hold more
+// again soon?
+const RevokeSponsorship AssetSponsorship = 2
+
 // AssetConfigTxnFields captures the fields used for asset
 // allocation, re-configuration, and destruction.
 type AssetConfigTxnFields struct {
@@ -63,6 +80,9 @@ type AssetTransferTxnFields struct {
 	// asset holdings should be transferred.  It's always valid to transfer
 	// remaining asset holdings to the creator account.
 	AssetCloseTo basics.Address `codec:"aclose"`
+
+	// AssetSponsorship indicates the type of sponsorship operation.
+	AssetSponsorship AssetSponsorship `codec:"aspsr"`
 }
 
 // AssetFreezeTxnFields captures the fields used for freezing asset slots.

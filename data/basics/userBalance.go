@@ -228,11 +228,10 @@ type AccountData struct {
 	// TotalBoxBytes stores the sum of all len(keys) and len(values) of Boxes
 	TotalBoxBytes uint64 `codec:"tbxb"`
 
-	// SponsoredAssetsOffset stores the number of asset holdings this account has
-	// sponsored on other accounts minus the number of asset holdings other
-	// accounts have sponsored on this account.
-	// TODO: Consider using a uint64 and boolean to indicate negative values
-	SponsoredAssetsOffset int64 `codec:"sao"`
+	// TotalAssetsSponsored is the number of asset holdings other accounts are sponsoring for this account.
+	// TotalAssetsSponsoring is the number of asset holdings this account is sponsoring for other accounts.
+	TotalAssetsSponsored  uint64 `codec:"tasd"`
+	TotalAssetsSponsoring uint64 `codec:"tasg"`
 }
 
 // AppLocalState stores the LocalState associated with an application. It also
@@ -511,7 +510,8 @@ func (u AccountData) MinBalance(reqs BalanceRequirements) MicroAlgos {
 		uint64(len(u.AppParams)), uint64(len(u.AppLocalStates)),
 		uint64(u.TotalExtraAppPages),
 		u.TotalBoxes, u.TotalBoxBytes,
-		u.SponsoredAssetsOffset,
+		u.TotalAssetsSponsored,
+		u.TotalAssetsSponsoring,
 	)
 }
 
@@ -525,7 +525,8 @@ func MinBalance(
 	totalAppParams uint64, totalAppLocalStates uint64,
 	totalExtraAppPages uint64,
 	totalBoxes uint64, totalBoxBytes uint64,
-	sponsoredAssetsOffset int64,
+	totalAssetsSponsored uint64,
+	totalAssetsSponsoring uint64,
 ) MicroAlgos {
 	var min uint64
 
@@ -533,13 +534,7 @@ func MinBalance(
 	min = reqs.MinBalance
 
 	// MinBalance for each Asset, adjusted for sponsors
-	adjustedTotalAssets := totalAssets
-	if sponsoredAssetsOffset > 0 {
-		adjustedTotalAssets += uint64(sponsoredAssetsOffset)
-	} else if sponsoredAssetsOffset < 0 {
-		// Handle math.MinInt64
-		adjustedTotalAssets -= uint64(-(sponsoredAssetsOffset + 1)) + 1
-	}
+	adjustedTotalAssets := totalAssets - totalAssetsSponsored + totalAssetsSponsoring
 	assetCost := MulSaturate(reqs.MinBalance, adjustedTotalAssets)
 	min = AddSaturate(min, assetCost)
 

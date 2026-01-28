@@ -18,7 +18,6 @@ package apply
 
 import (
 	"fmt"
-	"slices"
 
 	"github.com/algorand/go-algorand/data/basics"
 	"github.com/algorand/go-algorand/data/transactions"
@@ -322,24 +321,23 @@ func AssetTransfer(ct transactions.AssetTransferTxnFields, header transactions.H
 			if sponsor := sndHolding.Sponsor; !sponsor.IsZero() {
 
 				// Deallocate MBR from Sponsor
-				// -1 to their SponsoredAssetsOffset
+				// -1 to their TotalAssetsSponsoring
 				sponsorRecord, err := balances.Get(sponsor, false)
 				if err != nil {
 					return err
 				}
-				sponsorRecord.SponsoredAssetsOffset = sponsorRecord.SponsoredAssetsOffset - 1
+				sponsorRecord.TotalAssetsSponsoring = basics.SubSaturate(sponsorRecord.TotalAssetsSponsoring, 1)
 				err = balances.Put(sponsor, sponsorRecord)
 				if err != nil {
 					return err
 				}
 
-				// Allocate MBR to Holder
-				// +1 from their SponsoredAssetsOffset
+				// -1 from Senders TotalAssetsSponsored
 				sndRecord, err := balances.Get(source, false)
 				if err != nil {
 					return err
 				}
-				sndRecord.SponsoredAssetsOffset = sndRecord.SponsoredAssetsOffset + 1
+				sndRecord.TotalAssetsSponsored = basics.SubSaturate(sndRecord.TotalAssetsSponsored, 1)
 				err = balances.Put(source, sndRecord)
 				if err != nil {
 					return err
@@ -359,7 +357,8 @@ func AssetTransfer(ct transactions.AssetTransferTxnFields, header transactions.H
 	// This results in the sender (not AssetSender) increasing their own Minimum
 	// Balance Requirement and Opting In the AssetReceiver into to the asset
 	// rather than failing and only if required.
-	if ct.AssetReceiver != header.Sender && slices.Contains(header.Directives, transactions.AssetSponsor) {
+	if ct.AssetSponsorship == transactions.ApproveSponsorship {
+		// if ct.AssetReceiver != header.Sender && slices.Contains(header.Directives, transactions.AssetSponsor) {
 		rcvHolding, ok, err := balances.GetAssetHolding(ct.AssetReceiver, ct.XferAsset)
 		if err != nil {
 			return err
@@ -387,8 +386,7 @@ func AssetTransfer(ct transactions.AssetTransferTxnFields, header transactions.H
 			}
 
 			rcvRecord.TotalAssets = basics.AddSaturate(rcvRecord.TotalAssets, 1)
-			// TODO: Overflow check? OverflowTracker is for unsigned only
-			rcvRecord.SponsoredAssetsOffset = rcvRecord.SponsoredAssetsOffset - 1
+			rcvRecord.TotalAssetsSponsored = basics.AddSaturate(rcvRecord.TotalAssetsSponsored, 1)
 			err = balances.Put(ct.AssetReceiver, rcvRecord)
 			if err != nil {
 				return err
@@ -404,12 +402,12 @@ func AssetTransfer(ct transactions.AssetTransferTxnFields, header transactions.H
 				return err
 			}
 
-			// Allocate MBR on Sender by incrementing their SponsoredAssetsOffset.
+			// Allocate MBR on Sender by incrementing their TotalAssetsSponsoring.
 			sndRecord, err := balances.Get(header.Sender, false)
 			if err != nil {
 				return err
 			}
-			sndRecord.SponsoredAssetsOffset = sndRecord.SponsoredAssetsOffset + 1
+			sndRecord.TotalAssetsSponsoring = basics.AddSaturate(sndRecord.TotalAssetsSponsoring, 1)
 			err = balances.Put(header.Sender, sndRecord)
 			if err != nil {
 				return err
@@ -423,7 +421,8 @@ func AssetTransfer(ct transactions.AssetTransferTxnFields, header transactions.H
 	// and Closing Out the asset of the AssetReceiver.
 	// Must not contain an AssetCloseTo field, since no assets should actually
 	// be getting moved.
-	if ct.AssetCloseTo.IsZero() && ct.AssetReceiver != header.Sender && slices.Contains(header.Directives, transactions.AssetRevoke) {
+	if ct.AssetSponsorship == transactions.RevokeSponsorship {
+		// if ct.AssetCloseTo.IsZero() && ct.AssetReceiver != header.Sender && slices.Contains(header.Directives, transactions.AssetRevoke) {
 		rcvHolding, ok, err := balances.GetAssetHolding(ct.AssetReceiver, ct.XferAsset)
 		if err != nil {
 			return err
@@ -444,8 +443,7 @@ func AssetTransfer(ct transactions.AssetTransferTxnFields, header transactions.H
 			}
 
 			rcvRecord.TotalAssets = basics.SubSaturate(rcvRecord.TotalAssets, 1)
-			// TODO: Overflow check? OverflowTracker is for unsigned only
-			rcvRecord.SponsoredAssetsOffset = rcvRecord.SponsoredAssetsOffset + 1
+			rcvRecord.TotalAssetsSponsored = basics.SubSaturate(rcvRecord.TotalAssetsSponsored, 1)
 			err = balances.Put(ct.AssetReceiver, rcvRecord)
 			if err != nil {
 				return err
@@ -461,12 +459,12 @@ func AssetTransfer(ct transactions.AssetTransferTxnFields, header transactions.H
 				return err
 			}
 
-			// Deallocate MBR on Sender by decrementing their SponsoredAssetsOffset.
+			// Decrement Sponsors TotalAssetsSponsoring.
 			sndRecord, err := balances.Get(header.Sender, false)
 			if err != nil {
 				return err
 			}
-			sndRecord.SponsoredAssetsOffset = sndRecord.SponsoredAssetsOffset - 1
+			sndRecord.TotalAssetsSponsoring = basics.SubSaturate(sndRecord.TotalAssetsSponsoring, 1)
 			err = balances.Put(header.Sender, sndRecord)
 			if err != nil {
 				return err
@@ -570,15 +568,16 @@ func AssetTransfer(ct transactions.AssetTransferTxnFields, header transactions.H
 			return fmt.Errorf("asset %v not zero (%d) after closing", ct.XferAsset, sndHolding.Amount)
 		}
 
-		// Update SponsoredAssetsOffsets if holding was sponsored.
+		// Update TotalAssetsSponsored for asset holder and TotalAssetsSponsoring for
+		// asset sponsor if asset holding was sponsored.
 		if !sndHolding.Sponsor.IsZero() {
-			record.SponsoredAssetsOffset = record.SponsoredAssetsOffset + 1
+			record.TotalAssetsSponsored = basics.SubSaturate(record.TotalAssetsSponsored, 1)
 
 			sponsorRecord, err2 := balances.Get(sndHolding.Sponsor, false)
 			if err2 != nil {
 				return err2
 			}
-			sponsorRecord.SponsoredAssetsOffset = sponsorRecord.SponsoredAssetsOffset - 1
+			sponsorRecord.TotalAssetsSponsoring = basics.SubSaturate(sponsorRecord.TotalAssetsSponsoring, 1)
 			err = balances.Put(sndHolding.Sponsor, sponsorRecord)
 			if err != nil {
 				return err

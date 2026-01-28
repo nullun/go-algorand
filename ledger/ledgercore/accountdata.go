@@ -51,7 +51,8 @@ type AccountBaseData struct {
 	LastProposed  basics.Round // The last round that this account proposed the winning block.
 	LastHeartbeat basics.Round // The last round that this account sent a heartbeat to show it was online.
 
-	SponsoredAssetsOffset int64 // Signed number of asset holdings the account is responsible for.
+	TotalAssetsSponsored  uint64 // Total number of asset holdings other accounts are sponsoring for this account.
+	TotalAssetsSponsoring uint64 // Total number of asset holdings this account is sponsoring for other accounts.
 }
 
 // ToAccountData returns ledgercore.AccountData from basics.AccountData
@@ -77,7 +78,8 @@ func ToAccountData(acct basics.AccountData) AccountData {
 			LastProposed:  acct.LastProposed,
 			LastHeartbeat: acct.LastHeartbeat,
 
-			SponsoredAssetsOffset: acct.SponsoredAssetsOffset,
+			TotalAssetsSponsored:  acct.TotalAssetsSponsored,
+			TotalAssetsSponsoring: acct.TotalAssetsSponsoring,
 		},
 		VotingData: basics.VotingData{
 			VoteID:          acct.VoteID,
@@ -115,7 +117,8 @@ func AssignAccountData(a *basics.AccountData, acct AccountData) {
 	a.LastProposed = acct.LastProposed
 	a.LastHeartbeat = acct.LastHeartbeat
 
-	a.SponsoredAssetsOffset = acct.SponsoredAssetsOffset
+	a.TotalAssetsSponsored = acct.TotalAssetsSponsored
+	a.TotalAssetsSponsoring = acct.TotalAssetsSponsoring
 }
 
 // WithUpdatedRewards calls basics account data WithUpdatedRewards
@@ -161,7 +164,8 @@ func (u AccountData) MinBalance(proto *config.ConsensusParams) basics.MicroAlgos
 		u.TotalAppParams, u.TotalAppLocalStates,
 		uint64(u.TotalExtraAppPages),
 		u.TotalBoxes, u.TotalBoxBytes,
-		u.SponsoredAssetsOffset,
+		u.TotalAssetsSponsored,
+		u.TotalAssetsSponsoring,
 	)
 }
 

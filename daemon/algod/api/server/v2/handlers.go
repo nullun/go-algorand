@@ -532,13 +532,12 @@ func (v2 *Handlers) basicAccountInformation(ctx echo.Context, addr basics.Addres
 			NumByteSlice: record.TotalAppSchema.NumByteSlice,
 			NumUint:      record.TotalAppSchema.NumUint,
 		},
-		AppsTotalExtraPages:   omitEmpty(uint64(record.TotalExtraAppPages)),
-		TotalBoxes:            omitEmpty(record.TotalBoxes),
-		TotalBoxBytes:         omitEmpty(record.TotalBoxBytes),
-		MinBalance:            record.MinBalance(&consensus).Raw,
-		LastProposed:          omitEmpty(record.LastProposed),
-		LastHeartbeat:         omitEmpty(record.LastHeartbeat),
-		SponsoredAssetsOffset: omitEmpty(record.SponsoredAssetsOffset),
+		AppsTotalExtraPages: omitEmpty(uint64(record.TotalExtraAppPages)),
+		TotalBoxes:          omitEmpty(record.TotalBoxes),
+		TotalBoxBytes:       omitEmpty(record.TotalBoxBytes),
+		MinBalance:          record.MinBalance(&consensus).Raw,
+		LastProposed:        omitEmpty(record.LastProposed),
+		LastHeartbeat:       omitEmpty(record.LastHeartbeat),
 	}
 	response := model.AccountResponse(account)
 	return ctx.JSON(http.StatusOK, response)

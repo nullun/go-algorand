@@ -141,7 +141,6 @@ func AccountDataToAccount(
 		MinBalance:                  minBalance.Raw,
 		LastProposed:                omitEmpty(record.LastProposed),
 		LastHeartbeat:               omitEmpty(record.LastHeartbeat),
-		SponsoredAssetsOffset:       omitEmpty(record.SponsoredAssetsOffset),
 	}, nil
 }
 
@@ -327,27 +326,26 @@ func AccountToAccountData(a *model.Account) (basics.AccountData, error) {
 	}
 
 	ad := basics.AccountData{
-		Status:                status,
-		MicroAlgos:            basics.MicroAlgos{Raw: a.Amount},
-		RewardsBase:           rewardsBase,
-		RewardedMicroAlgos:    basics.MicroAlgos{Raw: a.Rewards},
-		IncentiveEligible:     nilToZero(a.IncentiveEligible),
-		VoteID:                voteID,
-		SelectionID:           selID,
-		VoteFirstValid:        voteFirstValid,
-		VoteLastValid:         voteLastValid,
-		VoteKeyDilution:       voteKeyDilution,
-		StateProofID:          stateProofID,
-		Assets:                assets,
-		AppLocalStates:        appLocalStates,
-		AppParams:             appParams,
-		TotalAppSchema:        totalSchema,
-		TotalExtraAppPages:    totalExtraPages,
-		TotalBoxes:            nilToZero(a.TotalBoxes),
-		TotalBoxBytes:         nilToZero(a.TotalBoxBytes),
-		LastProposed:          nilToZero(a.LastProposed),
-		LastHeartbeat:         nilToZero(a.LastHeartbeat),
-		SponsoredAssetsOffset: nilToZero(a.SponsoredAssetsOffset),
+		Status:             status,
+		MicroAlgos:         basics.MicroAlgos{Raw: a.Amount},
+		RewardsBase:        rewardsBase,
+		RewardedMicroAlgos: basics.MicroAlgos{Raw: a.Rewards},
+		IncentiveEligible:  nilToZero(a.IncentiveEligible),
+		VoteID:             voteID,
+		SelectionID:        selID,
+		VoteFirstValid:     voteFirstValid,
+		VoteLastValid:      voteLastValid,
+		VoteKeyDilution:    voteKeyDilution,
+		StateProofID:       stateProofID,
+		Assets:             assets,
+		AppLocalStates:     appLocalStates,
+		AppParams:          appParams,
+		TotalAppSchema:     totalSchema,
+		TotalExtraAppPages: totalExtraPages,
+		TotalBoxes:         nilToZero(a.TotalBoxes),
+		TotalBoxBytes:      nilToZero(a.TotalBoxBytes),
+		LastProposed:       nilToZero(a.LastProposed),
+		LastHeartbeat:      nilToZero(a.LastHeartbeat),
 	}
 
 	ad.AuthAddr, err = nilToZeroAddr(a.AuthAddr)

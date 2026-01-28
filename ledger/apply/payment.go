@@ -61,6 +61,14 @@ func Payment(payment transactions.PaymentTxnFields, header transactions.Header, 
 			return fmt.Errorf("balance %d still not zero after CloseRemainderTo", rec.MicroAlgos.Raw)
 		}
 
+		// Confirm that there are no sponsoring asset holdings by the account.
+		if rec.TotalAssetsSponsoring != 0 {
+			return fmt.Errorf("cannot close: %d outstanding sponsoring assets", rec.TotalAssetsSponsoring)
+		}
+		// Confirm that there are no sponsored asset holdings by the account.
+		if rec.TotalAssetsSponsored != 0 {
+			return fmt.Errorf("cannot close: %d outstanding sponsored assets", rec.TotalAssetsSponsored)
+		}
 		// Confirm that there is no asset-related state in the account
 		totalAssets := rec.TotalAssets
 		if totalAssets > 0 {
@@ -88,11 +96,6 @@ func Payment(payment transactions.PaymentTxnFields, header transactions.Header, 
 		if rec.TotalBoxBytes > 0 {
 			// This should be impossible because every box byte comes from the existence of a box.
 			return fmt.Errorf("cannot close: %d outstanding box bytes", rec.TotalBoxBytes)
-		}
-
-		// Confirm that there are no sponsored asset holdings by the account.
-		if rec.SponsoredAssetsOffset != 0 {
-			return fmt.Errorf("cannot close: %d outstanding assets sponsored", rec.SponsoredAssetsOffset)
 		}
 
 		// Can't have created apps remaining either

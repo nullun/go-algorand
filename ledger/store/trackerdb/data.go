@@ -49,6 +49,8 @@ type BaseAccountData struct {
 	IncentiveEligible          bool              `codec:"o"`
 	LastProposed               basics.Round      `codec:"p"`
 	LastHeartbeat              basics.Round      `codec:"q"`
+	TotalAssetsSponsored       uint64            `codec:"r"`
+	TotalAssetsSponsoring      uint64            `codec:"s"`
 
 	BaseVotingData
 
@@ -57,9 +59,6 @@ type BaseAccountData struct {
 	// consensus parameter is being set. Once the above consensus takes place, this field would be populated with the
 	// correct round number.
 	UpdateRound uint64 `codec:"z"`
-
-	// TODO: Consider using a uint64 and boolean to indicate negative values
-	SponsoredAssetsOffset int64 `codec:"r"`
 }
 
 // ResourceFlags are bitmask used to indicate which portions ofa resources are used.
@@ -309,10 +308,12 @@ func (ba *BaseAccountData) SetCoreAccountData(ad *ledgercore.AccountData) {
 	ba.TotalBoxes = ad.TotalBoxes
 	ba.TotalBoxBytes = ad.TotalBoxBytes
 	ba.IncentiveEligible = ad.IncentiveEligible
-	ba.SponsoredAssetsOffset = ad.SponsoredAssetsOffset
 
 	ba.LastProposed = ad.LastProposed
 	ba.LastHeartbeat = ad.LastHeartbeat
+
+	ba.TotalAssetsSponsored = ad.TotalAssetsSponsored
+	ba.TotalAssetsSponsoring = ad.TotalAssetsSponsoring
 
 	ba.BaseVotingData.SetCoreAccountData(ad)
 }
@@ -334,10 +335,12 @@ func (ba *BaseAccountData) SetAccountData(ad *basics.AccountData) {
 	ba.TotalBoxes = ad.TotalBoxes
 	ba.TotalBoxBytes = ad.TotalBoxBytes
 	ba.IncentiveEligible = ad.IncentiveEligible
-	ba.SponsoredAssetsOffset = ad.SponsoredAssetsOffset
 
 	ba.LastProposed = ad.LastProposed
 	ba.LastHeartbeat = ad.LastHeartbeat
+
+	ba.TotalAssetsSponsored = ad.TotalAssetsSponsored
+	ba.TotalAssetsSponsoring = ad.TotalAssetsSponsoring
 
 	ba.BaseVotingData.VoteID = ad.VoteID
 	ba.BaseVotingData.SelectionID = ad.SelectionID
@@ -379,7 +382,8 @@ func (ba *BaseAccountData) GetLedgerCoreAccountBaseData() ledgercore.AccountBase
 		LastProposed:  ba.LastProposed,
 		LastHeartbeat: ba.LastHeartbeat,
 
-		SponsoredAssetsOffset: ba.SponsoredAssetsOffset,
+		TotalAssetsSponsored:  ba.TotalAssetsSponsored,
+		TotalAssetsSponsoring: ba.TotalAssetsSponsoring,
 	}
 }
 
@@ -422,7 +426,8 @@ func (ba *BaseAccountData) GetAccountData() basics.AccountData {
 		LastProposed:  ba.LastProposed,
 		LastHeartbeat: ba.LastHeartbeat,
 
-		SponsoredAssetsOffset: ba.SponsoredAssetsOffset,
+		TotalAssetsSponsored:  ba.TotalAssetsSponsored,
+		TotalAssetsSponsoring: ba.TotalAssetsSponsoring,
 	}
 }
 
@@ -445,8 +450,9 @@ func (ba *BaseAccountData) IsEmpty() bool {
 		ba.TotalBoxBytes == 0 &&
 		ba.LastProposed == 0 &&
 		ba.LastHeartbeat == 0 &&
-		ba.BaseVotingData.IsEmpty() &&
-		ba.SponsoredAssetsOffset == 0
+		ba.TotalAssetsSponsored == 0 &&
+		ba.TotalAssetsSponsoring == 0 &&
+		ba.BaseVotingData.IsEmpty()
 }
 
 // IsEmpty returns true if all of the fields are zero.

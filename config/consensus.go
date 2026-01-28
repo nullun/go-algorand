@@ -585,10 +585,6 @@ type ConsensusParams struct {
 	// be paid by another account.
 	SupportSponsoredFee bool
 
-	// SupportEnforcements allows transactions to carry enforcements that
-	// perform/enforce a variety of different protocol-level side-effects.
-	SupportEnforcements bool
-
 	// SupportTransactionDirectives allows transactions to carry additional
 	// constraints and effects that can enforce further requirements and/or
 	// perform extra side-effects at the protocol-level.
@@ -1479,7 +1475,6 @@ func initConsensusProtocols() {
 	vFuture.AllowZeroLocalAppRef = true
 	vFuture.EnforceAuthAddrSenderDiff = true
 	vFuture.SupportSponsoredFee = true
-	vFuture.SupportEnforcements = true
 	vFuture.SupportTransactionDirectives = true
 
 	Consensus[protocol.ConsensusFuture] = vFuture

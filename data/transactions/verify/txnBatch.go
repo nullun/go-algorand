@@ -238,7 +238,7 @@ func getNumberOfBatchableSigsInTxn(stx *transactions.SignedTxn, groupIndex int) 
 	}
 
 	if stx.IsSponsored() {
-		sponsorSigType, err := checkTxnSigTypeCounts(&stx.Sponsor.SignatureFields, groupIndex)
+		sponsorSigType, err := checkTxnSigTypeCounts(&stx.Ssig.SignatureFields, groupIndex)
 		if err != nil {
 			return count, err
 		}
@@ -247,7 +247,7 @@ func getNumberOfBatchableSigsInTxn(stx *transactions.SignedTxn, groupIndex int) 
 		case singleSig:
 			count++
 		case multiSig:
-			count += uint64(stx.Sponsor.Msig.Signatures())
+			count += uint64(stx.Ssig.Msig.Signatures())
 		case logicSig:
 			// Currently the sigs in here are not batched. Something to consider later.
 		}

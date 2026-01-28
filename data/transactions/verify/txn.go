@@ -194,7 +194,7 @@ func txnBatchPrep(gi int, groupCtx *GroupContext, verifier crypto.BatchVerifier)
 			switch dir {
 			case transactions.FeeSponsored:
 				// Cannot check Sponsor Signature as it's outside of `tx`.
-				if s.Sponsor.Blank() {
+				if s.Ssig.Blank() {
 					return &TxGroupError{err: errTxnSigHasIncompleteOrMissingSponsorSig, GroupIndex: gi, Reason: TxGroupErrorReasonSponsorSigFailed}
 				}
 			case transactions.AssetSponsor:
@@ -259,7 +259,7 @@ func txnGroupBatchPrep(stxs []transactions.SignedTxn, contextHdr *bookkeeping.Bl
 			return nil, prepErr
 		}
 		feesPaid = basics.AddSaturate(feesPaid, stxn.Txn.Fee.Raw)
-		lSigPooledSize += stxn.Lsig.Len() + stxn.Sponsor.Lsig.Len()
+		lSigPooledSize += stxn.Lsig.Len() + stxn.Ssig.Lsig.Len()
 		if stxn.Txn.Type == protocol.StateProofTx {
 			// State proofs are free, bail before incrementing
 			continue
@@ -365,7 +365,7 @@ func stxnCoreChecks(gi int, groupCtx *GroupContext, batchVerifier crypto.BatchVe
 	}
 
 	if stxn.IsSponsored() {
-		sponsorSigType, err := checkTxnSigTypeCounts(&stxn.Sponsor.SignatureFields, gi)
+		sponsorSigType, err := checkTxnSigTypeCounts(&stxn.Ssig.SignatureFields, gi)
 		if err != nil {
 			return err
 		}
@@ -374,7 +374,7 @@ func stxnCoreChecks(gi int, groupCtx *GroupContext, batchVerifier crypto.BatchVe
 			return &TxGroupError{err: errTxnSigHasIncompleteOrMissingSponsorSig, GroupIndex: gi, Reason: TxGroupErrorReasonHasNoSig}
 		}
 
-		return enqueueAuthSigVerify(stxn.SponsorAuthorizer(), &stxn.Sponsor.SignatureFields, &stxn.Txn, gi, groupCtx, sponsorSigType, batchVerifier)
+		return enqueueAuthSigVerify(stxn.SponsorAuthorizer(), &stxn.Ssig.SignatureFields, &stxn.Txn, gi, groupCtx, sponsorSigType, batchVerifier)
 	}
 
 	return nil

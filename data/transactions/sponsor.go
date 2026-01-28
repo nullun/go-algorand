@@ -22,17 +22,17 @@ import "github.com/algorand/go-algorand/data/basics"
 type SponsorSig struct {
 	_struct struct{} `codec:",omitempty,omitemptyarray"`
 
-	Address basics.Address `codec:"addr"`
+	Sponsor basics.Address `codec:"addr"`
 	SignatureFields
 }
 
 // Blank returns true if there is no content in this SponsorSig.
 // AuthAddr on it's own is useless. So we don't care here.
 func (ssig *SponsorSig) Blank() bool {
-	return ssig.Address.IsZero() && ssig.Sig.Blank() && ssig.Msig.Blank() && ssig.Lsig.Blank()
+	return ssig.Sponsor.IsZero() && ssig.Sig.Blank() && ssig.Msig.Blank() && ssig.Lsig.Blank()
 }
 
 // Equal returns true if two SponsorSig are equal, including Address and AuthAddr.
 func (ssig *SponsorSig) Equal(b *SponsorSig) bool {
-	return ssig.Address == b.Address && ssig.Sig == b.Sig && ssig.Msig.Equal(b.Msig) && ssig.Lsig.Equal(&b.Lsig) && ssig.AuthAddr == b.AuthAddr
+	return ssig.Sponsor == b.Sponsor && ssig.Sig == b.Sig && ssig.Msig.Equal(b.Msig) && ssig.Lsig.Equal(&b.Lsig) && ssig.AuthAddr == b.AuthAddr
 }

@@ -1187,14 +1187,14 @@ func (eval *BlockEvaluator) transaction(txn transactions.SignedTxn, evalParams *
 		}
 
 		// If Sponsor is present, similarly check if the correct authoratative address was used.
-		if !txn.Sponsor.Address.IsZero() {
-			acctspsrdata, lookupErr := cow.lookup(txn.Sponsor.Address)
+		if !txn.Ssig.Sponsor.IsZero() {
+			acctspsrdata, lookupErr := cow.lookup(txn.Ssig.Sponsor)
 			if lookupErr != nil {
 				return lookupErr
 			}
 			correctSponsorAuthorizer := acctspsrdata.AuthAddr
 			if (correctSponsorAuthorizer == basics.Address{}) {
-				correctSponsorAuthorizer = txn.Sponsor.Address
+				correctSponsorAuthorizer = txn.Ssig.Sponsor
 			}
 			if txn.SponsorAuthorizer() != correctSponsorAuthorizer {
 				return fmt.Errorf("sponsored transaction %v: should have been authorized by sponsor %v but was actually authorized by sponsor %v", txn.ID(), correctSponsorAuthorizer, txn.SponsorAuthorizer())
@@ -1254,8 +1254,8 @@ func (cs *roundCowState) takeFee(stx *transactions.SignedTxn, senderRewards *bas
 	feePayer := stx.Txn.Sender
 	feePayerRewards := senderRewards
 
-	if !stx.Sponsor.Address.IsZero() {
-		feePayer = stx.Sponsor.Address
+	if !stx.Ssig.Sponsor.IsZero() {
+		feePayer = stx.Ssig.Sponsor
 		feePayerRewards = sponsorRewards
 	}
 

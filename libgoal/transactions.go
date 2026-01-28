@@ -94,7 +94,7 @@ func (c *Client) SignTransactionWithWalletAndSigner(walletHandle, pw []byte, sig
 		// Decode the SignedTxn
 		var sponsorStx transactions.SignedTxn
 		err = protocol.Decode(resp.SignedTransaction, &sponsorStx)
-		stx.Sponsor = sponsorStx.Sponsor
+		stx.Ssig = sponsorStx.Ssig
 	}
 
 	return

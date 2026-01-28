@@ -298,8 +298,8 @@ func (tx Transaction) SignAsSponsor(secrets *crypto.SignatureSecrets) SignedTxn 
 
 	s := SignedTxn{
 		Txn: tx,
-		Sponsor: SponsorSig{
-			Address: basics.Address(secrets.SignatureVerifier),
+		Ssig: SponsorSig{
+			Sponsor: basics.Address(secrets.SignatureVerifier),
 			SignatureFields: SignatureFields{
 				Sig: ssig,
 			},

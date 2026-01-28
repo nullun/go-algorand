@@ -88,7 +88,7 @@ var (
 	errTxnSigNotWellFormed                    = errors.New("signedtxn should only have one of Sig or Msig or LogicSig")
 	errRekeyingNotSupported                   = errors.New("nonempty AuthAddr but rekeying is not supported")
 	errAuthAddrEqualsSender                   = errors.New("AuthAddr must be different from Sender")
-	errSponsoredFeeNotSupported               = errors.New("nonempty Sponsor but sponsoring is not supported")
+	errSponsoredFeeNotSupported               = errors.New("nonempty SponsorSig but sponsoring is not supported")
 	errTxnSigHasIncompleteOrMissingSponsorSig = errors.New("signedtxn has incomplete or missing sponsor sig")
 	errUnknownSignature                       = errors.New("has one mystery sig. WAT?")
 )
@@ -177,7 +177,7 @@ func txnBatchPrep(gi int, groupCtx *GroupContext, verifier crypto.BatchVerifier)
 		return &TxGroupError{err: errRekeyingNotSupported, GroupIndex: gi, Reason: TxGroupErrorReasonGeneric}
 	}
 
-	if !groupCtx.consensusParams.SupportSponsoredFee && !s.Txn.Sponsor.IsZero() {
+	if !groupCtx.consensusParams.SupportSponsoredFee && !s.Ssig.Blank() {
 		return &TxGroupError{err: errSponsoredFeeNotSupported, GroupIndex: gi, Reason: TxGroupErrorReasonGeneric}
 	}
 

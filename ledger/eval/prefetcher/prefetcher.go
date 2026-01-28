@@ -349,8 +349,8 @@ func (p *accountPrefetcher) prefetch(ctx context.Context) {
 			}
 
 			// Transaction may be sponsored by another account.
-			if !stxn.Txn.Sponsor.IsZero() {
-				loadAccountsAddAccountTask(&stxn.Txn.Sponsor, task, accountTasks, queue)
+			if !stxn.Ssig.Sponsor.IsZero() {
+				loadAccountsAddAccountTask(&stxn.Ssig.Sponsor, task, accountTasks, queue)
 			}
 
 			// If you add new addresses here, also add them in getTxnAddresses().

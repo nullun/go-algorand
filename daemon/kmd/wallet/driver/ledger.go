@@ -353,10 +353,10 @@ func (lw *LedgerWallet) SignTransaction(tx transactions.Transaction, pk crypto.P
 				},
 			},
 		}
-		// Set the AuthAddr if the key we signed with doesn't match the txn sponsor
-		if basics.Address(pk) != tx.Sponsor {
-			stxn.Ssig.AuthAddr = basics.Address(pk)
-		}
+		// // Set the AuthAddr if the key we signed with doesn't match the txn sponsor
+		// if basics.Address(pk) != tx.Sponsor {
+		// 	stxn.Ssig.AuthAddr = basics.Address(pk)
+		// }
 	} else {
 		stxn = transactions.SignedTxn{
 			Txn: tx,

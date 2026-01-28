@@ -80,12 +80,6 @@ type Header struct {
 	// membership of a multisig account, etc.
 	RekeyTo basics.Address `codec:"rekey"`
 
-	// Sponsor specifies a different address to take the transaction fee from
-	// instead of the Sender. If provided, the transaction is only valid when
-	// an additional signature from the sponsor is provided alongside the senders.
-	// The Sponsor cannot be the same as Sender.
-	Sponsor basics.Address `codec:"spsr"`
-
 	// Directives specifies a list of protocol-level constraints and effects that
 	// must be adhered to, to be considered a valid transaction. Failing a
 	// constraint or effect results in an invalid transaction.
@@ -329,9 +323,6 @@ func (tx Transaction) MatchAddress(addr basics.Address) bool {
 	if addr == tx.Sender {
 		return true
 	}
-	if addr == tx.Sponsor {
-		return true
-	}
 
 	switch tx.Type {
 	case protocol.PaymentTx:
@@ -512,9 +503,10 @@ func (tx Transaction) WellFormed(spec SpecialAddresses, proto config.ConsensusPa
 	if !proto.SupportRekeying && (tx.RekeyTo != basics.Address{}) {
 		return fmt.Errorf("transaction has RekeyTo set but rekeying not yet enabled")
 	}
-	if !proto.SupportSponsoredFee && (tx.Sponsor != basics.Address{}) {
-		return fmt.Errorf("transaction has Sponsor set but sponsoring not yet enabled")
-	}
+	// TODO: Replace with FeeSponsored boolean
+	// if !proto.SupportSponsoredFee && (tx.Sponsor != basics.Address{}) {
+	// 	return fmt.Errorf("transaction has Sponsor set but sponsoring not yet enabled")
+	// }
 	return nil
 }
 

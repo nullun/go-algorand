@@ -70,9 +70,6 @@ func (hb HeartbeatTxnFields) wellFormed(header Header, proto config.ConsensusPar
 		if !header.RekeyTo.IsZero() {
 			return fmt.Errorf("tx.RekeyTo is set in %s heartbeat", kind)
 		}
-		if !header.Sponsor.IsZero() {
-			return fmt.Errorf("tx.Sponsor is set in %s heartbeat", kind)
-		}
 	}
 
 	if (hb.HbProof == crypto.HeartbeatProof{}) {

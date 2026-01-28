@@ -516,7 +516,6 @@ var createAppCmd = &cobra.Command{
 		// Fill in note and lease
 		tx.Note = parseNoteField(cmd)
 		tx.Lease = parseLease(cmd)
-		tx.Sponsor = cliAddress(sponsorAddress)
 
 		if dirFeeSponsor {
 			tx.Directives = append(tx.Directives, transactions.FeeSponsored)
@@ -601,7 +600,6 @@ var updateAppCmd = &cobra.Command{
 		// Fill in note and lease
 		tx.Note = parseNoteField(cmd)
 		tx.Lease = parseLease(cmd)
-		tx.Sponsor = cliAddress(sponsorAddress)
 
 		if dirFeeSponsor {
 			tx.Directives = append(tx.Directives, transactions.FeeSponsored)
@@ -676,7 +674,6 @@ var optInAppCmd = &cobra.Command{
 		// Fill in note and lease
 		tx.Note = parseNoteField(cmd)
 		tx.Lease = parseLease(cmd)
-		tx.Sponsor = cliAddress(sponsorAddress)
 
 		if dirFeeSponsor {
 			tx.Directives = append(tx.Directives, transactions.FeeSponsored)
@@ -751,7 +748,6 @@ var closeOutAppCmd = &cobra.Command{
 		// Fill in note and lease
 		tx.Note = parseNoteField(cmd)
 		tx.Lease = parseLease(cmd)
-		tx.Sponsor = cliAddress(sponsorAddress)
 
 		if dirFeeSponsor {
 			tx.Directives = append(tx.Directives, transactions.FeeSponsored)
@@ -826,7 +822,6 @@ var clearAppCmd = &cobra.Command{
 		// Fill in note and lease
 		tx.Note = parseNoteField(cmd)
 		tx.Lease = parseLease(cmd)
-		tx.Sponsor = cliAddress(sponsorAddress)
 
 		if dirFeeSponsor {
 			tx.Directives = append(tx.Directives, transactions.FeeSponsored)
@@ -900,7 +895,6 @@ var callAppCmd = &cobra.Command{
 		// Fill in note and lease
 		tx.Note = parseNoteField(cmd)
 		tx.Lease = parseLease(cmd)
-		tx.Sponsor = cliAddress(sponsorAddress)
 
 		if dirFeeSponsor {
 			tx.Directives = append(tx.Directives, transactions.FeeSponsored)
@@ -975,7 +969,6 @@ var deleteAppCmd = &cobra.Command{
 		// Fill in note and lease
 		tx.Note = parseNoteField(cmd)
 		tx.Lease = parseLease(cmd)
-		tx.Sponsor = cliAddress(sponsorAddress)
 
 		if dirFeeSponsor {
 			tx.Directives = append(tx.Directives, transactions.FeeSponsored)
@@ -1483,7 +1476,6 @@ var methodAppCmd = &cobra.Command{
 		// Fill in note and lease
 		appCallTxn.Note = parseNoteField(cmd)
 		appCallTxn.Lease = parseLease(cmd)
-		appCallTxn.Sponsor = cliAddress(sponsorAddress)
 
 		if dirFeeSponsor {
 			appCallTxn.Directives = append(appCallTxn.Directives, transactions.FeeSponsored)

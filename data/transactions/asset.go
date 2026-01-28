@@ -27,19 +27,19 @@ import (
 // AssetSponsorship indicates the type of sponsorship operation.
 type AssetSponsorship uint8
 
-// ApproveSponsorship indicates that the AssetReceiver's asset holdings will be
-// sponsored by the Sender. Placing the asset holdings minimum balance
+// ApproveAssetSponsorship indicates that the AssetReceiver's asset holdings
+// will be sponsored by the Sender. Placing the asset holdings minimum balance
 // requirement on the Sender.
-const ApproveSponsorship AssetSponsorship = 1
+const ApproveAssetSponsorship AssetSponsorship = 1
 
-// RevokeSponsorship indicates that the AssetReceiver's asset holdings will no
-// longer be sponsored by the Sender (who must be the current Sponsor). This
-// will only succeed if the AssetReceiver's asset holdings are zero.
+// RevokeAssetSponsorship indicates that the AssetReceiver's asset holdings
+// will no longer be sponsored by the Sender (who must be the current Sponsor).
+// This will only succeed if the AssetReceiver's asset holdings are zero.
 // TODO: Should it be possible for someone else takeover an existing Asset
 // Sponsorship? How would you prevent someone immediately taking over and
 // revoking someone who temporarily has zero units but may intend to hold more
 // again soon?
-const RevokeSponsorship AssetSponsorship = 2
+const RevokeAssetSponsorship AssetSponsorship = 2
 
 // AssetConfigTxnFields captures the fields used for asset
 // allocation, re-configuration, and destruction.
@@ -120,13 +120,17 @@ func (ac AssetConfigTxnFields) wellFormed(proto config.ConsensusParams) error {
 	return nil
 }
 
-func (ax AssetTransferTxnFields) wellFormed() error {
+func (ax AssetTransferTxnFields) wellFormed(proto config.ConsensusParams) error {
 	if ax.XferAsset == 0 && ax.AssetAmount != 0 {
 		return errors.New("asset ID cannot be zero")
 	}
 
 	if !ax.AssetSender.IsZero() && !ax.AssetCloseTo.IsZero() {
 		return errors.New("cannot close asset by clawback")
+	}
+
+	if !proto.SupportAssetSponsorship && ax.AssetSponsorship != 0 {
+		return errors.New("transaction tries to set asset sponsorship, but asset sponsorship is not supported")
 	}
 
 	return nil

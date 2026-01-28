@@ -71,9 +71,7 @@ var (
 	requestFilename    string
 	requestOutFilename string
 	inspectTxid        bool
-	dirFeeSponsor      bool
-	dirAssetSponsor    bool
-	dirAssetRevoke     bool
+	feeSponsored       bool
 
 	simulateStartRound            basics.Round
 	simulateAllowEmptySignatures  bool
@@ -457,8 +455,8 @@ var sendCmd = &cobra.Command{
 			payment.RekeyTo = rekeyTo
 		}
 
-		if dirFeeSponsor {
-			payment.Directives = append(payment.Directives, transactions.FeeSponsored)
+		if feeSponsored {
+			payment.FeeSponsored = true
 		}
 
 		// ConstructPayment fills in the suggested fee when fee=0. But if the user actually used --fee=0 on the

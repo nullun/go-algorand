@@ -357,8 +357,7 @@ func AssetTransfer(ct transactions.AssetTransferTxnFields, header transactions.H
 	// This results in the sender (not AssetSender) increasing their own Minimum
 	// Balance Requirement and Opting In the AssetReceiver into to the asset
 	// rather than failing and only if required.
-	if ct.AssetSponsorship == transactions.ApproveSponsorship {
-		// if ct.AssetReceiver != header.Sender && slices.Contains(header.Directives, transactions.AssetSponsor) {
+	if ct.AssetSponsorship == transactions.ApproveAssetSponsorship {
 		rcvHolding, ok, err := balances.GetAssetHolding(ct.AssetReceiver, ct.XferAsset)
 		if err != nil {
 			return err
@@ -421,8 +420,7 @@ func AssetTransfer(ct transactions.AssetTransferTxnFields, header transactions.H
 	// and Closing Out the asset of the AssetReceiver.
 	// Must not contain an AssetCloseTo field, since no assets should actually
 	// be getting moved.
-	if ct.AssetSponsorship == transactions.RevokeSponsorship {
-		// if ct.AssetCloseTo.IsZero() && ct.AssetReceiver != header.Sender && slices.Contains(header.Directives, transactions.AssetRevoke) {
+	if ct.AssetSponsorship == transactions.RevokeAssetSponsorship {
 		rcvHolding, ok, err := balances.GetAssetHolding(ct.AssetReceiver, ct.XferAsset)
 		if err != nil {
 			return err

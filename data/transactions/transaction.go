@@ -80,11 +80,6 @@ type Header struct {
 	// membership of a multisig account, etc.
 	RekeyTo basics.Address `codec:"rekey"`
 
-	// Directives specifies a list of protocol-level constraints and effects that
-	// must be adhered to, to be considered a valid transaction. Failing a
-	// constraint or effect results in an invalid transaction.
-	Directives []Directive `codec:"dir,allocbound=bounds.MaxTxnDirectives"`
-
 	// FeeSponsored indicates whether the transaction fee MUST be paid by a sponsor.
 	// The absence of this field (false) doesn't prevent an opportunistic sponsor
 	// from providing their signature and paying the transaction fee.
@@ -388,7 +383,7 @@ func (tx Transaction) WellFormed(spec SpecialAddresses, proto config.ConsensusPa
 			return fmt.Errorf("asset transaction not supported")
 		}
 
-		err := tx.AssetTransferTxnFields.wellFormed()
+		err := tx.AssetTransferTxnFields.wellFormed(proto)
 		if err != nil {
 			return err
 		}

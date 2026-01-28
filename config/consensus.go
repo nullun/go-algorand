@@ -585,10 +585,13 @@ type ConsensusParams struct {
 	// be paid by another account.
 	SupportFeeSponsored bool
 
-	// SupportTransactionDirectives allows transactions to carry additional
-	// constraints and effects that can enforce further requirements and/or
-	// perform extra side-effects at the protocol-level.
-	SupportTransactionDirectives bool
+	// SupportAssetSponsorship indicates support for asset sponsorship. Allowing
+	// accounts to provide sponsorship to other accounts so that they can receive
+	// and send assets without maintaining the minimum balance requirement
+	// increase themselves.
+	// This can also be revoked by the sponsor, if the sponsorted party holds zero
+	// units of the asset being sponsored.
+	SupportAssetSponsorship bool
 }
 
 // ProposerPayoutRules puts several related consensus parameters in one place. The same
@@ -1475,7 +1478,7 @@ func initConsensusProtocols() {
 	vFuture.AllowZeroLocalAppRef = true
 	vFuture.EnforceAuthAddrSenderDiff = true
 	vFuture.SupportFeeSponsored = true
-	vFuture.SupportTransactionDirectives = true
+	vFuture.SupportAssetSponsorship = true
 
 	Consensus[protocol.ConsensusFuture] = vFuture
 

@@ -517,8 +517,8 @@ var createAppCmd = &cobra.Command{
 		tx.Note = parseNoteField(cmd)
 		tx.Lease = parseLease(cmd)
 
-		if dirFeeSponsor {
-			tx.Directives = append(tx.Directives, transactions.FeeSponsored)
+		if feeSponsored {
+			tx.FeeSponsored = true
 		}
 
 		// Fill in rounds, fee, etc.
@@ -601,8 +601,8 @@ var updateAppCmd = &cobra.Command{
 		tx.Note = parseNoteField(cmd)
 		tx.Lease = parseLease(cmd)
 
-		if dirFeeSponsor {
-			tx.Directives = append(tx.Directives, transactions.FeeSponsored)
+		if feeSponsored {
+			tx.FeeSponsored = true
 		}
 
 		// Fill in rounds, fee, etc.
@@ -675,8 +675,8 @@ var optInAppCmd = &cobra.Command{
 		tx.Note = parseNoteField(cmd)
 		tx.Lease = parseLease(cmd)
 
-		if dirFeeSponsor {
-			tx.Directives = append(tx.Directives, transactions.FeeSponsored)
+		if feeSponsored {
+			tx.FeeSponsored = true
 		}
 
 		// Fill in rounds, fee, etc.
@@ -749,8 +749,8 @@ var closeOutAppCmd = &cobra.Command{
 		tx.Note = parseNoteField(cmd)
 		tx.Lease = parseLease(cmd)
 
-		if dirFeeSponsor {
-			tx.Directives = append(tx.Directives, transactions.FeeSponsored)
+		if feeSponsored {
+			tx.FeeSponsored = true
 		}
 
 		// Fill in rounds, fee, etc.
@@ -823,8 +823,8 @@ var clearAppCmd = &cobra.Command{
 		tx.Note = parseNoteField(cmd)
 		tx.Lease = parseLease(cmd)
 
-		if dirFeeSponsor {
-			tx.Directives = append(tx.Directives, transactions.FeeSponsored)
+		if feeSponsored {
+			tx.FeeSponsored = true
 		}
 
 		// Fill in rounds, fee, etc.
@@ -896,8 +896,8 @@ var callAppCmd = &cobra.Command{
 		tx.Note = parseNoteField(cmd)
 		tx.Lease = parseLease(cmd)
 
-		if dirFeeSponsor {
-			tx.Directives = append(tx.Directives, transactions.FeeSponsored)
+		if feeSponsored {
+			tx.FeeSponsored = true
 		}
 
 		// Fill in rounds, fee, etc.
@@ -970,8 +970,8 @@ var deleteAppCmd = &cobra.Command{
 		tx.Note = parseNoteField(cmd)
 		tx.Lease = parseLease(cmd)
 
-		if dirFeeSponsor {
-			tx.Directives = append(tx.Directives, transactions.FeeSponsored)
+		if feeSponsored {
+			tx.FeeSponsored = true
 		}
 
 		// Fill in rounds, fee, etc.
@@ -1477,8 +1477,8 @@ var methodAppCmd = &cobra.Command{
 		appCallTxn.Note = parseNoteField(cmd)
 		appCallTxn.Lease = parseLease(cmd)
 
-		if dirFeeSponsor {
-			appCallTxn.Directives = append(appCallTxn.Directives, transactions.FeeSponsored)
+		if feeSponsored {
+			appCallTxn.FeeSponsored = true
 		}
 
 		// Fill in rounds, fee, etc.

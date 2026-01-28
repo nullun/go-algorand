@@ -185,26 +185,6 @@ func txnBatchPrep(gi int, groupCtx *GroupContext, verifier crypto.BatchVerifier)
 		return &TxGroupError{err: errAuthAddrEqualsSender, GroupIndex: gi, Reason: TxGroupErrorReasonGeneric}
 	}
 
-	if len(s.Txn.Directives) > 0 {
-		if !groupCtx.consensusParams.SupportTransactionDirectives {
-			return &TxGroupError{err: fmt.Errorf("transaction has Directives set but directives not yet enabled"), GroupIndex: gi, Reason: TxGroupErrorReasonGeneric}
-		}
-
-		for _, dir := range s.Txn.Directives {
-			switch dir {
-			case transactions.FeeSponsored:
-				// Cannot check Sponsor Signature as it's outside of `tx`.
-				if s.Ssig.Blank() {
-					return &TxGroupError{err: errTxnSigHasIncompleteOrMissingSponsorSig, GroupIndex: gi, Reason: TxGroupErrorReasonSponsorSigFailed}
-				}
-			case transactions.AssetSponsor:
-				if s.Txn.Type != protocol.AssetTransferTx {
-					return &TxGroupError{err: fmt.Errorf("AssetSponsor directive can only be used with AssetTransfer transactions"), GroupIndex: gi, Reason: TxGroupErrorReasonSponsorSigFailed}
-				}
-			}
-		}
-	}
-
 	// NOTE: I think it's best I include this here as well.
 	// Rudamentary well-formedness checks on the SignedTxn so we can fail fast.
 	if s.Txn.FeeSponsored && s.Ssig.Blank() {

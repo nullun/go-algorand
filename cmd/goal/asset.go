@@ -47,6 +47,7 @@ var (
 	assetNoFreezer          bool
 	assetNoClawback         bool
 	assetSponsor            bool
+	assetRevoke             bool
 
 	assetNewManager  string
 	assetNewReserve  string
@@ -107,7 +108,9 @@ func init() {
 	sendAssetCmd.Flags().StringVarP(&toAddress, "to", "t", "", "Address to send to money to (required)")
 	sendAssetCmd.Flags().Uint64VarP(&amount, "amount", "a", 0, "The amount to be transferred (required), in base units of the asset.")
 	sendAssetCmd.Flags().StringVarP(&closeToAddress, "close-to", "c", "", "Close asset account and send remainder to this address")
-	sendAssetCmd.Flags().BoolVar(&assetSponsor, "sponsor-asset", false, "Sponsor the asset holding if recipient isn't already holding the asset")
+	// sendAssetCmd.Flags().BoolVar(&assetSponsor, "sponsor-asset", false, "Sponsor the asset holding if recipient isn't already holding the asset")
+	sendAssetCmd.Flags().BoolVar(&assetSponsor, "asset-sponsor", false, "Sponsor the AssetReceiver's asset holding")
+	sendAssetCmd.Flags().BoolVar(&assetRevoke, "asset-revoke", false, "Removes the AssetReceiver's sponsored asset holding. Must be holding zero units")
 	sendAssetCmd.MarkFlagRequired("to")
 	sendAssetCmd.MarkFlagRequired("amount")
 
@@ -286,8 +289,8 @@ var createAssetCmd = &cobra.Command{
 		tx.Note = parseNoteField(cmd)
 		tx.Lease = parseLease(cmd)
 
-		if dirFeeSponsor {
-			tx.Directives = append(tx.Directives, transactions.FeeSponsored)
+		if feeSponsored {
+			tx.FeeSponsored = true
 		}
 
 		fv, lv, _, err := client.ComputeValidityRounds(firstValid, lastValid, numValidRounds)
@@ -369,8 +372,8 @@ var destroyAssetCmd = &cobra.Command{
 		tx.Note = parseNoteField(cmd)
 		tx.Lease = parseLease(cmd)
 
-		if dirFeeSponsor {
-			tx.Directives = append(tx.Directives, transactions.FeeSponsored)
+		if feeSponsored {
+			tx.FeeSponsored = true
 		}
 
 		firstValid, lastValid, _, err = client.ComputeValidityRounds(firstValid, lastValid, numValidRounds)
@@ -466,8 +469,8 @@ var configAssetCmd = &cobra.Command{
 		tx.Note = parseNoteField(cmd)
 		tx.Lease = parseLease(cmd)
 
-		if dirFeeSponsor {
-			tx.Directives = append(tx.Directives, transactions.FeeSponsored)
+		if feeSponsored {
+			tx.FeeSponsored = true
 		}
 
 		firstValid, lastValid, _, err = client.ComputeValidityRounds(firstValid, lastValid, numValidRounds)
@@ -555,16 +558,16 @@ var sendAssetCmd = &cobra.Command{
 		tx.Note = parseNoteField(cmd)
 		tx.Lease = parseLease(cmd)
 
-		if dirFeeSponsor {
-			tx.Directives = append(tx.Directives, transactions.FeeSponsored)
+		if feeSponsored {
+			tx.FeeSponsored = true
 		}
 
-		if dirAssetSponsor {
-			tx.Directives = append(tx.Directives, transactions.AssetSponsor)
+		if assetSponsor {
+			tx.AssetSponsorship = transactions.ApproveAssetSponsorship
 		}
 
-		if dirAssetRevoke {
-			tx.Directives = append(tx.Directives, transactions.AssetRevoke)
+		if assetRevoke {
+			tx.AssetSponsorship = transactions.RevokeAssetSponsorship
 		}
 
 		firstValid, lastValid, _, err = client.ComputeValidityRounds(firstValid, lastValid, numValidRounds)
@@ -638,8 +641,8 @@ var freezeAssetCmd = &cobra.Command{
 		tx.Note = parseNoteField(cmd)
 		tx.Lease = parseLease(cmd)
 
-		if dirFeeSponsor {
-			tx.Directives = append(tx.Directives, transactions.FeeSponsored)
+		if feeSponsored {
+			tx.FeeSponsored = true
 		}
 
 		firstValid, lastValid, _, err = client.ComputeValidityRounds(firstValid, lastValid, numValidRounds)
@@ -729,8 +732,8 @@ var optinAssetCmd = &cobra.Command{
 		tx.Note = parseNoteField(cmd)
 		tx.Lease = parseLease(cmd)
 
-		if dirFeeSponsor {
-			tx.Directives = append(tx.Directives, transactions.FeeSponsored)
+		if feeSponsored {
+			tx.FeeSponsored = true
 		}
 
 		firstValid, lastValid, _, err = client.ComputeValidityRounds(firstValid, lastValid, numValidRounds)

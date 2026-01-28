@@ -32,8 +32,10 @@ func TestAxferWellFormedErrors(t *testing.T) {
 	partitiontest.PartitionTest(t)
 	t.Parallel()
 
+	// TODO: Actually add tests for AssetSponsorship
 	cases := []struct {
 		axfer         AssetTransferTxnFields
+		cv            protocol.ConsensusVersion
 		expectedError string
 	}{
 		{
@@ -68,7 +70,11 @@ func TestAxferWellFormedErrors(t *testing.T) {
 			name = ax.expectedError
 		}
 		t.Run(name, func(t *testing.T) {
-			err := ax.axfer.wellFormed()
+			cv := ax.cv
+			if cv == "" {
+				cv = protocol.ConsensusFuture
+			}
+			err := ax.axfer.wellFormed(config.Consensus[cv])
 			if ax.expectedError != "" {
 				require.ErrorContains(t, err, ax.expectedError)
 			} else {

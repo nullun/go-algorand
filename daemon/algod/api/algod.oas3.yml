@@ -1097,14 +1097,19 @@
             ],
             "type": "string"
           },
-          "sponsored-assets-offset": {
-            "description": "\\[sao\\] An offset identifying how many assets you're sponsoring minus how many have sponsored you.",
-            "type": "integer",
-            "x-go-type": "int64"
+          "sponsor": {
+            "description": "\\[s\\] Address of the sponsoring account for this account. If empty, the account is not sponsored.",
+            "type": "string",
+            "x-algorand-format": "Address"
           },
           "status": {
             "description": "\\[onl\\] delegation status of the account's MicroAlgos\n* Offline - indicates that the associated account is delegated.\n*  Online  - indicates that the associated account used as part of the delegation pool.\n*   NotParticipating - indicates that the associated account is neither a delegator nor a delegate.",
             "type": "string"
+          },
+          "total-accounts-sponsoring": {
+            "description": "\\[tacs\\] The number of accounts this account is sponsoring",
+            "format": "uint64",
+            "type": "integer"
           },
           "total-apps-opted-in": {
             "description": "The count of all applications that have been opted in, equivalent to the count of application local data (AppLocalState objects) stored in this account.",
@@ -1113,6 +1118,16 @@
           },
           "total-assets-opted-in": {
             "description": "The count of all assets that have been opted in, equivalent to the count of AssetHolding objects held by this account.",
+            "format": "uint64",
+            "type": "integer"
+          },
+          "total-assets-sponsored": {
+            "description": "\\[tasd\\] The number of asset holdings this account has sponsored by others",
+            "format": "uint64",
+            "type": "integer"
+          },
+          "total-assets-sponsoring": {
+            "description": "\\[tasg\\] The number of asset holdings this account is sponsoring for others",
             "format": "uint64",
             "type": "integer"
           },

@@ -766,7 +766,19 @@ func printAccountInfo(client libgoal.Client, address string, onlyShowAssetIDs bo
 		fmt.Fprintf(report, "\tID %d, local state used %d/%d uints, %d/%d byte slices\n", localState.Id, usedInts, allocatedInts, usedBytes, allocatedBytes)
 	}
 
-	fmt.Fprintf(report, "Minimum Balance:\t%v microAlgos\n", account.MinBalance)
+	derefString := func(s *string) string {
+		if s == nil {
+			return ""
+		}
+		return *s
+	}
+
+	sponsor := derefString(account.Sponsor)
+	if sponsor != "" {
+		sponsor = fmt.Sprintf(" (Sponsor: %s)", sponsor)
+	}
+
+	fmt.Fprintf(report, "Minimum Balance:\t%v microAlgos%s\n", account.MinBalance, sponsor)
 
 	if hasError {
 		fmt.Fprint(os.Stderr, errorReport.String())

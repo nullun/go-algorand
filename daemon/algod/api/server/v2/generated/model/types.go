@@ -213,8 +213,8 @@ type Account struct {
 	// * lsig
 	SigType *AccountSigType `json:"sig-type,omitempty"`
 
-	// SponsoredAssetsOffset \[sao\] An offset identifying how many assets you're sponsoring minus how many have sponsored you.
-	SponsoredAssetsOffset *int64 `json:"sponsored-assets-offset,omitempty"`
+	// Sponsor \[s\] Address of the sponsoring account for this account. If empty, the account is not sponsored.
+	Sponsor *string `json:"sponsor,omitempty"`
 
 	// Status \[onl\] delegation status of the account's MicroAlgos
 	// * Offline - indicates that the associated account is delegated.
@@ -222,11 +222,20 @@ type Account struct {
 	// *   NotParticipating - indicates that the associated account is neither a delegator nor a delegate.
 	Status string `json:"status"`
 
+	// TotalAccountsSponsoring \[tacs\] The number of accounts this account is sponsoring
+	TotalAccountsSponsoring *uint64 `json:"total-accounts-sponsoring,omitempty"`
+
 	// TotalAppsOptedIn The count of all applications that have been opted in, equivalent to the count of application local data (AppLocalState objects) stored in this account.
 	TotalAppsOptedIn uint64 `json:"total-apps-opted-in"`
 
 	// TotalAssetsOptedIn The count of all assets that have been opted in, equivalent to the count of AssetHolding objects held by this account.
 	TotalAssetsOptedIn uint64 `json:"total-assets-opted-in"`
+
+	// TotalAssetsSponsored \[tasd\] The number of asset holdings this account has sponsored by others
+	TotalAssetsSponsored *uint64 `json:"total-assets-sponsored,omitempty"`
+
+	// TotalAssetsSponsoring \[tasg\] The number of asset holdings this account is sponsoring for others
+	TotalAssetsSponsoring *uint64 `json:"total-assets-sponsoring,omitempty"`
 
 	// TotalBoxBytes \[tbxb\] The total number of bytes used by this account's app's box keys and values.
 	TotalBoxBytes *uint64 `json:"total-box-bytes,omitempty"`

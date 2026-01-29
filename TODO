@@ -1,0 +1,6 @@
+ # TODO
+ 
+ * [ ] Consensus Flags: Separate into 3 separate Fee/Assets/Accounts Sponsorship flags, or just have a single Sponsorship flag?
+ * [ ] Remove commented out code.
+ * [ ] Finish algod API changes.
+ * [ ] Finish goal commands.

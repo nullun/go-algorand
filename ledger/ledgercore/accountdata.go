@@ -53,6 +53,9 @@ type AccountBaseData struct {
 
 	TotalAssetsSponsored  uint64 // Total number of asset holdings other accounts are sponsoring for this account.
 	TotalAssetsSponsoring uint64 // Total number of asset holdings this account is sponsoring for other accounts.
+
+	TotalAccountsSponsoring uint64         // Total number of accounts this account is sponsoring.
+	Sponsor                 basics.Address // Address of the account sponsoring this account
 }
 
 // ToAccountData returns ledgercore.AccountData from basics.AccountData
@@ -80,6 +83,9 @@ func ToAccountData(acct basics.AccountData) AccountData {
 
 			TotalAssetsSponsored:  acct.TotalAssetsSponsored,
 			TotalAssetsSponsoring: acct.TotalAssetsSponsoring,
+
+			TotalAccountsSponsoring: acct.TotalAccountsSponsoring,
+			Sponsor:                 acct.Sponsor,
 		},
 		VotingData: basics.VotingData{
 			VoteID:          acct.VoteID,
@@ -119,6 +125,9 @@ func AssignAccountData(a *basics.AccountData, acct AccountData) {
 
 	a.TotalAssetsSponsored = acct.TotalAssetsSponsored
 	a.TotalAssetsSponsoring = acct.TotalAssetsSponsoring
+
+	a.TotalAccountsSponsoring = acct.TotalAccountsSponsoring
+	a.Sponsor = acct.Sponsor
 }
 
 // WithUpdatedRewards calls basics account data WithUpdatedRewards
@@ -159,6 +168,8 @@ func (u AccountData) LastSeen() basics.Round {
 func (u AccountData) MinBalance(proto *config.ConsensusParams) basics.MicroAlgos {
 	return basics.MinBalance(
 		proto.BalanceRequirements(),
+		!u.Sponsor.IsZero(),
+		u.TotalAccountsSponsoring,
 		u.TotalAssets,
 		u.TotalAppSchema,
 		u.TotalAppParams, u.TotalAppLocalStates,

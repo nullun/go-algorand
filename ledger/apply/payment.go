@@ -39,6 +39,71 @@ func Payment(payment transactions.PaymentTxnFields, header transactions.Header, 
 		}
 	}
 
+	// TODO: AccountSponsor
+	if payment.AccountSponsorship == transactions.ApproveAccountSponsorship {
+		rcvRecord, err := balances.Get(payment.Receiver, false)
+		if err != nil {
+			return err
+		}
+		// if !rcvRecord.Sponsor.IsZero() {
+		// 	return fmt.Errorf("cannot approve sponsorship: account is already sponsored by %s", rcvRecord.Sponsor.String())
+		// }
+		if !rcvRecord.IsZero() {
+			return fmt.Errorf("cannot approve sponsorship: account already exists")
+		}
+		rcvRecord.Sponsor = header.Sender
+		err = balances.Put(payment.Receiver, rcvRecord)
+		if err != nil {
+			return err
+		}
+
+		sndRecord, err := balances.Get(header.Sender, false)
+		if err != nil {
+			return err
+		}
+		sndRecord.TotalAccountsSponsoring = basics.AddSaturate(sndRecord.TotalAccountsSponsoring, 1)
+		err = balances.Put(header.Sender, sndRecord)
+		if err != nil {
+			return err
+		}
+	}
+
+	// TODO: AccountRevoke
+	if payment.AccountSponsorship == transactions.RevokeAccountSponsorship {
+		rcvRecord, err := balances.Get(payment.Receiver, false)
+		if err != nil {
+			return err
+		}
+		// if !rcvRecord.MicroAlgos.IsZero() {
+		// 	return fmt.Errorf("balance %d still not zero after CloseRemainderTo", rcvRecord.MicroAlgos.Raw)
+		// }
+		proto := balances.ConsensusParams()
+		minBal := rcvRecord.MinBalance(&proto).Raw
+		if minBal > 0 {
+			return fmt.Errorf("cannot revoke sponsorship: account has non-zero minimum balance requirement %d", minBal)
+		}
+
+		if rcvRecord.TotalAssetsSponsored > 0 {
+			return fmt.Errorf("cannot revoke sponsorship: %d outstanding sponsored assets", rcvRecord.TotalAssetsSponsored)
+		}
+
+		// Clear out entire sponsored account record
+		err = balances.CloseAccount(payment.Receiver)
+		if err != nil {
+			return err
+		}
+
+		sndRecord, err := balances.Get(header.Sender, false)
+		if err != nil {
+			return err
+		}
+		sndRecord.TotalAccountsSponsoring = basics.SubSaturate(sndRecord.TotalAccountsSponsoring, 1)
+		err = balances.Put(header.Sender, sndRecord)
+		if err != nil {
+			return err
+		}
+	}
+
 	if payment.CloseRemainderTo != (basics.Address{}) {
 		rec, err := balances.Get(header.Sender, true)
 		if err != nil {
@@ -59,6 +124,30 @@ func Payment(payment transactions.PaymentTxnFields, header transactions.Header, 
 		}
 		if !rec.MicroAlgos.IsZero() {
 			return fmt.Errorf("balance %d still not zero after CloseRemainderTo", rec.MicroAlgos.Raw)
+		}
+
+		totalAccountsSponsoring := rec.TotalAccountsSponsoring
+		if totalAccountsSponsoring > 0 {
+			if totalAccountsSponsoring > 1 {
+				return fmt.Errorf("cannot close: %d outstanding sponsored accounts", totalAccountsSponsoring)
+			}
+
+			if ad.ClosingAmount.Raw < balances.ConsensusParams().MinBalance {
+				return fmt.Errorf("cannot close: insufficient balance (%d) to unsponsor account account", ad.ClosingAmount.Raw)
+			}
+
+			closeRecord, err2 := balances.Get(payment.CloseRemainderTo, false)
+			if err2 != nil {
+				return err2
+			}
+			if header.Sender != closeRecord.Sponsor {
+				return fmt.Errorf("cannot close: account is sponsoring another account")
+			}
+			closeRecord.Sponsor = basics.Address{}
+			err2 = balances.Put(payment.CloseRemainderTo, closeRecord)
+			if err2 != nil {
+				return err2
+			}
 		}
 
 		// Confirm that there are no sponsoring asset holdings by the account.

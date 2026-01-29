@@ -244,6 +244,15 @@ type Account struct {
 // * lsig
 type AccountSigType string
 
+// AccountApplicationData AccountApplicationData describes the account's application data for a specific application ID.
+type AccountApplicationData struct {
+	// AppLocalState Stores local state associated with an application.
+	AppLocalState *ApplicationLocalState `json:"app-local-state,omitempty"`
+
+	// CreatedApp Stores the global information associated with an application.
+	CreatedApp *ApplicationParams `json:"created-app,omitempty"`
+}
+
 // AccountAssetHolding AccountAssetHolding describes the account's asset holding and asset parameters (if either exist) for a specific asset ID.
 type AccountAssetHolding struct {
 	// AssetHolding Describes an asset held by an account.
@@ -1120,6 +1129,17 @@ type AccountApplicationResponse struct {
 	Round basics.Round `json:"round"`
 }
 
+// AccountApplicationsInformationResponse defines model for AccountApplicationsInformationResponse.
+type AccountApplicationsInformationResponse struct {
+	ApplicationData *[]AccountApplicationData `json:"application-data,omitempty"`
+
+	// NextToken Used for pagination, when making another request provide this token with the next parameter.
+	NextToken *string `json:"next-token,omitempty"`
+
+	// Round The round for which this information is relevant.
+	Round basics.Round `json:"round"`
+}
+
 // AccountAssetResponse defines model for AccountAssetResponse.
 type AccountAssetResponse struct {
 	// AssetHolding Describes an asset held by an account.
@@ -1456,6 +1476,15 @@ type AccountInformationParamsExclude string
 
 // AccountInformationParamsFormat defines parameters for AccountInformation.
 type AccountInformationParamsFormat string
+
+// AccountApplicationsInformationParams defines parameters for AccountApplicationsInformation.
+type AccountApplicationsInformationParams struct {
+	// Limit Maximum number of results to return.
+	Limit *uint64 `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// Next The next page of results. Use the next token provided by the previous results.
+	Next *string `form:"next,omitempty" json:"next,omitempty"`
+}
 
 // AccountApplicationInformationParams defines parameters for AccountApplicationInformation.
 type AccountApplicationInformationParams struct {

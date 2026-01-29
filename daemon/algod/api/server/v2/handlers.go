@@ -1218,6 +1218,17 @@ func (v2 *Handlers) AccountAssetsInformation(ctx echo.Context, address basics.Ad
 	return ctx.JSON(http.StatusOK, response)
 }
 
+// AccountApplicationsInformation looks up an account's application data.
+// (GET /v2/accounts/{address}/applications)
+func (v2 *Handlers) AccountApplicationsInformation(ctx echo.Context, address basics.Address, params model.AccountApplicationsInformationParams) error {
+	if !v2.Node.Config().EnableExperimentalAPI {
+		return ctx.String(http.StatusNotFound, "/v2/accounts/{address}/applications was not enabled in the configuration file by setting the EnableExperimentalAPI to true")
+	}
+
+	// return ctx.String(http.StatusNotFound, "/v2/accounts/{address}/applications was not enabled in the configuration file by setting the EnableExperimentalAPI to true")
+	return notImplemented(ctx, fmt.Errorf("not implemented"), "not implemented yet", v2.Log)
+}
+
 // PreEncodedSimulateTxnResult mirrors model.SimulateTransactionResult
 type PreEncodedSimulateTxnResult struct {
 	Txn                      PreEncodedTxInfo                        `codec:"txn-result"`

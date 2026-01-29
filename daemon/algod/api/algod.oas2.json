@@ -369,6 +369,53 @@
         }
       }
     },
+    "/v2/accounts/{address}/applications": {
+      "get": {
+        "description": "Lookup an account's application local state and global state (AppLocalState and AppParams, if either exists).",
+        "tags": ["public", "experimental"],
+        "produces": ["application/json"],
+        "schemes": ["http"],
+        "summary": "Get a list of applications state held by an account, inclusive of application params.",
+        "operationId": "AccountApplicationsInformation",
+        "parameters": [
+          {
+            "$ref": "#/parameters/address"
+          },
+          {
+            "$ref": "#/parameters/limit"
+          },
+          {
+            "$ref": "#/parameters/next"
+          }
+        ],
+        "responses": {
+          "200": {
+            "$ref": "#/responses/AccountApplicationsInformationResponse"
+          },
+          "400": {
+            "description": "Malformed address",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "401": {
+            "description": "Invalid API Token",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "500": {
+            "description": "Internal Error",
+            "schema": {
+              "$ref": "#/definitions/ErrorResponse"
+            }
+          },
+          "default": {
+            "description": "Unknown Error"
+          }
+        }
+      }
+    },
     "/v2/accounts/{address}/transactions/pending": {
       "get": {
         "description": "Get the list of pending transactions by address, sorted by priority, in decreasing order, truncated at the end at MAX. If MAX = 0, returns all pending transactions.\n",
@@ -2653,6 +2700,21 @@
         }
       }
     },
+    "AccountApplicationData": {
+      "description": "AccountApplicationData describes the account's application data for a specific application ID.",
+      "type": "object",
+      "required": ["application-data"],
+      "properties": {
+        "app-local-state": {
+          "description": "\\[appl\\] the application local data stored in this account.\n\nThe raw account uses `AppLocalState` for this type.",
+          "$ref": "#/definitions/ApplicationLocalState"
+        },
+        "created-app": {
+          "description": "\\[appp\\] parameters of the application created by this account including app global data.\n\nThe raw account uses `AppParams` for this type.",
+          "$ref": "#/definitions/ApplicationParams"
+        }
+      }
+    },
     "AccountParticipation": {
       "description": "AccountParticipation describes the parameters used by this account in consensus protocol.",
       "type": "object",
@@ -4331,6 +4393,30 @@
           "created-app": {
             "description": "\\[appp\\] parameters of the application created by this account including app global data.\n\nThe raw account uses `AppParams` for this type.",
             "$ref": "#/definitions/ApplicationParams"
+          }
+        }
+      }
+    },
+    "AccountApplicationsInformationResponse": {
+      "description": "AccountApplicationsInformationResponse contains a list of application data for an account.",
+      "schema": {
+        "type": "object",
+        "required": ["round"],
+        "properties": {
+          "round": {
+            "description": "The round for which this information is relevant.",
+            "type": "integer",
+            "x-go-type": "basics.Round"
+          },
+          "next-token": {
+            "description": "Used for pagination, when making another request provide this token with the next parameter.",
+            "type": "string"
+          },
+          "application-data": {
+            "type": "array",
+            "items": {
+              "$ref": "#/definitions/AccountApplicationData"
+            }
           }
         }
       }

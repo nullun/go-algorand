@@ -194,7 +194,7 @@
             "in": "query",
             "required": false,
             "type": "string",
-            "enum": ["all", "none"]
+            "enum": ["all", "none", "params"]
           },
           {
             "$ref": "#/parameters/format"

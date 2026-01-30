@@ -3155,7 +3155,8 @@
             "schema": {
               "enum": [
                 "all",
-                "none"
+                "none",
+                "params"
               ],
               "type": "string"
             }

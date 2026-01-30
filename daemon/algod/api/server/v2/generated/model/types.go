@@ -53,8 +53,9 @@ const (
 
 // Defines values for AccountInformationParamsExclude.
 const (
-	AccountInformationParamsExcludeAll  AccountInformationParamsExclude = "all"
-	AccountInformationParamsExcludeNone AccountInformationParamsExclude = "none"
+	AccountInformationParamsExcludeAll    AccountInformationParamsExclude = "all"
+	AccountInformationParamsExcludeNone   AccountInformationParamsExclude = "none"
+	AccountInformationParamsExcludeParams AccountInformationParamsExclude = "params"
 )
 
 // Defines values for AccountInformationParamsFormat.

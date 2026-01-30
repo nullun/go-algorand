@@ -108,26 +108,26 @@ func (l *mockLedger) LookupAsset(rnd basics.Round, addr basics.Address, aidx bas
 	return ar, nil
 }
 
-func (l *mockLedger) LookupAssets(addr basics.Address, assetIDGT basics.AssetIndex, limit uint64) ([]ledgercore.AssetResourceWithIDs, basics.Round, error) {
+func (l *mockLedger) LookupResources(addr basics.Address, resourceIDGT basics.CreatableIndex, ctype basics.CreatableType, limit uint64) ([]ledgercore.AccountResourceWithIDs, basics.Round, error) {
 	ad, ok := l.accounts[addr]
 	if !ok {
 		return nil, basics.Round(0), nil
 	}
 
-	var res []ledgercore.AssetResourceWithIDs
-	for i := assetIDGT + 1; i < assetIDGT+1+basics.AssetIndex(limit); i++ {
-		apr := ledgercore.AssetResourceWithIDs{}
-		if ap, ok := ad.AssetParams[i]; ok {
+	var res []ledgercore.AccountResourceWithIDs
+	for i := resourceIDGT + 1; i < resourceIDGT+1+basics.CreatableIndex(limit); i++ {
+		apr := ledgercore.AccountResourceWithIDs{}
+		if ap, ok := ad.AssetParams[basics.AssetIndex(i)]; ok {
 			apr.AssetParams = &ap
-			apr.Creator = basics.Address{}
+			apr.AssetCreator = basics.Address{}
 		}
 
-		if ah, ok := ad.Assets[i]; ok {
+		if ah, ok := ad.Assets[basics.AssetIndex(i)]; ok {
 			apr.AssetHolding = &ah
 		}
 
 		if apr.AssetParams != nil || apr.AssetHolding != nil {
-			apr.AssetID = i
+			apr.AssetID = basics.AssetIndex(i)
 			res = append(res, apr)
 		}
 	}

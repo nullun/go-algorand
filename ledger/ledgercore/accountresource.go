@@ -38,14 +38,27 @@ type AssetResource struct {
 // inclusive of the asset ID and creator address
 type AssetResourceWithIDs struct {
 	AssetResource
-	AssetID basics.AssetIndex
-	Creator basics.Address
+	AssetID      basics.AssetIndex
+	AssetCreator basics.Address
 }
 
 // AppResource used to retrieve a generic app resource information from the data tier
 type AppResource struct {
 	AppLocalState *basics.AppLocalState
 	AppParams     *basics.AppParams
+}
+
+// AppResourceWithIDs is used to retrieve an application resource information from the data tier,
+type AppResourceWithIDs struct {
+	AppResource
+	AppIndex   basics.AppIndex
+	AppCreator basics.Address
+}
+
+// AccountResourceWithIDs is used to retrieve a generic account resource information from the data tier,
+type AccountResourceWithIDs struct {
+	AssetResourceWithIDs
+	AppResourceWithIDs
 }
 
 // AssignAccountResourceToAccountData assigns the Asset/App params/holdings contained

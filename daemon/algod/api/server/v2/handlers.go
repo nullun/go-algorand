@@ -82,6 +82,14 @@ const MaxAssetResults = 1000
 // /v2/accounts/{address}/assets endpoint
 const DefaultAssetResults = uint64(1000)
 
+// MaxApplicationResults sets a size limit for the number of applications returned in a single request to the
+// /v2/accounts/{address}/applications endpoint
+const MaxApplicationResults = 1000
+
+// DefaultApplicationResults sets a default size limit for the number of assets returned in a single request to the
+// /v2/accounts/{address}/applications endpoint
+const DefaultApplicationResults = uint64(1000)
+
 const (
 	errInvalidLimit      = "limit parameter must be a positive integer"
 	errUnableToParseNext = "unable to parse next token"
@@ -109,7 +117,7 @@ type LedgerForAPI interface {
 	ConsensusParams(r basics.Round) (config.ConsensusParams, error)
 	Latest() basics.Round
 	LookupAsset(rnd basics.Round, addr basics.Address, aidx basics.AssetIndex) (ledgercore.AssetResource, error)
-	LookupAssets(addr basics.Address, assetIDGT basics.AssetIndex, limit uint64) ([]ledgercore.AssetResourceWithIDs, basics.Round, error)
+	LookupResources(addr basics.Address, resourceIDGT basics.CreatableIndex, ctype basics.CreatableType, limit uint64) ([]ledgercore.AccountResourceWithIDs, basics.Round, error)
 	LookupApplication(rnd basics.Round, addr basics.Address, aidx basics.AppIndex) (ledgercore.AppResource, error)
 	BlockCert(rnd basics.Round) (blk bookkeeping.Block, cert agreement.Certificate, err error)
 	LatestTotals() (basics.Round, ledgercore.AccountTotals, error)
@@ -1172,8 +1180,7 @@ func (v2 *Handlers) AccountAssetsInformation(ctx echo.Context, address basics.Ad
 	// 3. Prepare JSON response
 
 	// We intentionally request one more than the limit to determine if there are more assets.
-	records, lookupRound, err := ledger.LookupAssets(address, basics.AssetIndex(assetGreaterThan), *params.Limit+1)
-
+	records, lookupRound, err := ledger.LookupResources(address, basics.CreatableIndex(assetGreaterThan), basics.AssetCreatable, *params.Limit+1)
 	if err != nil {
 		return internalError(ctx, err, errFailedLookingUpLedger, v2.Log)
 	}
@@ -1205,8 +1212,8 @@ func (v2 *Handlers) AccountAssetsInformation(ctx echo.Context, address basics.Ad
 			},
 		}
 
-		if !record.Creator.IsZero() {
-			asset := AssetParamsToAsset(record.Creator.String(), record.AssetID, record.AssetParams)
+		if !record.AssetCreator.IsZero() {
+			asset := AssetParamsToAsset(record.AssetCreator.String(), record.AssetID, record.AssetParams)
 			aah.AssetParams = &asset.Params
 		}
 
@@ -1225,8 +1232,86 @@ func (v2 *Handlers) AccountApplicationsInformation(ctx echo.Context, address bas
 		return ctx.String(http.StatusNotFound, "/v2/accounts/{address}/applications was not enabled in the configuration file by setting the EnableExperimentalAPI to true")
 	}
 
-	// return ctx.String(http.StatusNotFound, "/v2/accounts/{address}/applications was not enabled in the configuration file by setting the EnableExperimentalAPI to true")
-	return notImplemented(ctx, fmt.Errorf("not implemented"), "not implemented yet", v2.Log)
+	var applicationGreaterThan uint64 = 0
+	if params.Next != nil {
+		agt, err0 := strconv.ParseUint(*params.Next, 10, 64)
+		if err0 != nil {
+			return badRequest(ctx, err0, fmt.Sprintf("%s: %v", errUnableToParseNext, err0), v2.Log)
+		}
+		applicationGreaterThan = agt
+	}
+
+	if params.Limit != nil {
+		if *params.Limit <= 0 {
+			return badRequest(ctx, errors.New(errInvalidLimit), errInvalidLimit, v2.Log)
+		}
+
+		if *params.Limit > MaxApplicationResults {
+			limitErrMsg := fmt.Sprintf("limit %d exceeds max applications single batch limit %d", *params.Limit, MaxApplicationResults)
+			return badRequest(ctx, errors.New(limitErrMsg), limitErrMsg, v2.Log)
+		}
+	} else {
+		// default limit
+		l := DefaultApplicationResults
+		params.Limit = &l
+	}
+
+	ledger := v2.Node.LedgerForAPI()
+
+	// Logic
+	// 1. Get the account's application data subject to limits
+	// 2. Handle empty response
+	// 3. Prepare JSON response
+
+	// We intentionally request one more than the limit to determine if there are more applications.
+	records, lookupRound, err := ledger.LookupResources(address, basics.CreatableIndex(applicationGreaterThan), basics.AppCreatable, *params.Limit+1)
+	if err != nil {
+		return internalError(ctx, err, errFailedLookingUpLedger, v2.Log)
+	}
+
+	// prepare JSON response
+	response := model.AccountApplicationsInformationResponse{Round: lookupRound}
+
+	// If the total count is greater than the limit, we set the next token to the last application ID being returned
+	if uint64(len(records)) > *params.Limit {
+		// we do not include the last record in the response
+		records = records[:*params.Limit]
+		nextTk := strconv.FormatUint(uint64(records[len(records)-1].AppIndex), 10)
+		response.NextToken = &nextTk
+	}
+
+	applicationData := make([]model.AccountApplicationData, 0, len(records))
+
+	for _, record := range records {
+		if record.AppLocalState == nil {
+			v2.Log.Warnf("AccountApplicationsInformation: application %d has no local state - should not be possible", record.AppIndex)
+			continue
+		}
+
+		localState := convertTKVToGenerated(&record.AppLocalState.KeyValue)
+		als := model.ApplicationLocalState{
+			Id:       record.AppIndex,
+			KeyValue: localState,
+			Schema: model.ApplicationStateSchema{
+				NumByteSlice: record.AppLocalState.Schema.NumByteSlice,
+				NumUint:      record.AppLocalState.Schema.NumUint,
+			},
+		}
+		aad := model.AccountApplicationData{
+			AppLocalState: &als,
+		}
+
+		if !record.AppCreator.IsZero() {
+			application := AppParamsToApplication(record.AppCreator.String(), basics.AppIndex(record.AppIndex), record.AppParams)
+			aad.CreatedApp = &application.Params
+		}
+
+		applicationData = append(applicationData, aad)
+	}
+
+	response.ApplicationData = &applicationData
+
+	return ctx.JSON(http.StatusOK, response)
 }
 
 // PreEncodedSimulateTxnResult mirrors model.SimulateTransactionResult

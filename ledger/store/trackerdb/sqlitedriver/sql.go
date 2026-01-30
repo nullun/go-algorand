@@ -456,11 +456,11 @@ func (qs *accountsDbQueries) LookupLimitedResources(addr basics.Address, minIdx 
 		var addrid, aidx sql.NullInt64
 		var dbRound basics.Round
 		data = nil
-		var actAssetBuf []byte
-		var crtAssetBuf []byte
+		var actResBuf []byte
+		var crtResBuf []byte
 		var creatorAddrBuf []byte
 		for rows.Next() {
-			err = rows.Scan(&addrid, &dbRound, &aidx, &creatorAddrBuf, &actAssetBuf, &crtAssetBuf)
+			err = rows.Scan(&addrid, &dbRound, &aidx, &creatorAddrBuf, &actResBuf, &crtResBuf)
 			if err != nil {
 				return err
 			}
@@ -474,31 +474,21 @@ func (qs *accountsDbQueries) LookupLimitedResources(addr basics.Address, minIdx 
 				break
 			}
 			var actResData trackerdb.ResourcesData
-			var crtResData trackerdb.ResourcesData
-			err = protocol.Decode(actAssetBuf, &actResData)
+			err = protocol.Decode(actResBuf, &actResData)
 			if err != nil {
 				return err
 			}
 
 			var prdwc trackerdb.PersistedResourcesDataWithCreator
-			if len(crtAssetBuf) > 0 {
-				err = protocol.Decode(crtAssetBuf, &crtResData)
+			if len(crtResBuf) > 0 {
+				var crtResData trackerdb.ResourcesData
+				err = protocol.Decode(crtResBuf, &crtResData)
 				if err != nil {
 					return err
 				}
 
-				// Since there is a creator, we want to return all of the asset params along with the asset holdings.
-				// The most simple way to do this is to set the necessary asset holding data on the creator resource data
-				// retrieved from the database. Note that this is unique way of setting resource flags, making this structure
-				// not suitable for use in other contexts (where the params would only be present colocated with the asset holding
-				// of the creator).
-				crtResData.Amount = actResData.Amount
-				crtResData.Frozen = actResData.Frozen
-				crtResData.ResourceFlags = actResData.ResourceFlags
-
 				creatorAddr := basics.Address{}
 				copy(creatorAddr[:], creatorAddrBuf)
-
 				prdwc = trackerdb.PersistedResourcesDataWithCreator{
 					PersistedResourcesData: trackerdb.PersistedResourcesData{
 						AcctRef: sqlRowRef{addrid.Int64},
@@ -508,6 +498,17 @@ func (qs *accountsDbQueries) LookupLimitedResources(addr basics.Address, minIdx 
 					},
 					Creator: creatorAddr,
 				}
+
+				// TODO: Reword this
+				// Since there is a creator, we want to return all of the asset params along with the asset holdings.
+				// The most simple way to do this is to set the necessary asset holding data on the creator resource data
+				// retrieved from the database. Note that this is unique way of setting resource flags, making this structure
+				// not suitable for use in other contexts (where the params would only be present colocated with the asset holding
+				// of the creator).
+				prdwc.Data.SchemaNumUint = actResData.SchemaNumUint
+				prdwc.Data.SchemaNumByteSlice = actResData.SchemaNumByteSlice
+				prdwc.Data.KeyValue = actResData.KeyValue
+
 			} else { // no creator found, asset was likely deleted, will not have asset params
 				prdwc = trackerdb.PersistedResourcesDataWithCreator{
 					PersistedResourcesData: trackerdb.PersistedResourcesData{
@@ -520,7 +521,6 @@ func (qs *accountsDbQueries) LookupLimitedResources(addr basics.Address, minIdx 
 			}
 
 			data = append(data, prdwc)
-
 			rnd = dbRound
 		}
 		return nil

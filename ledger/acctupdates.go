@@ -341,8 +341,8 @@ func (au *accountUpdates) LookupResource(rnd basics.Round, addr basics.Address, 
 	return au.lookupResource(rnd, addr, aidx, ctype, true /* take lock */)
 }
 
-func (au *accountUpdates) LookupAssetResources(addr basics.Address, assetIDGT basics.AssetIndex, limit uint64) ([]ledgercore.AssetResourceWithIDs, basics.Round, error) {
-	return au.lookupAssetResources(addr, assetIDGT, limit)
+func (au *accountUpdates) LookupAccountResources(addr basics.Address, resourceIDGT basics.CreatableIndex, ctype basics.CreatableType, limit uint64) ([]ledgercore.AccountResourceWithIDs, basics.Round, error) {
+	return au.lookupAccountResources(addr, resourceIDGT, ctype, limit)
 }
 
 func (au *accountUpdates) LookupKv(rnd basics.Round, key string) ([]byte, error) {
@@ -1212,38 +1212,60 @@ func (au *accountUpdates) lookupResource(rnd basics.Round, addr basics.Address, 
 	}
 }
 
-// lookupAssetResources returns all the resources for a given address, solely based on what is persisted to disk. It does not
+// lookupAccountResources returns all the resources for a given address, solely based on what is persisted to disk. It does not
 // take into account any in-memory deltas; the round number returned is the latest round number that is known to the database.
-func (au *accountUpdates) lookupAssetResources(addr basics.Address, assetIDGT basics.AssetIndex, limit uint64) (data []ledgercore.AssetResourceWithIDs, validThrough basics.Round, err error) {
+func (au *accountUpdates) lookupAccountResources(addr basics.Address, resourceIDGT basics.CreatableIndex, ctype basics.CreatableType, limit uint64) (data []ledgercore.AccountResourceWithIDs, validThrough basics.Round, err error) {
 	// Look for resources on disk
-	persistedResources, resourceDbRound, err0 := au.accountsq.LookupLimitedResources(addr, basics.CreatableIndex(assetIDGT), limit, basics.AssetCreatable)
+	persistedResources, resourceDbRound, err0 := au.accountsq.LookupLimitedResources(addr, basics.CreatableIndex(resourceIDGT), limit, ctype)
 	if err0 != nil {
 		return nil, basics.Round(0), err0
 	}
 
-	data = make([]ledgercore.AssetResourceWithIDs, 0, len(persistedResources))
+	data = make([]ledgercore.AccountResourceWithIDs, 0, len(persistedResources))
 	for _, pd := range persistedResources {
 		ah := pd.Data.GetAssetHolding()
+		ls := pd.Data.GetAppLocalState()
 
-		var arwi ledgercore.AssetResourceWithIDs
+		var arwi ledgercore.AccountResourceWithIDs
 		if !pd.Creator.IsZero() {
-			ap := pd.Data.GetAssetParams()
+			asp := pd.Data.GetAssetParams()
+			app := pd.Data.GetAppParams()
 
-			arwi = ledgercore.AssetResourceWithIDs{
-				AssetID: basics.AssetIndex(pd.Aidx),
-				Creator: pd.Creator,
+			arwi = ledgercore.AccountResourceWithIDs{
+				AssetResourceWithIDs: ledgercore.AssetResourceWithIDs{
+					AssetID:      basics.AssetIndex(pd.Aidx),
+					AssetCreator: pd.Creator,
 
-				AssetResource: ledgercore.AssetResource{
-					AssetHolding: &ah,
-					AssetParams:  &ap,
+					AssetResource: ledgercore.AssetResource{
+						AssetHolding: &ah,
+						AssetParams:  &asp,
+					},
+				},
+				AppResourceWithIDs: ledgercore.AppResourceWithIDs{
+					AppIndex:   basics.AppIndex(pd.Aidx),
+					AppCreator: pd.Creator,
+
+					AppResource: ledgercore.AppResource{
+						AppLocalState: &ls,
+						AppParams:     &app,
+					},
 				},
 			}
 		} else {
-			arwi = ledgercore.AssetResourceWithIDs{
-				AssetID: basics.AssetIndex(pd.Aidx),
+			arwi = ledgercore.AccountResourceWithIDs{
+				AssetResourceWithIDs: ledgercore.AssetResourceWithIDs{
+					AssetID: basics.AssetIndex(pd.Aidx),
 
-				AssetResource: ledgercore.AssetResource{
-					AssetHolding: &ah,
+					AssetResource: ledgercore.AssetResource{
+						AssetHolding: &ah,
+					},
+				},
+				AppResourceWithIDs: ledgercore.AppResourceWithIDs{
+					AppIndex: basics.AppIndex(pd.Aidx),
+
+					AppResource: ledgercore.AppResource{
+						AppLocalState: &ls,
+					},
 				},
 			}
 		}

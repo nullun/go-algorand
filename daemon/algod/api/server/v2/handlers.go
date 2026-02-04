@@ -603,7 +603,7 @@ func (v2 *Handlers) AccountAssetInformation(ctx echo.Context, address basics.Add
 
 	if record.AssetParams != nil {
 		asset := AssetParamsToAsset(address.String(), assetID, record.AssetParams)
-		response.CreatedAsset = &asset.Params
+		response.CreatedAsset = asset.Params
 	}
 
 	if record.AssetHolding != nil {
@@ -1223,7 +1223,7 @@ func (v2 *Handlers) AccountAssetsInformation(ctx echo.Context, address basics.Ad
 
 		if !record.AssetCreator.IsZero() {
 			asset := AssetParamsToAsset(record.AssetCreator.String(), record.AssetID, record.AssetParams)
-			aah.AssetParams = &asset.Params
+			aah.AssetParams = asset.Params
 		}
 
 		assetHoldings = append(assetHoldings, aah)

@@ -459,7 +459,7 @@ func AppLocalState(state basics.AppLocalState, appIdx basics.AppIndex) model.App
 // AssetParamsToAsset converts basics.AssetParams to model.Asset
 func AssetParamsToAsset(creator string, idx basics.AssetIndex, params *basics.AssetParams) model.Asset {
 	frozen := params.DefaultFrozen
-	assetParams := model.AssetParams{
+	assetParams := &model.AssetParams{
 		Creator:       creator,
 		Total:         params.Total,
 		Decimals:      uint64(params.Decimals),

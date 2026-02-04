@@ -499,12 +499,17 @@ func (qs *accountsDbQueries) LookupLimitedResources(addr basics.Address, minIdx 
 					Creator: creatorAddr,
 				}
 
-				// TODO: Reword this
-				// Since there is a creator, we want to return all of the asset params along with the asset holdings.
-				// The most simple way to do this is to set the necessary asset holding data on the creator resource data
-				// retrieved from the database. Note that this is unique way of setting resource flags, making this structure
-				// not suitable for use in other contexts (where the params would only be present colocated with the asset holding
-				// of the creator).
+				// Since we want to return the account state along with the creator params,
+				// the simplest way to achieve this is to set the necessary account-level
+				// fields on the creators resource data retrieved from the database.
+				// Note that this is a unique way of setting resource flags, making this
+				// structure not suitable for use in other contexts (where the params would
+				// only be present colocated with the creator's own state).
+				// Asset Specific
+				prdwc.Data.Amount = actResData.Amount
+				prdwc.Data.Frozen = actResData.Frozen
+				prdwc.Data.ResourceFlags = actResData.ResourceFlags
+				// Application Specific
 				prdwc.Data.SchemaNumUint = actResData.SchemaNumUint
 				prdwc.Data.SchemaNumByteSlice = actResData.SchemaNumByteSlice
 				prdwc.Data.KeyValue = actResData.KeyValue

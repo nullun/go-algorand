@@ -1512,7 +1512,7 @@
         "type": "object"
       },
       "Asset": {
-        "description": "Specifies both the unique identifier and the parameters for an asset",
+        "description": "Specifies the unique identifier and the parameters for an asset (if not excluded)",
         "properties": {
           "index": {
             "description": "unique asset identifier",
@@ -1524,8 +1524,7 @@
           }
         },
         "required": [
-          "index",
-          "params"
+          "index"
         ],
         "type": "object"
       },

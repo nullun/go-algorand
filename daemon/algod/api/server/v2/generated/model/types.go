@@ -423,7 +423,7 @@ type ApplicationStateSchema struct {
 	NumUint uint64 `json:"num-uint"`
 }
 
-// Asset Specifies both the unique identifier and the parameters for an asset
+// Asset Specifies the unique identifier and the parameters for an asset (if not excluded)
 type Asset struct {
 	// Index unique asset identifier
 	Index basics.AssetIndex `json:"index"`
@@ -434,7 +434,7 @@ type Asset struct {
 	//
 	// Definition:
 	// data/transactions/asset.go : AssetParams
-	Params AssetParams `json:"params"`
+	Params *AssetParams `json:"params,omitempty"`
 }
 
 // AssetHolding Describes an asset held by an account.
@@ -1181,7 +1181,7 @@ type AccountResponse = Account
 // ApplicationResponse Application index and its parameters (if not excluded)
 type ApplicationResponse = Application
 
-// AssetResponse Specifies both the unique identifier and the parameters for an asset
+// AssetResponse Specifies the unique identifier and the parameters for an asset (if not excluded)
 type AssetResponse = Asset
 
 // BlockHashResponse defines model for BlockHashResponse.

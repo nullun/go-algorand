@@ -275,7 +275,7 @@ func (dl *dryrunLedger) lookup(rnd basics.Round, addr basics.Address) (basics.Ac
 	appi, ok := dl.accountApps[addr]
 	if ok {
 		app := dl.dr.Apps[appi]
-		params, err := ApplicationParamsToAppParams(&app.Params)
+		params, err := ApplicationParamsToAppParams(app.Params)
 		if err != nil {
 			return basics.AccountData{}, 0, err
 		}
@@ -526,7 +526,7 @@ func doDryrunRequest(dr *DryrunRequest, response *model.DryrunResponse) {
 			ok := false
 			for _, appt := range dr.Apps {
 				if appt.Id == appIdx {
-					app, err = ApplicationParamsToAppParams(&appt.Params)
+					app, err = ApplicationParamsToAppParams(appt.Params)
 					if err != nil {
 						response.Error = err.Error()
 						return

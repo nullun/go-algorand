@@ -550,12 +550,12 @@ func (l *Ledger) GetStateProofVerificationContext(stateProofLastAttestedRound ba
 // LookupLatest uses the accounts tracker to return the account state (including
 // resources) for a given address, for the latest round. The returned account values
 // reflect the changes of all blocks up to and including the returned round number.
-func (l *Ledger) LookupLatest(addr basics.Address) (basics.AccountData, basics.Round, basics.MicroAlgos, error) {
+func (l *Ledger) LookupLatest(addr basics.Address, excludeParams bool) (basics.AccountData, basics.Round, basics.MicroAlgos, error) {
 	l.trackerMu.RLock()
 	defer l.trackerMu.RUnlock()
 
 	// Intentionally apply (pending) rewards up to rnd.
-	data, rnd, withoutRewards, err := l.accts.lookupLatest(addr)
+	data, rnd, withoutRewards, err := l.accts.lookupLatest(addr, excludeParams)
 	if err != nil {
 		return basics.AccountData{}, 0, basics.MicroAlgos{}, err
 	}

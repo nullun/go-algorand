@@ -111,7 +111,7 @@ type Handlers struct {
 // LedgerForAPI describes the Ledger methods used by the v2 API.
 type LedgerForAPI interface {
 	LookupAccount(round basics.Round, addr basics.Address) (ledgercore.AccountData, basics.Round, basics.MicroAlgos, error)
-	LookupLatest(addr basics.Address) (basics.AccountData, basics.Round, basics.MicroAlgos, error)
+	LookupLatest(addr basics.Address, excludeParams bool) (basics.AccountData, basics.Round, basics.MicroAlgos, error)
 	LookupKv(round basics.Round, key string) ([]byte, error)
 	LookupKeysByPrefix(round basics.Round, keyPrefix string, maxKeyNum uint64) ([]string, error)
 	ConsensusParams(r basics.Round) (config.ConsensusParams, error)
@@ -424,10 +424,13 @@ func (v2 *Handlers) AccountInformation(ctx echo.Context, address basics.Address,
 	}
 
 	// should we skip fetching apps and assets?
+	var excludeParams bool
 	if params.Exclude != nil {
 		switch *params.Exclude {
 		case "all":
 			return v2.basicAccountInformation(ctx, address, handle, contentType)
+		case "params":
+			excludeParams = true
 		case "none", "":
 		default:
 			return badRequest(ctx, err, errFailedToParseExclude, v2.Log)
@@ -442,7 +445,13 @@ func (v2 *Handlers) AccountInformation(ctx echo.Context, address basics.Address,
 		if lookupErr != nil {
 			return internalError(ctx, lookupErr, errFailedLookingUpLedger, v2.Log)
 		}
-		totalResults := record.TotalAssets + record.TotalAssetParams + record.TotalAppLocalStates + record.TotalAppParams
+		var totalResults uint64
+		// NOTE: Undecide if this should be left to include params
+		if excludeParams {
+			totalResults = record.TotalAssets + record.TotalAppLocalStates
+		} else {
+			totalResults = record.TotalAssets + record.TotalAssetParams + record.TotalAppLocalStates + record.TotalAppParams
+		}
 		if totalResults > maxResults {
 			v2.Log.Infof("MaxAccountAPIResults limit %d exceeded, total results %d", maxResults, totalResults)
 			extraData := map[string]any{
@@ -459,7 +468,7 @@ func (v2 *Handlers) AccountInformation(ctx echo.Context, address basics.Address,
 		}
 	}
 
-	record, lastRound, amountWithoutPendingRewards, err := myLedger.LookupLatest(address)
+	record, lastRound, amountWithoutPendingRewards, err := myLedger.LookupLatest(address, excludeParams)
 	if err != nil {
 		return internalError(ctx, err, errFailedLookingUpLedger, v2.Log)
 	}
@@ -478,7 +487,7 @@ func (v2 *Handlers) AccountInformation(ctx echo.Context, address basics.Address,
 		return internalError(ctx, err, fmt.Sprintf("could not retrieve consensus information for last round (%d)", lastRound), v2.Log)
 	}
 
-	account, err := AccountDataToAccount(address.String(), &record, lastRound, &consensus, amountWithoutPendingRewards)
+	account, err := AccountDataToAccount(address.String(), &record, lastRound, &consensus, amountWithoutPendingRewards, excludeParams)
 	if err != nil {
 		return internalError(ctx, err, errInternalFailure, v2.Log)
 	}
@@ -642,7 +651,7 @@ func (v2 *Handlers) AccountApplicationInformation(ctx echo.Context, address basi
 
 	if record.AppParams != nil {
 		app := AppParamsToApplication(address.String(), applicationID, record.AppParams)
-		response.CreatedApp = &app.Params
+		response.CreatedApp = app.Params
 	}
 
 	if record.AppLocalState != nil {
@@ -1303,7 +1312,7 @@ func (v2 *Handlers) AccountApplicationsInformation(ctx echo.Context, address bas
 
 		if !record.AppCreator.IsZero() {
 			application := AppParamsToApplication(record.AppCreator.String(), basics.AppIndex(record.AppIndex), record.AppParams)
-			aad.CreatedApp = &application.Params
+			aad.CreatedApp = application.Params
 		}
 
 		applicationData = append(applicationData, aad)

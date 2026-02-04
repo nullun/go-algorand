@@ -3127,9 +3127,9 @@
       }
     },
     "Application": {
-      "description": "Application index and its parameters",
+      "description": "Application index and its parameters (if not excluded)",
       "type": "object",
-      "required": ["id", "params"],
+      "required": ["id"],
       "properties": {
         "id": {
           "description": "\\[appidx\\] application index.",

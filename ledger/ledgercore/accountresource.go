@@ -65,12 +65,16 @@ type AccountResourceWithIDs struct {
 // in the AccountResource to the given basics.AccountData, creating maps if necessary.
 // Returns true if the AccountResource contained a new or updated resource,
 // and false if the AccountResource contained no changes (indicating the resource was deleted).
-func AssignAccountResourceToAccountData(cindex basics.CreatableIndex, resource AccountResource, ad *basics.AccountData) (assigned bool) {
+func AssignAccountResourceToAccountData(cindex basics.CreatableIndex, resource AccountResource, ad *basics.AccountData, excludeParams bool) (assigned bool) {
 	if resource.AssetParams != nil {
 		if ad.AssetParams == nil {
 			ad.AssetParams = make(map[basics.AssetIndex]basics.AssetParams)
 		}
-		ad.AssetParams[basics.AssetIndex(cindex)] = *resource.AssetParams
+		if !excludeParams {
+			ad.AssetParams[basics.AssetIndex(cindex)] = *resource.AssetParams
+		} else {
+			ad.AssetParams[basics.AssetIndex(cindex)] = basics.AssetParams{}
+		}
 		assigned = true
 	}
 	if resource.AssetHolding != nil {
@@ -84,7 +88,11 @@ func AssignAccountResourceToAccountData(cindex basics.CreatableIndex, resource A
 		if ad.AppParams == nil {
 			ad.AppParams = make(map[basics.AppIndex]basics.AppParams)
 		}
-		ad.AppParams[basics.AppIndex(cindex)] = *resource.AppParams
+		if !excludeParams {
+			ad.AppParams[basics.AppIndex(cindex)] = *resource.AppParams
+		} else {
+			ad.AppParams[basics.AppIndex(cindex)] = basics.AppParams{}
+		}
 		assigned = true
 	}
 	if resource.AppLocalState != nil {

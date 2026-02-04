@@ -273,7 +273,7 @@ func (pps *WorkerState) integrateAccountInfo(addr string, ppa *pingPongAccount, 
 		for _, ap := range *ai.CreatedApps {
 			appID := ap.Id
 			pps.cinfo.OptIns[appID] = uniqueAppend(pps.cinfo.OptIns[appID], addr)
-			pps.cinfo.AppParams[appID] = ap.Params
+			pps.cinfo.AppParams[appID] = *ap.Params
 		}
 	}
 	// apps opted into
@@ -807,7 +807,7 @@ func (pps *WorkerState) prepareApps(client *libgoal.Client) (err error) {
 		for _, ap := range *ai.CreatedApps {
 			appID := ap.Id
 			pps.cinfo.OptIns[appID] = uniqueAppend(pps.cinfo.OptIns[appID], addr)
-			pps.cinfo.AppParams[appID] = ap.Params
+			pps.cinfo.AppParams[appID] = *ap.Params
 		}
 	}
 
@@ -846,8 +846,8 @@ func (pps *WorkerState) prepareApps(client *libgoal.Client) (err error) {
 		if err != nil {
 			return
 		}
-		//txgroup = txgroup[:0]
-		//senders = senders[:0]
+		// txgroup = txgroup[:0]
+		// senders = senders[:0]
 	}
 
 	for appid := range pps.cinfo.AppParams {

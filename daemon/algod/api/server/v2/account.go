@@ -44,8 +44,8 @@ func AccountDataToAccount(
 	address string, record *basics.AccountData,
 	lastRound basics.Round, consensus *config.ConsensusParams,
 	amountWithoutPendingRewards basics.MicroAlgos,
+	excludeParams bool,
 ) (model.Account, error) {
-
 	assets := make([]model.AssetHolding, 0, len(record.Assets))
 	for curid, holding := range record.Assets {
 		// Empty is ok, asset may have been deleted, so we can no
@@ -60,7 +60,14 @@ func AccountDataToAccount(
 
 	createdAssets := make([]model.Asset, 0, len(record.AssetParams))
 	for idx, params := range record.AssetParams {
-		asset := AssetParamsToAsset(address, idx, &params)
+		var asset model.Asset
+		if excludeParams {
+			asset = model.Asset{
+				Index: idx,
+			}
+		} else {
+			asset = AssetParamsToAsset(address, idx, &params)
+		}
 		createdAssets = append(createdAssets, asset)
 	}
 	sort.Slice(createdAssets, func(i, j int) bool {
@@ -84,7 +91,14 @@ func AccountDataToAccount(
 
 	createdApps := make([]model.Application, 0, len(record.AppParams))
 	for appIdx, appParams := range record.AppParams {
-		app := AppParamsToApplication(address, appIdx, &appParams)
+		var app model.Application
+		if excludeParams {
+			app = model.Application{
+				Id: appIdx,
+			}
+		} else {
+			app = AppParamsToApplication(address, appIdx, &appParams)
+		}
 		createdApps = append(createdApps, app)
 	}
 	sort.Slice(createdApps, func(i, j int) bool {
@@ -293,7 +307,7 @@ func AccountToAccountData(a *model.Account) (basics.AccountData, error) {
 	if a.CreatedApps != nil && len(*a.CreatedApps) > 0 {
 		appParams = make(map[basics.AppIndex]basics.AppParams, len(*a.CreatedApps))
 		for _, params := range *a.CreatedApps {
-			ap, err := ApplicationParamsToAppParams(&params.Params)
+			ap, err := ApplicationParamsToAppParams(params.Params)
 			if err != nil {
 				return basics.AccountData{}, err
 			}
@@ -408,7 +422,7 @@ func AppParamsToApplication(creator string, appIdx basics.AppIndex, appParams *b
 	extraProgramPages := uint64(appParams.ExtraProgramPages)
 	app := model.Application{
 		Id: appIdx,
-		Params: model.ApplicationParams{
+		Params: &model.ApplicationParams{
 			Creator:           creator,
 			ApprovalProgram:   appParams.ApprovalProgram,
 			ClearStateProgram: appParams.ClearStateProgram,

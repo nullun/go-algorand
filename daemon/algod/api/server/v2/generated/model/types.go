@@ -312,13 +312,13 @@ type AppCallLogs struct {
 	TxId string `json:"txId"`
 }
 
-// Application Application index and its parameters
+// Application Application index and its parameters (if not excluded)
 type Application struct {
 	// Id \[appidx\] application index.
 	Id basics.AppIndex `json:"id"`
 
 	// Params Stores the global information associated with an application.
-	Params ApplicationParams `json:"params"`
+	Params *ApplicationParams `json:"params,omitempty"`
 }
 
 // ApplicationInitialStates An application's initial global/local/box states that were accessed during simulation.
@@ -1178,7 +1178,7 @@ type AccountAssetsInformationResponse struct {
 // data/basics/userBalance.go : AccountData
 type AccountResponse = Account
 
-// ApplicationResponse Application index and its parameters
+// ApplicationResponse Application index and its parameters (if not excluded)
 type ApplicationResponse = Application
 
 // AssetResponse Specifies both the unique identifier and the parameters for an asset

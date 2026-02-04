@@ -69,7 +69,7 @@ func balanceRecordsFromDdr(ddr *v2.DryrunRequest) (records []basics.BalanceRecor
 		}
 		// deserialize app params and update account data
 		var params basics.AppParams
-		params, err = v2.ApplicationParamsToAppParams(&a.Params)
+		params, err = v2.ApplicationParamsToAppParams(a.Params)
 		if err != nil {
 			return
 		}

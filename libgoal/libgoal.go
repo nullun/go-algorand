@@ -1217,12 +1217,12 @@ func MakeDryrunStateGenerated(client Client, txnOrStxnOrSlice interface{}, other
 					if app, err = client.ApplicationInformation(appIdx); err != nil {
 						return
 					}
-					appParams = app.Params
+					appParams = *app.Params
 					accounts = append(accounts, appIdx.Address())
 				}
 				dr.Apps = append(dr.Apps, model.Application{
 					Id:     appIdx,
-					Params: appParams,
+					Params: &appParams,
 				})
 			}
 

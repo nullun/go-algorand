@@ -884,7 +884,7 @@ func (au *accountUpdates) newBlockImpl(blk bookkeeping.Block, delta ledgercore.S
 // The rewards are added to the AccountData before returning.
 // Note that the function doesn't update the account with the rewards,
 // even while it does return the AccountData which represent the "rewarded" account data.
-func (au *accountUpdates) lookupLatest(addr basics.Address) (data basics.AccountData, rnd basics.Round, withoutRewards basics.MicroAlgos, err error) {
+func (au *accountUpdates) lookupLatest(addr basics.Address, excludeParams bool) (data basics.AccountData, rnd basics.Round, withoutRewards basics.MicroAlgos, err error) {
 	au.accountsMu.RLock()
 	needUnlock := true
 	defer func() {
@@ -906,11 +906,11 @@ func (au *accountUpdates) lookupLatest(addr basics.Address) (data basics.Account
 	var foundResources map[basics.CreatableIndex]basics.Round
 	var resourceCount uint64
 
-	addResource := func(cidx basics.CreatableIndex, round basics.Round, res ledgercore.AccountResource) error {
+	addResource := func(cidx basics.CreatableIndex, round basics.Round, res ledgercore.AccountResource, excludeParams bool) error {
 		foundRound, ok := foundResources[cidx]
 		if !ok { // first time seeing this cidx
 			foundResources[cidx] = round
-			if ledgercore.AssignAccountResourceToAccountData(cidx, res, &data) {
+			if ledgercore.AssignAccountResourceToAccountData(cidx, res, &data, excludeParams) {
 				resourceCount++
 			}
 			return nil
@@ -1015,7 +1015,7 @@ func (au *accountUpdates) lookupLatest(addr basics.Address) (data basics.Account
 
 		// check for resources modified in the past rounds, in the deltas
 		for cidx, mr := range au.resources.getForAddress(addr) {
-			if addErr := addResource(cidx, rnd, mr.resource); addErr != nil {
+			if addErr := addResource(cidx, rnd, mr.resource, excludeParams); addErr != nil {
 				return basics.AccountData{}, basics.Round(0), basics.MicroAlgos{}, addErr
 			}
 		}
@@ -1031,7 +1031,7 @@ func (au *accountUpdates) lookupLatest(addr basics.Address) (data basics.Account
 				// would ensure that we promote this field.
 				au.baseResources.writePending(prd, addr)
 				if prd.AcctRef != nil {
-					if addErr := addResource(prd.Aidx, rnd, prd.AccountResource()); addErr != nil {
+					if addErr := addResource(prd.Aidx, rnd, prd.AccountResource(), excludeParams); addErr != nil {
 						return basics.AccountData{}, basics.Round(0), basics.MicroAlgos{}, addErr
 					}
 				}
@@ -1086,7 +1086,7 @@ func (au *accountUpdates) lookupLatest(addr basics.Address) (data basics.Account
 		if resourceDbRound == currentDbRound {
 			for _, pd := range persistedResources {
 				au.baseResources.writePending(pd, addr)
-				if addErr := addResource(pd.Aidx, currentDbRound, pd.AccountResource()); addErr != nil {
+				if addErr := addResource(pd.Aidx, currentDbRound, pd.AccountResource(), excludeParams); addErr != nil {
 					return basics.AccountData{}, basics.Round(0), basics.MicroAlgos{}, addErr
 				}
 			}

@@ -65,10 +65,7 @@
 package api
 
 import (
-	"fmt"
 	"net/http"
-
-	"github.com/gorilla/mux"
 
 	v1 "github.com/algorand/go-algorand/daemon/kmd/api/v1"
 	"github.com/algorand/go-algorand/daemon/kmd/lib/kmdapi"
@@ -135,29 +132,29 @@ func SwaggerHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(kmdapi.SwaggerSpecJSON))
 }
 
-// Handler returns the root mux router for the kmd API. It sets up handlers on
-// subrouters specific to each API version.
-func Handler(sm *session.Manager, log logging.Logger, allowedOrigins []string, apiToken string, pnaHeader bool, reqCB func()) *mux.Router {
-	rootRouter := mux.NewRouter()
-
-	// Send the appropriate CORS headers
-	if pnaHeader {
-		rootRouter.Use(AllowPNA())
-	}
-	rootRouter.Use(corsMiddleware(allowedOrigins))
+// Handler returns the root HTTP handler for the kmd API. It sets up handlers
+// for each API version and applies middleware.
+func Handler(sm *session.Manager, log logging.Logger, allowedOrigins []string, apiToken string, pnaHeader bool, reqCB func()) http.Handler {
+	mux := http.NewServeMux()
 
 	// Handle OPTIONS requests
-	rootRouter.Methods("OPTIONS").HandlerFunc(optionsHandler)
+	mux.HandleFunc("OPTIONS /{path...}", optionsHandler)
 
 	// The /versions endpoint has no version, so we register it here. /versions
 	// has no auth, because it doesn't return anything sensitive, and auth is
 	// version-specific. The same applies for /swagger.json.
-	rootRouter.HandleFunc("/versions", versionsHandler)
-	rootRouter.HandleFunc("/swagger.json", SwaggerHandler)
+	mux.HandleFunc("GET /versions", versionsHandler)
+	mux.HandleFunc("GET /swagger.json", SwaggerHandler)
 
 	// Handle API V1 routes at /v1/<...>
-	v1Router := rootRouter.PathPrefix(fmt.Sprintf("/%s", apiV1Tag)).Subrouter()
-	v1.RegisterHandlers(v1Router, sm, log, apiToken, reqCB)
+	v1.RegisterHandlers(mux, "/"+apiV1Tag, sm, log, apiToken, reqCB)
 
-	return rootRouter
+	// Send the appropriate CORS headers
+	var handler http.Handler = mux
+	handler = corsMiddleware(allowedOrigins)(handler)
+	if pnaHeader {
+		handler = AllowPNA()(handler)
+	}
+
+	return handler
 }

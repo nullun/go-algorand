@@ -46,8 +46,6 @@ var (
 	assetNoReserve          bool
 	assetNoFreezer          bool
 	assetNoClawback         bool
-	assetDelegate           bool
-	assetRescind            bool
 
 	assetNewManager  string
 	assetNewReserve  string
@@ -63,6 +61,8 @@ func init() {
 	assetCmd.AddCommand(infoAssetCmd)
 	assetCmd.AddCommand(freezeAssetCmd)
 	assetCmd.AddCommand(optinAssetCmd)
+	assetCmd.AddCommand(delegateAssetCmd)
+	assetCmd.AddCommand(rescindAssetCmd)
 
 	assetCmd.PersistentFlags().StringVarP(&walletName, "wallet", "w", "", "Set the wallet to be used for the selected operation")
 
@@ -109,10 +109,21 @@ func init() {
 	sendAssetCmd.Flags().Uint64VarP(&amount, "amount", "a", 0, "The amount to be transferred (required), in base units of the asset.")
 	sendAssetCmd.Flags().StringVarP(&closeToAddress, "close-to", "c", "", "Close asset account and send remainder to this address")
 	// sendAssetCmd.Flags().BoolVar(&assetSponsor, "sponsor-asset", false, "Sponsor the asset holding if recipient isn't already holding the asset")
-	sendAssetCmd.Flags().BoolVar(&assetDelegate, "asset-delegate", false, "Delegate the AssetReceiver's asset holding")
-	sendAssetCmd.Flags().BoolVar(&assetRescind, "asset-rescind", false, "Remove the AssetReceiver's delegated asset holding. Must be holding zero units")
 	sendAssetCmd.MarkFlagRequired("to")
 	sendAssetCmd.MarkFlagRequired("amount")
+
+	delegateAssetCmd.Flags().Uint64Var((*uint64)(&assetID), "assetid", 0, "ID of the asset being delegated (required)")
+	delegateAssetCmd.Flags().StringVarP(&account, "from", "f", "", "Account address to delegate from (if not specified, uses default account)")
+	delegateAssetCmd.Flags().StringVarP(&toAddress, "to", "t", "", "Address to delegate to (required)")
+	delegateAssetCmd.Flags().Uint64VarP(&amount, "amount", "a", 0, "The amount to be delegated")
+	delegateAssetCmd.MarkFlagRequired("assetid")
+	delegateAssetCmd.MarkFlagRequired("to")
+
+	rescindAssetCmd.Flags().Uint64Var((*uint64)(&assetID), "assetid", 0, "ID of the asset being rescinded (required)")
+	rescindAssetCmd.Flags().StringVarP(&account, "from", "f", "", "Account address to rescind from (if not specified, uses default account)")
+	rescindAssetCmd.Flags().StringVarP(&toAddress, "to", "t", "", "Address to rescind to (required)")
+	rescindAssetCmd.MarkFlagRequired("assetid")
+	rescindAssetCmd.MarkFlagRequired("to")
 
 	freezeAssetCmd.Flags().StringVar(&assetFreezer, "freezer", "", "Address to issue a freeze transaction from")
 	freezeAssetCmd.Flags().StringVar(&assetCreator, "creator", "", "Account address for asset creator")
@@ -136,6 +147,8 @@ func init() {
 	addTxnFlags(sendAssetCmd)
 	addTxnFlags(freezeAssetCmd)
 	addTxnFlags(optinAssetCmd)
+	addTxnFlags(delegateAssetCmd)
+	addTxnFlags(rescindAssetCmd)
 
 	infoAssetCmd.Flags().Uint64Var((*uint64)(&assetID), "assetid", 0, "ID of the asset to look up")
 	infoAssetCmd.Flags().StringVar(&assetUnitName, "unitname", "", "Unit name of the asset to look up")
@@ -562,14 +575,6 @@ var sendAssetCmd = &cobra.Command{
 			tx.FeeSponsored = true
 		}
 
-		if assetDelegate {
-			tx.AssetDelegation = transactions.ApproveAssetDelegation
-		}
-
-		if assetRescind {
-			tx.AssetDelegation = transactions.RescindAssetDelegation
-		}
-
 		firstValid, lastValid, _, err = client.ComputeValidityRounds(firstValid, lastValid, numValidRounds)
 		if err != nil {
 			reportErrorf("Cannot determine last valid round: %s", err)
@@ -742,6 +747,165 @@ var optinAssetCmd = &cobra.Command{
 		}
 
 		tx, err = client.FillUnsignedTxTemplate(account, firstValid, lastValid, fee, tx)
+		if err != nil {
+			reportErrorf("Cannot construct transaction: %s", err)
+		}
+
+		explicitFee := cmd.Flags().Changed("fee")
+		if explicitFee {
+			tx.Fee = basics.MicroAlgos{Raw: fee}
+		}
+
+		if outFilename == "" {
+			wh, pw := ensureWalletHandleMaybePassword(dataDir, walletName, true)
+			signedTxn, err2 := client.SignTransactionWithWalletAndSigner(wh, pw, signerAddress, sponsorAddress, tx)
+			if err2 != nil {
+				reportErrorf(errorSigningTX, err2)
+			}
+
+			txid, err2 := client.BroadcastTransaction(signedTxn)
+			if err2 != nil {
+				reportErrorf(errorBroadcastingTX, err2)
+			}
+
+			// Report tx details to user
+			reportInfof("Issued transaction from account %s, txid %s (fee %d)", tx.Sender, txid, tx.Fee.Raw)
+
+			if !noWaitAfterSend {
+				_, err2 = waitForCommit(client, txid, lastValid)
+				if err2 != nil {
+					reportErrorln(err2)
+				}
+			}
+		} else {
+			err = writeTxnToFile(client, sign, dataDir, walletName, tx, outFilename)
+			if err != nil {
+				reportErrorln(err)
+			}
+		}
+	},
+}
+
+var delegateAssetCmd = &cobra.Command{
+	Use:   "delegate",
+	Short: "Delegate assets",
+	Long:  "Delegate asset holdings.",
+	Args:  validateNoPosArgsFn,
+	Run: func(cmd *cobra.Command, _ []string) {
+		checkTxValidityPeriodCmdFlags(cmd)
+
+		dataDir := datadir.EnsureSingleDataDir()
+		client := ensureFullClient(dataDir)
+		accountList := makeAccountsList(dataDir)
+
+		// Check if from was specified, else use default
+		if account == "" {
+			account = accountList.getDefaultAccount()
+		}
+
+		sender := accountList.getAddressByName(account)
+		toAddressResolved := accountList.getAddressByName(toAddress)
+
+		tx, err := client.MakeUnsignedAssetSendTx(assetID, amount, toAddressResolved, "", "")
+		if err != nil {
+			reportErrorf("Cannot construct transaction: %s", err)
+		}
+
+		tx.Note = parseNoteField(cmd)
+		tx.Lease = parseLease(cmd)
+
+		if feeSponsored {
+			tx.FeeSponsored = true
+		}
+
+		tx.AssetDelegation = transactions.ApproveAssetDelegation
+
+		firstValid, lastValid, _, err = client.ComputeValidityRounds(firstValid, lastValid, numValidRounds)
+		if err != nil {
+			reportErrorf("Cannot determine last valid round: %s", err)
+		}
+
+		tx, err = client.FillUnsignedTxTemplate(sender, firstValid, lastValid, fee, tx)
+		if err != nil {
+			reportErrorf("Cannot construct transaction: %s", err)
+		}
+
+		explicitFee := cmd.Flags().Changed("fee")
+		if explicitFee {
+			tx.Fee = basics.MicroAlgos{Raw: fee}
+		}
+
+		if outFilename == "" {
+			wh, pw := ensureWalletHandleMaybePassword(dataDir, walletName, true)
+			signedTxn, err2 := client.SignTransactionWithWalletAndSigner(wh, pw, signerAddress, sponsorAddress, tx)
+			if err2 != nil {
+				reportErrorf(errorSigningTX, err2)
+			}
+
+			txid, err2 := client.BroadcastTransaction(signedTxn)
+			if err2 != nil {
+				reportErrorf(errorBroadcastingTX, err2)
+			}
+
+			// Report tx details to user
+			reportInfof("Issued transaction from account %s, txid %s (fee %d)", tx.Sender, txid, tx.Fee.Raw)
+
+			if !noWaitAfterSend {
+				_, err2 = waitForCommit(client, txid, lastValid)
+				if err2 != nil {
+					reportErrorln(err2)
+				}
+			}
+		} else {
+			err = writeTxnToFile(client, sign, dataDir, walletName, tx, outFilename)
+			if err != nil {
+				reportErrorln(err)
+			}
+		}
+	},
+}
+
+var rescindAssetCmd = &cobra.Command{
+	Use:   "rescind",
+	Short: "Rescind delegated assets",
+	Long:  "Remove the delegated asset holding. Must be holding zero units.",
+	Args:  validateNoPosArgsFn,
+	Run: func(cmd *cobra.Command, _ []string) {
+		checkTxValidityPeriodCmdFlags(cmd)
+
+		dataDir := datadir.EnsureSingleDataDir()
+		client := ensureFullClient(dataDir)
+		accountList := makeAccountsList(dataDir)
+
+		// Check if from was specified, else use default
+		if account == "" {
+			account = accountList.getDefaultAccount()
+		}
+
+		sender := accountList.getAddressByName(account)
+		toAddressResolved := accountList.getAddressByName(toAddress)
+
+		// Rescind txns are always 0 amount
+		tx, err := client.MakeUnsignedAssetSendTx(assetID, 0, toAddressResolved, "", "")
+		if err != nil {
+			reportErrorf("Cannot construct transaction: %s", err)
+		}
+
+		tx.Note = parseNoteField(cmd)
+		tx.Lease = parseLease(cmd)
+
+		if feeSponsored {
+			tx.FeeSponsored = true
+		}
+
+		tx.AssetDelegation = transactions.RescindAssetDelegation
+
+		firstValid, lastValid, _, err = client.ComputeValidityRounds(firstValid, lastValid, numValidRounds)
+		if err != nil {
+			reportErrorf("Cannot determine last valid round: %s", err)
+		}
+
+		tx, err = client.FillUnsignedTxTemplate(sender, firstValid, lastValid, fee, tx)
 		if err != nil {
 			reportErrorf("Cannot construct transaction: %s", err)
 		}

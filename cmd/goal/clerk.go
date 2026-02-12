@@ -98,6 +98,7 @@ func init() {
 	clerkCmd.AddCommand(dryrunCmd)
 	clerkCmd.AddCommand(dryrunRemoteCmd)
 	clerkCmd.AddCommand(simulateCmd)
+	clerkCmd.AddCommand(bootstrapCmd)
 
 	// Wallet to be used for the clerk operation
 	clerkCmd.PersistentFlags().StringVarP(&walletName, "wallet", "w", "", "Set the wallet to be used for the selected operation")
@@ -186,6 +187,13 @@ func init() {
 	simulateCmd.Flags().BoolVar(&simulateScratchChange, "scratch", false, "Report scratch change during simulation time")
 	simulateCmd.Flags().BoolVar(&simulateAppStateChange, "state", false, "Report application state changes during simulation time")
 	simulateCmd.Flags().BoolVar(&simulateAllowUnnamedResources, "allow-unnamed-resources", false, "Allow access to unnamed resources during simulation")
+
+	// bootstrap flags
+	bootstrapCmd.Flags().StringVarP(&account, "from", "f", "", "Account address to bootstrap from (If not specified, uses default account)")
+	bootstrapCmd.Flags().StringVarP(&toAddress, "to", "t", "", "Address to be bootstrapped (required)")
+	bootstrapCmd.MarkFlagRequired("to")
+
+	addTxnFlags(bootstrapCmd)
 }
 
 var clerkCmd = &cobra.Command{
@@ -612,6 +620,106 @@ var sendCmd = &cobra.Command{
 			} else {
 				err = writeFile(outFilename, protocol.Encode(&stx), 0o600)
 			}
+			if err != nil {
+				reportErrorln(err)
+			}
+		}
+	},
+}
+
+var bootstrapCmd = &cobra.Command{
+	Use:   "bootstrap",
+	Short: "Bootstrap an account",
+	Long:  "Send a zero Algo payment transaction with the boot flag set.",
+	Args:  validateNoPosArgsFn,
+	Run: func(cmd *cobra.Command, args []string) {
+		checkTxValidityPeriodCmdFlags(cmd)
+
+		dataDir := datadir.EnsureSingleDataDir()
+		accountList := makeAccountsList(dataDir)
+
+		// Check if from was specified, else use default
+		if account == "" {
+			account = accountList.getDefaultAccount()
+		}
+		fromAddressResolved := accountList.getAddressByName(account)
+		toAddressResolved := accountList.getAddressByName(toAddress)
+
+		// Parse notes and lease fields
+		noteBytes := parseNoteField(cmd)
+		leaseBytes := parseLease(cmd)
+
+		client := ensureFullClient(dataDir)
+		firstValid, lastValid, _, err := client.ComputeValidityRounds(firstValid, lastValid, numValidRounds)
+		if err != nil {
+			reportErrorln(err)
+		}
+
+		// Bootstrap is a zero-amount payment
+		const bootstrapAmount uint64 = 0
+		payment, err := client.ConstructPayment(
+			fromAddressResolved, toAddressResolved, fee, bootstrapAmount, noteBytes, "",
+			leaseBytes, firstValid, lastValid,
+		)
+		if err != nil {
+			reportErrorf(errorConstructingTX, err)
+		}
+
+		// Set the bootstrap flag
+		payment.AccountBootstrap = transactions.BootstrapAccount
+
+		if feeSponsored {
+			payment.FeeSponsored = true
+		}
+
+		explicitFee := cmd.Flags().Changed("fee")
+		if explicitFee {
+			payment.Fee = basics.MicroAlgos{Raw: fee}
+		}
+
+		var authAddr basics.Address
+		if signerAddress != "" {
+			authAddr, err = basics.UnmarshalChecksumAddress(signerAddress)
+			if err != nil {
+				reportErrorf("Signer invalid (%s): %v", signerAddress, err)
+			}
+			if authAddr == payment.Sender {
+				reportErrorf("AuthAddr cannot be the same as the transaction sender")
+			}
+		}
+
+		signTx := sign || (outFilename == "")
+		var sponsor basics.Address
+		if sponsorAddress != "" {
+			sponsor, err = basics.UnmarshalChecksumAddress(sponsorAddress)
+			if err != nil {
+				reportErrorf("Sponsor invalid (%s): %v", sponsorAddress, err)
+			}
+		}
+		stx, err := createSignedTransaction(client, signTx, dataDir, walletName, payment, authAddr, sponsor)
+		if err != nil {
+			reportErrorf(errorSigningTX, err)
+		}
+
+		if outFilename == "" {
+			// Broadcast the tx
+			txid, err1 := client.BroadcastTransaction(stx)
+
+			if err1 != nil {
+				reportErrorf(errorBroadcastingTX, err1)
+			}
+
+			// Report tx details to user
+			reportInfof("Issued bootstrap transaction from account %s to %s, txid %s (fee %d)", fromAddressResolved, toAddressResolved, txid, stx.Txn.Fee.Raw)
+
+			if !noWaitAfterSend {
+				_, err1 = waitForCommit(client, txid, lastValid)
+				if err1 != nil {
+					reportErrorln(err1)
+				}
+			}
+		} else {
+			err = writeFile(outFilename, protocol.Encode(&stx), 0o600)
 			if err != nil {
 				reportErrorln(err)
 			}

@@ -74,7 +74,7 @@ func TestAxferWellFormedErrors(t *testing.T) {
 			if cv == "" {
 				cv = protocol.ConsensusFuture
 			}
-			err := ax.axfer.wellFormed(config.Consensus[cv])
+			err := ax.axfer.wellFormed(Header{}, config.Consensus[cv])
 			if ax.expectedError != "" {
 				require.ErrorContains(t, err, ax.expectedError)
 			} else {

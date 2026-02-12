@@ -416,13 +416,13 @@ func AssetTransfer(ct transactions.AssetTransferTxnFields, header transactions.H
 		}
 	}
 
-	// Allow a Delegator to rescind their delegation for accounts that hold zero
+	// Allow a Delegator to revoke their delegation for accounts that hold zero
 	// units of the delegated asset.
 	// This results in the Delegator decreasing their Minimum Balance Requirement
 	// and Closing Out the asset of the AssetReceiver.
 	// Must not contain an AssetCloseTo field, since no assets should actually
 	// be getting moved.
-	if ct.AssetDelegation == transactions.RescindAssetDelegation {
+	if ct.AssetDelegation == transactions.RevokeAssetDelegation {
 		rcvHolding, ok, err := balances.GetAssetHolding(ct.AssetReceiver, ct.XferAsset)
 		if err != nil {
 			return err
@@ -435,11 +435,11 @@ func AssetTransfer(ct transactions.AssetTransferTxnFields, header transactions.H
 			}
 
 			if rcvHolding.Amount != 0 {
-				return fmt.Errorf("cannot rescind delegation from an asset holding with non-zero balance: %d", rcvHolding.Amount)
+				return fmt.Errorf("cannot revoke delegation from an asset holding with non-zero balance: %d", rcvHolding.Amount)
 			}
 
 			if rcvHolding.Delegator != header.Sender {
-				return fmt.Errorf("only the delegator can rescind their delegation: sender %v, delegator: %v", header.Sender, rcvHolding.Delegator)
+				return fmt.Errorf("only the delegator can revoke their delegation: sender %v, delegator: %v", header.Sender, rcvHolding.Delegator)
 			}
 
 			rcvRecord.TotalAssets = basics.SubSaturate(rcvRecord.TotalAssets, 1)
@@ -470,7 +470,7 @@ func AssetTransfer(ct transactions.AssetTransferTxnFields, header transactions.H
 				return err
 			}
 		} else {
-			return fmt.Errorf("cannot rescind delegation for a non-existent asset holding")
+			return fmt.Errorf("cannot revoke delegation for a non-existent asset holding")
 		}
 	}
 

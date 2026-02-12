@@ -32,14 +32,14 @@ type AssetDelegation uint8
 // to the Sender.
 const ApproveAssetDelegation AssetDelegation = 1
 
-// RescindAssetDelegation indicates that the AssetReceiver's delegated asset holding
+// RevokeAssetDelegation indicates that the AssetReceiver's delegated asset holding
 // will no longer be delegated by the Sender (who must be the current Delegator).
 // This will only succeed if the AssetReceiver's asset holding balance is zero.
 // TODO: Should it be possible for someone else takeover an existing Asset
 // Delegation? How would you prevent someone immediately taking over and
-// rescinding someone who temporarily has zero units but may intend to hold more
+// revoking delegation for someone who temporarily has zero units but may intend to hold more
 // again soon?
-const RescindAssetDelegation AssetDelegation = 2
+const RevokeAssetDelegation AssetDelegation = 2
 
 // AssetConfigTxnFields captures the fields used for asset
 // allocation, re-configuration, and destruction.

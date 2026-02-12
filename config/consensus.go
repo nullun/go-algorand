@@ -588,7 +588,7 @@ type ConsensusParams struct {
 	// SupportAssetDelegation indicates support for asset delegation, allowing
 	// accounts to delegate the minimum balance requirement (MBR) of an asset holding
 	// to another account.
-	// This can also be rescinded by the delegator if the delegated holding has a
+	// This can also be revoked by the delegator if the delegated holding has a
 	// zero asset balance.
 	SupportAssetDelegation bool
 }

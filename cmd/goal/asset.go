@@ -62,7 +62,7 @@ func init() {
 	assetCmd.AddCommand(freezeAssetCmd)
 	assetCmd.AddCommand(optinAssetCmd)
 	assetCmd.AddCommand(delegateAssetCmd)
-	assetCmd.AddCommand(rescindAssetCmd)
+	assetCmd.AddCommand(revokeAssetCmd)
 
 	assetCmd.PersistentFlags().StringVarP(&walletName, "wallet", "w", "", "Set the wallet to be used for the selected operation")
 
@@ -119,11 +119,11 @@ func init() {
 	delegateAssetCmd.MarkFlagRequired("assetid")
 	delegateAssetCmd.MarkFlagRequired("to")
 
-	rescindAssetCmd.Flags().Uint64Var((*uint64)(&assetID), "assetid", 0, "ID of the asset being rescinded (required)")
-	rescindAssetCmd.Flags().StringVarP(&account, "from", "f", "", "Account address to rescind from (if not specified, uses default account)")
-	rescindAssetCmd.Flags().StringVarP(&toAddress, "to", "t", "", "Address to rescind to (required)")
-	rescindAssetCmd.MarkFlagRequired("assetid")
-	rescindAssetCmd.MarkFlagRequired("to")
+	revokeAssetCmd.Flags().Uint64Var((*uint64)(&assetID), "assetid", 0, "ID of the asset being revoked (required)")
+	revokeAssetCmd.Flags().StringVarP(&account, "from", "f", "", "Account address to revoke from (if not specified, uses default account)")
+	revokeAssetCmd.Flags().StringVarP(&toAddress, "to", "t", "", "Address to revoke delegation from (required)")
+	revokeAssetCmd.MarkFlagRequired("assetid")
+	revokeAssetCmd.MarkFlagRequired("to")
 
 	freezeAssetCmd.Flags().StringVar(&assetFreezer, "freezer", "", "Address to issue a freeze transaction from")
 	freezeAssetCmd.Flags().StringVar(&assetCreator, "creator", "", "Account address for asset creator")
@@ -148,7 +148,7 @@ func init() {
 	addTxnFlags(freezeAssetCmd)
 	addTxnFlags(optinAssetCmd)
 	addTxnFlags(delegateAssetCmd)
-	addTxnFlags(rescindAssetCmd)
+	addTxnFlags(revokeAssetCmd)
 
 	infoAssetCmd.Flags().Uint64Var((*uint64)(&assetID), "assetid", 0, "ID of the asset to look up")
 	infoAssetCmd.Flags().StringVar(&assetUnitName, "unitname", "", "Unit name of the asset to look up")
@@ -865,10 +865,10 @@ var delegateAssetCmd = &cobra.Command{
 	},
 }
 
-var rescindAssetCmd = &cobra.Command{
-	Use:   "rescind",
-	Short: "Rescind delegated assets",
-	Long:  "Remove the delegated asset holding. Must be holding zero units.",
+var revokeAssetCmd = &cobra.Command{
+	Use:   "revoke",
+	Short: "Revoke delegated assets",
+	Long:  "Remove the delegated asset holding (revoke delegation). Must be holding zero units.",
 	Args:  validateNoPosArgsFn,
 	Run: func(cmd *cobra.Command, _ []string) {
 		checkTxValidityPeriodCmdFlags(cmd)
@@ -885,7 +885,7 @@ var rescindAssetCmd = &cobra.Command{
 		sender := accountList.getAddressByName(account)
 		toAddressResolved := accountList.getAddressByName(toAddress)
 
-		// Rescind txns are always 0 amount
+		// Revoke txns are always 0 amount
 		tx, err := client.MakeUnsignedAssetSendTx(assetID, 0, toAddressResolved, "", "")
 		if err != nil {
 			reportErrorf("Cannot construct transaction: %s", err)
@@ -898,7 +898,7 @@ var rescindAssetCmd = &cobra.Command{
 			tx.FeeSponsored = true
 		}
 
-		tx.AssetDelegation = transactions.RescindAssetDelegation
+		tx.AssetDelegation = transactions.RevokeAssetDelegation
 
 		firstValid, lastValid, _, err = client.ComputeValidityRounds(firstValid, lastValid, numValidRounds)
 		if err != nil {

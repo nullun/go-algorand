@@ -23,22 +23,22 @@ import (
 	"github.com/algorand/go-algorand/data/basics"
 )
 
-// AccountSponsorship indicates the type of sponsorship operation.
-type AccountSponsorship uint8
+// AccountBootstrap indicates the type of account bootstrap operation.
+type AccountBootstrap uint8
 
-// ApproveAccountSponsorship indicates that the Receiver's initial minimum
-// balance requirement will be sponsored by the Sender.
-const ApproveAccountSponsorship AccountSponsorship = 1
+// BootstrapAccount indicates that the Receiver's initial minimum
+// balance requirement will be bootstrapped by the Sender.
+const BootstrapAccount AccountBootstrap = 1
 
-// RevokeAccountSponsorship indicates that the Receiver's initial minimum
-// balance requirement will no longer be sponsored by the Sender (who must be
-// the current Sponsor).
+// RescindAccount indicates that the Receiver's initial minimum
+// balance requirement will no longer be bootstrapped by the Sender (who must be
+// the current Bootstrapper).
 // This will only succeed if the Receiver's holdings are zero.
 // TODO: Should it be possible for someone else takeover an existing Account
-// Sponsorship? How would you prevent someone immediately taking over and
-// revoking someone who temporarily has zero units but may intend to hold more
+// Bootstrap? How would you prevent someone immediately taking over and
+// rescinding someone who temporarily has zero units but may intend to hold more
 // again soon?
-const RevokeAccountSponsorship AccountSponsorship = 2
+const RescindAccount AccountBootstrap = 2
 
 // PaymentTxnFields captures the fields used by payment transactions.
 type PaymentTxnFields struct {
@@ -53,8 +53,8 @@ type PaymentTxnFields struct {
 	// address.
 	CloseRemainderTo basics.Address `codec:"close"`
 
-	// AccountSponsorship indicates the type of sponsorship operation.
-	AccountSponsorship AccountSponsorship `codec:"spsr"`
+	// AccountBootstrap indicates the type of account bootstrap operation.
+	AccountBootstrap AccountBootstrap `codec:"boot"`
 }
 
 // wellFormed performs some stateless checks on the Sender of a pay transaction

@@ -51,8 +51,8 @@ type BaseAccountData struct {
 	LastHeartbeat              basics.Round      `codec:"q"`
 	TotalAssetsSponsored       uint64            `codec:"r"`
 	TotalAssetsSponsoring      uint64            `codec:"s"`
-	TotalAccountsSponsoring    uint64            `codec:"t"`
-	Sponsor                    basics.Address    `codec:"u"`
+	TotalAccountsBootstrapping uint64            `codec:"t"`
+	Bootstrapper               basics.Address    `codec:"u"`
 
 	BaseVotingData
 
@@ -316,8 +316,8 @@ func (ba *BaseAccountData) SetCoreAccountData(ad *ledgercore.AccountData) {
 
 	ba.TotalAssetsSponsored = ad.TotalAssetsSponsored
 	ba.TotalAssetsSponsoring = ad.TotalAssetsSponsoring
-	ba.TotalAccountsSponsoring = ad.TotalAccountsSponsoring
-	ba.Sponsor = ad.Sponsor
+	ba.TotalAccountsBootstrapping = ad.TotalAccountsBootstrapping
+	ba.Bootstrapper = ad.Bootstrapper
 
 	ba.BaseVotingData.SetCoreAccountData(ad)
 }
@@ -345,8 +345,8 @@ func (ba *BaseAccountData) SetAccountData(ad *basics.AccountData) {
 
 	ba.TotalAssetsSponsored = ad.TotalAssetsSponsored
 	ba.TotalAssetsSponsoring = ad.TotalAssetsSponsoring
-	ba.TotalAccountsSponsoring = ad.TotalAccountsSponsoring
-	ba.Sponsor = ad.Sponsor
+	ba.TotalAccountsBootstrapping = ad.TotalAccountsBootstrapping
+	ba.Bootstrapper = ad.Bootstrapper
 
 	ba.BaseVotingData.VoteID = ad.VoteID
 	ba.BaseVotingData.SelectionID = ad.SelectionID
@@ -388,10 +388,10 @@ func (ba *BaseAccountData) GetLedgerCoreAccountBaseData() ledgercore.AccountBase
 		LastProposed:  ba.LastProposed,
 		LastHeartbeat: ba.LastHeartbeat,
 
-		TotalAssetsSponsored:    ba.TotalAssetsSponsored,
-		TotalAssetsSponsoring:   ba.TotalAssetsSponsoring,
-		TotalAccountsSponsoring: ba.TotalAccountsSponsoring,
-		Sponsor:                 ba.Sponsor,
+		TotalAssetsSponsored:       ba.TotalAssetsSponsored,
+		TotalAssetsSponsoring:      ba.TotalAssetsSponsoring,
+		TotalAccountsBootstrapping: ba.TotalAccountsBootstrapping,
+		Bootstrapper:               ba.Bootstrapper,
 	}
 }
 
@@ -434,10 +434,10 @@ func (ba *BaseAccountData) GetAccountData() basics.AccountData {
 		LastProposed:  ba.LastProposed,
 		LastHeartbeat: ba.LastHeartbeat,
 
-		TotalAssetsSponsored:    ba.TotalAssetsSponsored,
-		TotalAssetsSponsoring:   ba.TotalAssetsSponsoring,
-		TotalAccountsSponsoring: ba.TotalAccountsSponsoring,
-		Sponsor:                 ba.Sponsor,
+		TotalAssetsSponsored:       ba.TotalAssetsSponsored,
+		TotalAssetsSponsoring:      ba.TotalAssetsSponsoring,
+		TotalAccountsBootstrapping: ba.TotalAccountsBootstrapping,
+		Bootstrapper:               ba.Bootstrapper,
 	}
 }
 
@@ -462,8 +462,8 @@ func (ba *BaseAccountData) IsEmpty() bool {
 		ba.LastHeartbeat == 0 &&
 		ba.TotalAssetsSponsored == 0 &&
 		ba.TotalAssetsSponsoring == 0 &&
-		ba.TotalAccountsSponsoring == 0 &&
-		ba.Sponsor.IsZero() &&
+		ba.TotalAccountsBootstrapping == 0 &&
+		ba.Bootstrapper.IsZero() &&
 		ba.BaseVotingData.IsEmpty()
 }
 

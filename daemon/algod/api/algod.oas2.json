@@ -2646,13 +2646,13 @@
           "type": "integer",
           "format": "uint64"
         },
-        "total-accounts-sponsoring": {
-          "description": "\\[tacs\\] The number of accounts this account is sponsoring",
+        "total-accounts-bootstrapping": {
+          "description": "\\[tacs\\] The number of accounts this account is bootstrapping",
           "type": "integer",
           "format": "uint64"
         },
-        "sponsor": {
-          "description": "\\[s\\] Address of the sponsoring account for this account. If empty, the account is not sponsored.",
+        "bootstrapper": {
+          "description": "\\[s\\] Address of the account that is bootstrapping this account. If empty, the account is not bootstrapped.",
           "type": "string",
           "x-algorand-format": "Address"
         }

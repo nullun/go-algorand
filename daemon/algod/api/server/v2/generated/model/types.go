@@ -168,6 +168,9 @@ type Account struct {
 	// AuthAddr \[spend\] the address against which signing should be checked. If empty, the address of the current account is used. This field can be updated in any transaction by setting the RekeyTo field.
 	AuthAddr *string `json:"auth-addr,omitempty"`
 
+	// Bootstrapper \[s\] Address of the account that is bootstrapping this account. If empty, the account is not bootstrapped.
+	Bootstrapper *string `json:"bootstrapper,omitempty"`
+
 	// CreatedApps \[appp\] parameters of applications created by this account including app global data.
 	//
 	// Note: the raw account uses `map[int] -> AppParams` for this type.
@@ -213,17 +216,14 @@ type Account struct {
 	// * lsig
 	SigType *AccountSigType `json:"sig-type,omitempty"`
 
-	// Sponsor \[s\] Address of the sponsoring account for this account. If empty, the account is not sponsored.
-	Sponsor *string `json:"sponsor,omitempty"`
-
 	// Status \[onl\] delegation status of the account's MicroAlgos
 	// * Offline - indicates that the associated account is delegated.
 	// *  Online  - indicates that the associated account used as part of the delegation pool.
 	// *   NotParticipating - indicates that the associated account is neither a delegator nor a delegate.
 	Status string `json:"status"`
 
-	// TotalAccountsSponsoring \[tacs\] The number of accounts this account is sponsoring
-	TotalAccountsSponsoring *uint64 `json:"total-accounts-sponsoring,omitempty"`
+	// TotalAccountsBootstrapping \[tacs\] The number of accounts this account is bootstrapping
+	TotalAccountsBootstrapping *uint64 `json:"total-accounts-bootstrapping,omitempty"`
 
 	// TotalAppsOptedIn The count of all applications that have been opted in, equivalent to the count of application local data (AppLocalState objects) stored in this account.
 	TotalAppsOptedIn uint64 `json:"total-apps-opted-in"`

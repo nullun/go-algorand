@@ -234,11 +234,11 @@ type AccountData struct {
 	// TotalAssetsSponsoring is the number of asset holdings this account is sponsoring for other accounts.
 	TotalAssetsSponsoring uint64 `codec:"tasg"`
 
-	// TotalAccountsSponsored is the number of accounts this account is sponsoring for asset holdings.
-	TotalAccountsSponsoring uint64 `codec:"tacs"`
+	// TotalAccountsBootstrapping is the number of accounts this account is bootstrapping.
+	TotalAccountsBootstrapping uint64 `codec:"tabs"`
 
-	// Sponsor is the address which holds the base MinBalance requirements for this account.
-	Sponsor Address `codec:"spsr"`
+	// Bootstrapper is the address which holds the base MinBalance requirements for this account.
+	Bootstrapper Address `codec:"boot"`
 }
 
 // AppLocalState stores the LocalState associated with an application. It also
@@ -512,8 +512,8 @@ type BalanceRequirements struct {
 func (u AccountData) MinBalance(reqs BalanceRequirements) MicroAlgos {
 	return MinBalance(
 		reqs,
-		!u.Sponsor.IsZero(),
-		u.TotalAccountsSponsoring,
+		!u.Bootstrapper.IsZero(),
+		u.TotalAccountsBootstrapping,
 		uint64(len(u.Assets)),
 		u.TotalAppSchema,
 		uint64(len(u.AppParams)), uint64(len(u.AppLocalStates)),
@@ -529,8 +529,8 @@ func (u AccountData) MinBalance(reqs BalanceRequirements) MicroAlgos {
 // storage the account is allowed to store on disk.
 func MinBalance(
 	reqs BalanceRequirements,
-	sponsored bool,
-	totalAccountsSponsoring uint64,
+	bootstrapped bool,
+	totalAccountsBootstrapping uint64,
 	totalAssets uint64,
 	totalAppSchema StateSchema,
 	totalAppParams uint64, totalAppLocalStates uint64,
@@ -542,13 +542,13 @@ func MinBalance(
 	var min uint64
 
 	// First, base MinBalance
-	if !sponsored {
+	if !bootstrapped {
 		min = reqs.MinBalance
 	}
 
-	// Multiple of base MinBalance for each account being sponsored
-	sponsoredAccountsCost := reqs.MinBalance * totalAccountsSponsoring
-	min = AddSaturate(min, sponsoredAccountsCost)
+	// Multiple of base MinBalance for each account being bootstrapped
+	bootstrappedAccountsCost := reqs.MinBalance * totalAccountsBootstrapping
+	min = AddSaturate(min, bootstrappedAccountsCost)
 
 	// MinBalance for each Asset, adjusted for sponsors
 	adjustedTotalAssets := totalAssets - totalAssetsSponsored + totalAssetsSponsoring

@@ -1032,6 +1032,11 @@
             "type": "string",
             "x-algorand-format": "Address"
           },
+          "bootstrapper": {
+            "description": "\\[s\\] Address of the account that is bootstrapping this account. If empty, the account is not bootstrapped.",
+            "type": "string",
+            "x-algorand-format": "Address"
+          },
           "created-apps": {
             "description": "\\[appp\\] parameters of applications created by this account including app global data.\n\nNote: the raw account uses `map[int] -> AppParams` for this type.",
             "items": {
@@ -1097,17 +1102,12 @@
             ],
             "type": "string"
           },
-          "sponsor": {
-            "description": "\\[s\\] Address of the sponsoring account for this account. If empty, the account is not sponsored.",
-            "type": "string",
-            "x-algorand-format": "Address"
-          },
           "status": {
             "description": "\\[onl\\] delegation status of the account's MicroAlgos\n* Offline - indicates that the associated account is delegated.\n*  Online  - indicates that the associated account used as part of the delegation pool.\n*   NotParticipating - indicates that the associated account is neither a delegator nor a delegate.",
             "type": "string"
           },
-          "total-accounts-sponsoring": {
-            "description": "\\[tacs\\] The number of accounts this account is sponsoring",
+          "total-accounts-bootstrapping": {
+            "description": "\\[tacs\\] The number of accounts this account is bootstrapping",
             "format": "uint64",
             "type": "integer"
           },

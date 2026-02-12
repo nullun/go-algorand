@@ -18,15 +18,15 @@ import (
 )
 
 // The following msgp objects are implemented in this file:
-// AccountSponsorship
-//          |-----> MarshalMsg
-//          |-----> CanMarshalMsg
-//          |-----> (*) UnmarshalMsg
-//          |-----> (*) UnmarshalMsgWithState
-//          |-----> (*) CanUnmarshalMsg
-//          |-----> Msgsize
-//          |-----> MsgIsZero
-//          |-----> AccountSponsorshipMaxSize()
+// AccountBootstrap
+//         |-----> MarshalMsg
+//         |-----> CanMarshalMsg
+//         |-----> (*) UnmarshalMsg
+//         |-----> (*) UnmarshalMsgWithState
+//         |-----> (*) CanUnmarshalMsg
+//         |-----> Msgsize
+//         |-----> MsgIsZero
+//         |-----> AccountBootstrapMaxSize()
 //
 // ApplicationCallTxnFields
 //             |-----> (*) MarshalMsg
@@ -302,22 +302,22 @@ import (
 //
 
 // MarshalMsg implements msgp.Marshaler
-func (z AccountSponsorship) MarshalMsg(b []byte) (o []byte) {
+func (z AccountBootstrap) MarshalMsg(b []byte) (o []byte) {
 	o = msgp.Require(b, z.Msgsize())
 	o = msgp.AppendUint8(o, uint8(z))
 	return
 }
 
-func (_ AccountSponsorship) CanMarshalMsg(z interface{}) bool {
-	_, ok := (z).(AccountSponsorship)
+func (_ AccountBootstrap) CanMarshalMsg(z interface{}) bool {
+	_, ok := (z).(AccountBootstrap)
 	if !ok {
-		_, ok = (z).(*AccountSponsorship)
+		_, ok = (z).(*AccountBootstrap)
 	}
 	return ok
 }
 
 // UnmarshalMsg implements msgp.Unmarshaler
-func (z *AccountSponsorship) UnmarshalMsgWithState(bts []byte, st msgp.UnmarshalState) (o []byte, err error) {
+func (z *AccountBootstrap) UnmarshalMsgWithState(bts []byte, st msgp.UnmarshalState) (o []byte, err error) {
 	if st.AllowableDepth == 0 {
 		err = msgp.ErrMaxDepthExceeded{}
 		return
@@ -330,33 +330,33 @@ func (z *AccountSponsorship) UnmarshalMsgWithState(bts []byte, st msgp.Unmarshal
 			err = msgp.WrapError(err)
 			return
 		}
-		(*z) = AccountSponsorship(zb0001)
+		(*z) = AccountBootstrap(zb0001)
 	}
 	o = bts
 	return
 }
 
-func (z *AccountSponsorship) UnmarshalMsg(bts []byte) (o []byte, err error) {
+func (z *AccountBootstrap) UnmarshalMsg(bts []byte) (o []byte, err error) {
 	return z.UnmarshalMsgWithState(bts, msgp.DefaultUnmarshalState)
 }
-func (_ *AccountSponsorship) CanUnmarshalMsg(z interface{}) bool {
-	_, ok := (z).(*AccountSponsorship)
+func (_ *AccountBootstrap) CanUnmarshalMsg(z interface{}) bool {
+	_, ok := (z).(*AccountBootstrap)
 	return ok
 }
 
 // Msgsize returns an upper bound estimate of the number of bytes occupied by the serialized message
-func (z AccountSponsorship) Msgsize() (s int) {
+func (z AccountBootstrap) Msgsize() (s int) {
 	s = msgp.Uint8Size
 	return
 }
 
 // MsgIsZero returns whether this is a zero value
-func (z AccountSponsorship) MsgIsZero() bool {
+func (z AccountBootstrap) MsgIsZero() bool {
 	return z == 0
 }
 
-// AccountSponsorshipMaxSize returns a maximum valid message size for this message type
-func AccountSponsorshipMaxSize() (s int) {
+// AccountBootstrapMaxSize returns a maximum valid message size for this message type
+func AccountBootstrapMaxSize() (s int) {
 	s = msgp.Uint8Size
 	return
 }
@@ -4419,15 +4419,15 @@ func (z *PaymentTxnFields) MarshalMsg(b []byte) (o []byte) {
 		zb0001Len--
 		zb0001Mask |= 0x2
 	}
-	if (*z).CloseRemainderTo.MsgIsZero() {
+	if (*z).AccountBootstrap == 0 {
 		zb0001Len--
 		zb0001Mask |= 0x4
 	}
-	if (*z).Receiver.MsgIsZero() {
+	if (*z).CloseRemainderTo.MsgIsZero() {
 		zb0001Len--
 		zb0001Mask |= 0x8
 	}
-	if (*z).AccountSponsorship == 0 {
+	if (*z).Receiver.MsgIsZero() {
 		zb0001Len--
 		zb0001Mask |= 0x10
 	}
@@ -4440,19 +4440,19 @@ func (z *PaymentTxnFields) MarshalMsg(b []byte) (o []byte) {
 			o = (*z).Amount.MarshalMsg(o)
 		}
 		if (zb0001Mask & 0x4) == 0 { // if not empty
+			// string "boot"
+			o = append(o, 0xa4, 0x62, 0x6f, 0x6f, 0x74)
+			o = msgp.AppendUint8(o, uint8((*z).AccountBootstrap))
+		}
+		if (zb0001Mask & 0x8) == 0 { // if not empty
 			// string "close"
 			o = append(o, 0xa5, 0x63, 0x6c, 0x6f, 0x73, 0x65)
 			o = (*z).CloseRemainderTo.MarshalMsg(o)
 		}
-		if (zb0001Mask & 0x8) == 0 { // if not empty
+		if (zb0001Mask & 0x10) == 0 { // if not empty
 			// string "rcv"
 			o = append(o, 0xa3, 0x72, 0x63, 0x76)
 			o = (*z).Receiver.MarshalMsg(o)
-		}
-		if (zb0001Mask & 0x10) == 0 { // if not empty
-			// string "spsr"
-			o = append(o, 0xa4, 0x73, 0x70, 0x73, 0x72)
-			o = msgp.AppendUint8(o, uint8((*z).AccountSponsorship))
 		}
 	}
 	return
@@ -4511,10 +4511,10 @@ func (z *PaymentTxnFields) UnmarshalMsgWithState(bts []byte, st msgp.UnmarshalSt
 				var zb0003 uint8
 				zb0003, bts, err = msgp.ReadUint8Bytes(bts)
 				if err != nil {
-					err = msgp.WrapError(err, "struct-from-array", "AccountSponsorship")
+					err = msgp.WrapError(err, "struct-from-array", "AccountBootstrap")
 					return
 				}
-				(*z).AccountSponsorship = AccountSponsorship(zb0003)
+				(*z).AccountBootstrap = AccountBootstrap(zb0003)
 			}
 		}
 		if zb0001 > 0 {
@@ -4558,15 +4558,15 @@ func (z *PaymentTxnFields) UnmarshalMsgWithState(bts []byte, st msgp.UnmarshalSt
 					err = msgp.WrapError(err, "CloseRemainderTo")
 					return
 				}
-			case "spsr":
+			case "boot":
 				{
 					var zb0004 uint8
 					zb0004, bts, err = msgp.ReadUint8Bytes(bts)
 					if err != nil {
-						err = msgp.WrapError(err, "AccountSponsorship")
+						err = msgp.WrapError(err, "AccountBootstrap")
 						return
 					}
-					(*z).AccountSponsorship = AccountSponsorship(zb0004)
+					(*z).AccountBootstrap = AccountBootstrap(zb0004)
 				}
 			default:
 				err = msgp.ErrNoField(string(field))
@@ -4597,7 +4597,7 @@ func (z *PaymentTxnFields) Msgsize() (s int) {
 
 // MsgIsZero returns whether this is a zero value
 func (z *PaymentTxnFields) MsgIsZero() bool {
-	return ((*z).Receiver.MsgIsZero()) && ((*z).Amount.MsgIsZero()) && ((*z).CloseRemainderTo.MsgIsZero()) && ((*z).AccountSponsorship == 0)
+	return ((*z).Receiver.MsgIsZero()) && ((*z).Amount.MsgIsZero()) && ((*z).CloseRemainderTo.MsgIsZero()) && ((*z).AccountBootstrap == 0)
 }
 
 // PaymentTxnFieldsMaxSize returns a maximum valid message size for this message type
@@ -7245,95 +7245,95 @@ func (z *Transaction) MarshalMsg(b []byte) (o []byte) {
 		zb0008Len--
 		zb0008Mask |= 0x40000000
 	}
-	if (*z).AssetConfigTxnFields.ConfigAsset.MsgIsZero() {
+	if (*z).PaymentTxnFields.AccountBootstrap == 0 {
 		zb0008Len--
 		zb0008Mask |= 0x80000000
 	}
-	if (*z).PaymentTxnFields.CloseRemainderTo.MsgIsZero() {
+	if (*z).AssetConfigTxnFields.ConfigAsset.MsgIsZero() {
 		zb0008Len--
 		zb0008Mask |= 0x100000000
 	}
-	if (*z).AssetFreezeTxnFields.FreezeAccount.MsgIsZero() {
+	if (*z).PaymentTxnFields.CloseRemainderTo.MsgIsZero() {
 		zb0008Len--
 		zb0008Mask |= 0x200000000
 	}
-	if (*z).AssetFreezeTxnFields.FreezeAsset.MsgIsZero() {
+	if (*z).AssetFreezeTxnFields.FreezeAccount.MsgIsZero() {
 		zb0008Len--
 		zb0008Mask |= 0x400000000
 	}
-	if (*z).Header.Fee.MsgIsZero() {
+	if (*z).AssetFreezeTxnFields.FreezeAsset.MsgIsZero() {
 		zb0008Len--
 		zb0008Mask |= 0x800000000
 	}
-	if (*z).Header.FeeSponsored == false {
+	if (*z).Header.Fee.MsgIsZero() {
 		zb0008Len--
 		zb0008Mask |= 0x1000000000
 	}
-	if (*z).Header.FirstValid.MsgIsZero() {
+	if (*z).Header.FeeSponsored == false {
 		zb0008Len--
 		zb0008Mask |= 0x2000000000
 	}
-	if (*z).Header.GenesisID == "" {
+	if (*z).Header.FirstValid.MsgIsZero() {
 		zb0008Len--
 		zb0008Mask |= 0x4000000000
 	}
-	if (*z).Header.GenesisHash.MsgIsZero() {
+	if (*z).Header.GenesisID == "" {
 		zb0008Len--
 		zb0008Mask |= 0x8000000000
 	}
-	if (*z).Header.Group.MsgIsZero() {
+	if (*z).Header.GenesisHash.MsgIsZero() {
 		zb0008Len--
 		zb0008Mask |= 0x10000000000
 	}
-	if (*z).HeartbeatTxnFields == nil {
+	if (*z).Header.Group.MsgIsZero() {
 		zb0008Len--
 		zb0008Mask |= 0x20000000000
 	}
-	if (*z).Header.LastValid.MsgIsZero() {
+	if (*z).HeartbeatTxnFields == nil {
 		zb0008Len--
 		zb0008Mask |= 0x40000000000
 	}
-	if (*z).Header.Lease == ([32]byte{}) {
+	if (*z).Header.LastValid.MsgIsZero() {
 		zb0008Len--
 		zb0008Mask |= 0x80000000000
 	}
-	if (*z).KeyregTxnFields.Nonparticipation == false {
+	if (*z).Header.Lease == ([32]byte{}) {
 		zb0008Len--
 		zb0008Mask |= 0x100000000000
 	}
-	if len((*z).Header.Note) == 0 {
+	if (*z).KeyregTxnFields.Nonparticipation == false {
 		zb0008Len--
 		zb0008Mask |= 0x200000000000
 	}
-	if (*z).PaymentTxnFields.Receiver.MsgIsZero() {
+	if len((*z).Header.Note) == 0 {
 		zb0008Len--
 		zb0008Mask |= 0x400000000000
 	}
-	if (*z).Header.RekeyTo.MsgIsZero() {
+	if (*z).PaymentTxnFields.Receiver.MsgIsZero() {
 		zb0008Len--
 		zb0008Mask |= 0x800000000000
 	}
-	if (*z).KeyregTxnFields.SelectionPK.MsgIsZero() {
+	if (*z).Header.RekeyTo.MsgIsZero() {
 		zb0008Len--
 		zb0008Mask |= 0x1000000000000
 	}
-	if (*z).Header.Sender.MsgIsZero() {
+	if (*z).KeyregTxnFields.SelectionPK.MsgIsZero() {
 		zb0008Len--
 		zb0008Mask |= 0x2000000000000
 	}
-	if (*z).StateProofTxnFields.StateProof.MsgIsZero() {
+	if (*z).Header.Sender.MsgIsZero() {
 		zb0008Len--
 		zb0008Mask |= 0x4000000000000
 	}
-	if (*z).StateProofTxnFields.Message.MsgIsZero() {
+	if (*z).StateProofTxnFields.StateProof.MsgIsZero() {
 		zb0008Len--
 		zb0008Mask |= 0x8000000000000
 	}
-	if (*z).KeyregTxnFields.StateProofPK.MsgIsZero() {
+	if (*z).StateProofTxnFields.Message.MsgIsZero() {
 		zb0008Len--
 		zb0008Mask |= 0x10000000000000
 	}
-	if (*z).PaymentTxnFields.AccountSponsorship == 0 {
+	if (*z).KeyregTxnFields.StateProofPK.MsgIsZero() {
 		zb0008Len--
 		zb0008Mask |= 0x20000000000000
 	}
@@ -7543,56 +7543,61 @@ func (z *Transaction) MarshalMsg(b []byte) (o []byte) {
 			o = msgp.AppendUint8(o, uint8((*z).AssetTransferTxnFields.AssetSponsorship))
 		}
 		if (zb0008Mask & 0x80000000) == 0 { // if not empty
+			// string "boot"
+			o = append(o, 0xa4, 0x62, 0x6f, 0x6f, 0x74)
+			o = msgp.AppendUint8(o, uint8((*z).PaymentTxnFields.AccountBootstrap))
+		}
+		if (zb0008Mask & 0x100000000) == 0 { // if not empty
 			// string "caid"
 			o = append(o, 0xa4, 0x63, 0x61, 0x69, 0x64)
 			o = (*z).AssetConfigTxnFields.ConfigAsset.MarshalMsg(o)
 		}
-		if (zb0008Mask & 0x100000000) == 0 { // if not empty
+		if (zb0008Mask & 0x200000000) == 0 { // if not empty
 			// string "close"
 			o = append(o, 0xa5, 0x63, 0x6c, 0x6f, 0x73, 0x65)
 			o = (*z).PaymentTxnFields.CloseRemainderTo.MarshalMsg(o)
 		}
-		if (zb0008Mask & 0x200000000) == 0 { // if not empty
+		if (zb0008Mask & 0x400000000) == 0 { // if not empty
 			// string "fadd"
 			o = append(o, 0xa4, 0x66, 0x61, 0x64, 0x64)
 			o = (*z).AssetFreezeTxnFields.FreezeAccount.MarshalMsg(o)
 		}
-		if (zb0008Mask & 0x400000000) == 0 { // if not empty
+		if (zb0008Mask & 0x800000000) == 0 { // if not empty
 			// string "faid"
 			o = append(o, 0xa4, 0x66, 0x61, 0x69, 0x64)
 			o = (*z).AssetFreezeTxnFields.FreezeAsset.MarshalMsg(o)
 		}
-		if (zb0008Mask & 0x800000000) == 0 { // if not empty
+		if (zb0008Mask & 0x1000000000) == 0 { // if not empty
 			// string "fee"
 			o = append(o, 0xa3, 0x66, 0x65, 0x65)
 			o = (*z).Header.Fee.MarshalMsg(o)
 		}
-		if (zb0008Mask & 0x1000000000) == 0 { // if not empty
+		if (zb0008Mask & 0x2000000000) == 0 { // if not empty
 			// string "fs"
 			o = append(o, 0xa2, 0x66, 0x73)
 			o = msgp.AppendBool(o, (*z).Header.FeeSponsored)
 		}
-		if (zb0008Mask & 0x2000000000) == 0 { // if not empty
+		if (zb0008Mask & 0x4000000000) == 0 { // if not empty
 			// string "fv"
 			o = append(o, 0xa2, 0x66, 0x76)
 			o = (*z).Header.FirstValid.MarshalMsg(o)
 		}
-		if (zb0008Mask & 0x4000000000) == 0 { // if not empty
+		if (zb0008Mask & 0x8000000000) == 0 { // if not empty
 			// string "gen"
 			o = append(o, 0xa3, 0x67, 0x65, 0x6e)
 			o = msgp.AppendString(o, (*z).Header.GenesisID)
 		}
-		if (zb0008Mask & 0x8000000000) == 0 { // if not empty
+		if (zb0008Mask & 0x10000000000) == 0 { // if not empty
 			// string "gh"
 			o = append(o, 0xa2, 0x67, 0x68)
 			o = (*z).Header.GenesisHash.MarshalMsg(o)
 		}
-		if (zb0008Mask & 0x10000000000) == 0 { // if not empty
+		if (zb0008Mask & 0x20000000000) == 0 { // if not empty
 			// string "grp"
 			o = append(o, 0xa3, 0x67, 0x72, 0x70)
 			o = (*z).Header.Group.MarshalMsg(o)
 		}
-		if (zb0008Mask & 0x20000000000) == 0 { // if not empty
+		if (zb0008Mask & 0x40000000000) == 0 { // if not empty
 			// string "hb"
 			o = append(o, 0xa2, 0x68, 0x62)
 			if (*z).HeartbeatTxnFields == nil {
@@ -7601,65 +7606,60 @@ func (z *Transaction) MarshalMsg(b []byte) (o []byte) {
 				o = (*z).HeartbeatTxnFields.MarshalMsg(o)
 			}
 		}
-		if (zb0008Mask & 0x40000000000) == 0 { // if not empty
+		if (zb0008Mask & 0x80000000000) == 0 { // if not empty
 			// string "lv"
 			o = append(o, 0xa2, 0x6c, 0x76)
 			o = (*z).Header.LastValid.MarshalMsg(o)
 		}
-		if (zb0008Mask & 0x80000000000) == 0 { // if not empty
+		if (zb0008Mask & 0x100000000000) == 0 { // if not empty
 			// string "lx"
 			o = append(o, 0xa2, 0x6c, 0x78)
 			o = msgp.AppendBytes(o, ((*z).Header.Lease)[:])
 		}
-		if (zb0008Mask & 0x100000000000) == 0 { // if not empty
+		if (zb0008Mask & 0x200000000000) == 0 { // if not empty
 			// string "nonpart"
 			o = append(o, 0xa7, 0x6e, 0x6f, 0x6e, 0x70, 0x61, 0x72, 0x74)
 			o = msgp.AppendBool(o, (*z).KeyregTxnFields.Nonparticipation)
 		}
-		if (zb0008Mask & 0x200000000000) == 0 { // if not empty
+		if (zb0008Mask & 0x400000000000) == 0 { // if not empty
 			// string "note"
 			o = append(o, 0xa4, 0x6e, 0x6f, 0x74, 0x65)
 			o = msgp.AppendBytes(o, (*z).Header.Note)
 		}
-		if (zb0008Mask & 0x400000000000) == 0 { // if not empty
+		if (zb0008Mask & 0x800000000000) == 0 { // if not empty
 			// string "rcv"
 			o = append(o, 0xa3, 0x72, 0x63, 0x76)
 			o = (*z).PaymentTxnFields.Receiver.MarshalMsg(o)
 		}
-		if (zb0008Mask & 0x800000000000) == 0 { // if not empty
+		if (zb0008Mask & 0x1000000000000) == 0 { // if not empty
 			// string "rekey"
 			o = append(o, 0xa5, 0x72, 0x65, 0x6b, 0x65, 0x79)
 			o = (*z).Header.RekeyTo.MarshalMsg(o)
 		}
-		if (zb0008Mask & 0x1000000000000) == 0 { // if not empty
+		if (zb0008Mask & 0x2000000000000) == 0 { // if not empty
 			// string "selkey"
 			o = append(o, 0xa6, 0x73, 0x65, 0x6c, 0x6b, 0x65, 0x79)
 			o = (*z).KeyregTxnFields.SelectionPK.MarshalMsg(o)
 		}
-		if (zb0008Mask & 0x2000000000000) == 0 { // if not empty
+		if (zb0008Mask & 0x4000000000000) == 0 { // if not empty
 			// string "snd"
 			o = append(o, 0xa3, 0x73, 0x6e, 0x64)
 			o = (*z).Header.Sender.MarshalMsg(o)
 		}
-		if (zb0008Mask & 0x4000000000000) == 0 { // if not empty
+		if (zb0008Mask & 0x8000000000000) == 0 { // if not empty
 			// string "sp"
 			o = append(o, 0xa2, 0x73, 0x70)
 			o = (*z).StateProofTxnFields.StateProof.MarshalMsg(o)
 		}
-		if (zb0008Mask & 0x8000000000000) == 0 { // if not empty
+		if (zb0008Mask & 0x10000000000000) == 0 { // if not empty
 			// string "spmsg"
 			o = append(o, 0xa5, 0x73, 0x70, 0x6d, 0x73, 0x67)
 			o = (*z).StateProofTxnFields.Message.MarshalMsg(o)
 		}
-		if (zb0008Mask & 0x10000000000000) == 0 { // if not empty
+		if (zb0008Mask & 0x20000000000000) == 0 { // if not empty
 			// string "sprfkey"
 			o = append(o, 0xa7, 0x73, 0x70, 0x72, 0x66, 0x6b, 0x65, 0x79)
 			o = (*z).KeyregTxnFields.StateProofPK.MarshalMsg(o)
-		}
-		if (zb0008Mask & 0x20000000000000) == 0 { // if not empty
-			// string "spsr"
-			o = append(o, 0xa4, 0x73, 0x70, 0x73, 0x72)
-			o = msgp.AppendUint8(o, uint8((*z).PaymentTxnFields.AccountSponsorship))
 		}
 		if (zb0008Mask & 0x40000000000000) == 0 { // if not empty
 			// string "sptype"
@@ -7925,10 +7925,10 @@ func (z *Transaction) UnmarshalMsgWithState(bts []byte, st msgp.UnmarshalState) 
 				var zb0012 uint8
 				zb0012, bts, err = msgp.ReadUint8Bytes(bts)
 				if err != nil {
-					err = msgp.WrapError(err, "struct-from-array", "AccountSponsorship")
+					err = msgp.WrapError(err, "struct-from-array", "AccountBootstrap")
 					return
 				}
-				(*z).PaymentTxnFields.AccountSponsorship = AccountSponsorship(zb0012)
+				(*z).PaymentTxnFields.AccountBootstrap = AccountBootstrap(zb0012)
 			}
 		}
 		if zb0008 > 0 {
@@ -8587,15 +8587,15 @@ func (z *Transaction) UnmarshalMsgWithState(bts []byte, st msgp.UnmarshalState) 
 					err = msgp.WrapError(err, "CloseRemainderTo")
 					return
 				}
-			case "spsr":
+			case "boot":
 				{
 					var zb0035 uint8
 					zb0035, bts, err = msgp.ReadUint8Bytes(bts)
 					if err != nil {
-						err = msgp.WrapError(err, "AccountSponsorship")
+						err = msgp.WrapError(err, "AccountBootstrap")
 						return
 					}
-					(*z).PaymentTxnFields.AccountSponsorship = AccountSponsorship(zb0035)
+					(*z).PaymentTxnFields.AccountBootstrap = AccountBootstrap(zb0035)
 				}
 			case "caid":
 				bts, err = (*z).AssetConfigTxnFields.ConfigAsset.UnmarshalMsgWithState(bts, st)
@@ -9078,7 +9078,7 @@ func (z *Transaction) Msgsize() (s int) {
 
 // MsgIsZero returns whether this is a zero value
 func (z *Transaction) MsgIsZero() bool {
-	return ((*z).Type.MsgIsZero()) && ((*z).Header.Sender.MsgIsZero()) && ((*z).Header.Fee.MsgIsZero()) && ((*z).Header.FirstValid.MsgIsZero()) && ((*z).Header.LastValid.MsgIsZero()) && (len((*z).Header.Note) == 0) && ((*z).Header.GenesisID == "") && ((*z).Header.GenesisHash.MsgIsZero()) && ((*z).Header.Group.MsgIsZero()) && ((*z).Header.Lease == ([32]byte{})) && ((*z).Header.RekeyTo.MsgIsZero()) && ((*z).Header.FeeSponsored == false) && ((*z).KeyregTxnFields.VotePK.MsgIsZero()) && ((*z).KeyregTxnFields.SelectionPK.MsgIsZero()) && ((*z).KeyregTxnFields.StateProofPK.MsgIsZero()) && ((*z).KeyregTxnFields.VoteFirst.MsgIsZero()) && ((*z).KeyregTxnFields.VoteLast.MsgIsZero()) && ((*z).KeyregTxnFields.VoteKeyDilution == 0) && ((*z).KeyregTxnFields.Nonparticipation == false) && ((*z).PaymentTxnFields.Receiver.MsgIsZero()) && ((*z).PaymentTxnFields.Amount.MsgIsZero()) && ((*z).PaymentTxnFields.CloseRemainderTo.MsgIsZero()) && ((*z).PaymentTxnFields.AccountSponsorship == 0) && ((*z).AssetConfigTxnFields.ConfigAsset.MsgIsZero()) && ((*z).AssetConfigTxnFields.AssetParams.MsgIsZero()) && ((*z).AssetTransferTxnFields.XferAsset.MsgIsZero()) && ((*z).AssetTransferTxnFields.AssetAmount == 0) && ((*z).AssetTransferTxnFields.AssetSender.MsgIsZero()) && ((*z).AssetTransferTxnFields.AssetReceiver.MsgIsZero()) && ((*z).AssetTransferTxnFields.AssetCloseTo.MsgIsZero()) && ((*z).AssetTransferTxnFields.AssetSponsorship == 0) && ((*z).AssetFreezeTxnFields.FreezeAccount.MsgIsZero()) && ((*z).AssetFreezeTxnFields.FreezeAsset.MsgIsZero()) && ((*z).AssetFreezeTxnFields.AssetFrozen == false) && ((*z).ApplicationCallTxnFields.ApplicationID.MsgIsZero()) && ((*z).ApplicationCallTxnFields.OnCompletion == 0) && (len((*z).ApplicationCallTxnFields.ApplicationArgs) == 0) && (len((*z).ApplicationCallTxnFields.Accounts) == 0) && (len((*z).ApplicationCallTxnFields.ForeignAssets) == 0) && (len((*z).ApplicationCallTxnFields.ForeignApps) == 0) && (len((*z).ApplicationCallTxnFields.Access) == 0) && (len((*z).ApplicationCallTxnFields.Boxes) == 0) && ((*z).ApplicationCallTxnFields.LocalStateSchema.MsgIsZero()) && ((*z).ApplicationCallTxnFields.GlobalStateSchema.MsgIsZero()) && (len((*z).ApplicationCallTxnFields.ApprovalProgram) == 0) && (len((*z).ApplicationCallTxnFields.ClearStateProgram) == 0) && ((*z).ApplicationCallTxnFields.ExtraProgramPages == 0) && ((*z).ApplicationCallTxnFields.RejectVersion == 0) && ((*z).StateProofTxnFields.StateProofType.MsgIsZero()) && ((*z).StateProofTxnFields.StateProof.MsgIsZero()) && ((*z).StateProofTxnFields.Message.MsgIsZero()) && ((*z).HeartbeatTxnFields == nil)
+	return ((*z).Type.MsgIsZero()) && ((*z).Header.Sender.MsgIsZero()) && ((*z).Header.Fee.MsgIsZero()) && ((*z).Header.FirstValid.MsgIsZero()) && ((*z).Header.LastValid.MsgIsZero()) && (len((*z).Header.Note) == 0) && ((*z).Header.GenesisID == "") && ((*z).Header.GenesisHash.MsgIsZero()) && ((*z).Header.Group.MsgIsZero()) && ((*z).Header.Lease == ([32]byte{})) && ((*z).Header.RekeyTo.MsgIsZero()) && ((*z).Header.FeeSponsored == false) && ((*z).KeyregTxnFields.VotePK.MsgIsZero()) && ((*z).KeyregTxnFields.SelectionPK.MsgIsZero()) && ((*z).KeyregTxnFields.StateProofPK.MsgIsZero()) && ((*z).KeyregTxnFields.VoteFirst.MsgIsZero()) && ((*z).KeyregTxnFields.VoteLast.MsgIsZero()) && ((*z).KeyregTxnFields.VoteKeyDilution == 0) && ((*z).KeyregTxnFields.Nonparticipation == false) && ((*z).PaymentTxnFields.Receiver.MsgIsZero()) && ((*z).PaymentTxnFields.Amount.MsgIsZero()) && ((*z).PaymentTxnFields.CloseRemainderTo.MsgIsZero()) && ((*z).PaymentTxnFields.AccountBootstrap == 0) && ((*z).AssetConfigTxnFields.ConfigAsset.MsgIsZero()) && ((*z).AssetConfigTxnFields.AssetParams.MsgIsZero()) && ((*z).AssetTransferTxnFields.XferAsset.MsgIsZero()) && ((*z).AssetTransferTxnFields.AssetAmount == 0) && ((*z).AssetTransferTxnFields.AssetSender.MsgIsZero()) && ((*z).AssetTransferTxnFields.AssetReceiver.MsgIsZero()) && ((*z).AssetTransferTxnFields.AssetCloseTo.MsgIsZero()) && ((*z).AssetTransferTxnFields.AssetSponsorship == 0) && ((*z).AssetFreezeTxnFields.FreezeAccount.MsgIsZero()) && ((*z).AssetFreezeTxnFields.FreezeAsset.MsgIsZero()) && ((*z).AssetFreezeTxnFields.AssetFrozen == false) && ((*z).ApplicationCallTxnFields.ApplicationID.MsgIsZero()) && ((*z).ApplicationCallTxnFields.OnCompletion == 0) && (len((*z).ApplicationCallTxnFields.ApplicationArgs) == 0) && (len((*z).ApplicationCallTxnFields.Accounts) == 0) && (len((*z).ApplicationCallTxnFields.ForeignAssets) == 0) && (len((*z).ApplicationCallTxnFields.ForeignApps) == 0) && (len((*z).ApplicationCallTxnFields.Access) == 0) && (len((*z).ApplicationCallTxnFields.Boxes) == 0) && ((*z).ApplicationCallTxnFields.LocalStateSchema.MsgIsZero()) && ((*z).ApplicationCallTxnFields.GlobalStateSchema.MsgIsZero()) && (len((*z).ApplicationCallTxnFields.ApprovalProgram) == 0) && (len((*z).ApplicationCallTxnFields.ClearStateProgram) == 0) && ((*z).ApplicationCallTxnFields.ExtraProgramPages == 0) && ((*z).ApplicationCallTxnFields.RejectVersion == 0) && ((*z).StateProofTxnFields.StateProofType.MsgIsZero()) && ((*z).StateProofTxnFields.StateProof.MsgIsZero()) && ((*z).StateProofTxnFields.Message.MsgIsZero()) && ((*z).HeartbeatTxnFields == nil)
 }
 
 // TransactionMaxSize returns a maximum valid message size for this message type

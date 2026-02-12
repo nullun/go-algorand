@@ -585,13 +585,12 @@ type ConsensusParams struct {
 	// be paid by another account.
 	SupportFeeSponsored bool
 
-	// SupportAssetSponsorship indicates support for asset sponsorship. Allowing
-	// accounts to provide sponsorship to other accounts so that they can receive
-	// and send assets without maintaining the minimum balance requirement
-	// increase themselves.
-	// This can also be revoked by the sponsor, if the sponsorted party holds zero
-	// units of the asset being sponsored.
-	SupportAssetSponsorship bool
+	// SupportAssetDelegation indicates support for asset delegation, allowing
+	// accounts to delegate the minimum balance requirement (MBR) of an asset holding
+	// to another account.
+	// This can also be rescinded by the delegator if the delegated holding has a
+	// zero asset balance.
+	SupportAssetDelegation bool
 }
 
 // ProposerPayoutRules puts several related consensus parameters in one place. The same
@@ -1478,7 +1477,7 @@ func initConsensusProtocols() {
 	vFuture.AllowZeroLocalAppRef = true
 	vFuture.EnforceAuthAddrSenderDiff = true
 	vFuture.SupportFeeSponsored = true
-	vFuture.SupportAssetSponsorship = true
+	vFuture.SupportAssetDelegation = true
 
 	Consensus[protocol.ConsensusFuture] = vFuture
 

@@ -83,8 +83,8 @@ func Payment(payment transactions.PaymentTxnFields, header transactions.Header, 
 			return fmt.Errorf("cannot rescind account bootstrap: account has non-zero minimum balance requirement %d", minBal)
 		}
 
-		if rcvRecord.TotalAssetsSponsored > 0 {
-			return fmt.Errorf("cannot rescind account bootstrap: %d outstanding sponsored assets", rcvRecord.TotalAssetsSponsored)
+		if rcvRecord.TotalAssetsDelegated > 0 {
+			return fmt.Errorf("cannot rescind account bootstrap: %d outstanding delegated assets", rcvRecord.TotalAssetsDelegated)
 		}
 
 		// Clear out entire bootstrapped account record
@@ -150,13 +150,13 @@ func Payment(payment transactions.PaymentTxnFields, header transactions.Header, 
 			}
 		}
 
-		// Confirm that there are no sponsoring asset holdings by the account.
-		if rec.TotalAssetsSponsoring != 0 {
-			return fmt.Errorf("cannot close: %d outstanding sponsoring assets", rec.TotalAssetsSponsoring)
+		// Confirm that there are no delegating asset holdings by the account.
+		if rec.TotalAssetsDelegating != 0 {
+			return fmt.Errorf("cannot close: %d outstanding delegating assets", rec.TotalAssetsDelegating)
 		}
-		// Confirm that there are no sponsored asset holdings by the account.
-		if rec.TotalAssetsSponsored != 0 {
-			return fmt.Errorf("cannot close: %d outstanding sponsored assets", rec.TotalAssetsSponsored)
+		// Confirm that there are no delegated asset holdings by the account.
+		if rec.TotalAssetsDelegated != 0 {
+			return fmt.Errorf("cannot close: %d outstanding delegated assets", rec.TotalAssetsDelegated)
 		}
 		// Confirm that there is no asset-related state in the account
 		totalAssets := rec.TotalAssets

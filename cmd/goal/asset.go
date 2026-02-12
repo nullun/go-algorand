@@ -46,8 +46,8 @@ var (
 	assetNoReserve          bool
 	assetNoFreezer          bool
 	assetNoClawback         bool
-	assetSponsor            bool
-	assetRevoke             bool
+	assetDelegate           bool
+	assetRescind            bool
 
 	assetNewManager  string
 	assetNewReserve  string
@@ -109,8 +109,8 @@ func init() {
 	sendAssetCmd.Flags().Uint64VarP(&amount, "amount", "a", 0, "The amount to be transferred (required), in base units of the asset.")
 	sendAssetCmd.Flags().StringVarP(&closeToAddress, "close-to", "c", "", "Close asset account and send remainder to this address")
 	// sendAssetCmd.Flags().BoolVar(&assetSponsor, "sponsor-asset", false, "Sponsor the asset holding if recipient isn't already holding the asset")
-	sendAssetCmd.Flags().BoolVar(&assetSponsor, "asset-sponsor", false, "Sponsor the AssetReceiver's asset holding")
-	sendAssetCmd.Flags().BoolVar(&assetRevoke, "asset-revoke", false, "Removes the AssetReceiver's sponsored asset holding. Must be holding zero units")
+	sendAssetCmd.Flags().BoolVar(&assetDelegate, "asset-delegate", false, "Delegate the AssetReceiver's asset holding")
+	sendAssetCmd.Flags().BoolVar(&assetRescind, "asset-rescind", false, "Remove the AssetReceiver's delegated asset holding. Must be holding zero units")
 	sendAssetCmd.MarkFlagRequired("to")
 	sendAssetCmd.MarkFlagRequired("amount")
 
@@ -562,12 +562,12 @@ var sendAssetCmd = &cobra.Command{
 			tx.FeeSponsored = true
 		}
 
-		if assetSponsor {
-			tx.AssetSponsorship = transactions.ApproveAssetSponsorship
+		if assetDelegate {
+			tx.AssetDelegation = transactions.ApproveAssetDelegation
 		}
 
-		if assetRevoke {
-			tx.AssetSponsorship = transactions.RevokeAssetSponsorship
+		if assetRescind {
+			tx.AssetDelegation = transactions.RescindAssetDelegation
 		}
 
 		firstValid, lastValid, _, err = client.ComputeValidityRounds(firstValid, lastValid, numValidRounds)

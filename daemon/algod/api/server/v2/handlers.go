@@ -538,8 +538,8 @@ func (v2 *Handlers) basicAccountInformation(ctx echo.Context, addr basics.Addres
 		MinBalance:                 record.MinBalance(&consensus).Raw,
 		LastProposed:               omitEmpty(record.LastProposed),
 		LastHeartbeat:              omitEmpty(record.LastHeartbeat),
-		TotalAssetsSponsored:       omitEmpty(record.TotalAssetsSponsored),
-		TotalAssetsSponsoring:      omitEmpty(record.TotalAssetsSponsoring),
+		TotalAssetsDelegated:       omitEmpty(record.TotalAssetsDelegated),
+		TotalAssetsDelegating:      omitEmpty(record.TotalAssetsDelegating),
 		TotalAccountsBootstrapping: omitEmpty(record.TotalAccountsBootstrapping),
 		Bootstrapper:               addrOrNil(record.Bootstrapper),
 	}

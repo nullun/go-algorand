@@ -51,8 +51,8 @@ type AccountBaseData struct {
 	LastProposed  basics.Round // The last round that this account proposed the winning block.
 	LastHeartbeat basics.Round // The last round that this account sent a heartbeat to show it was online.
 
-	TotalAssetsSponsored  uint64 // Total number of asset holdings other accounts are sponsoring for this account.
-	TotalAssetsSponsoring uint64 // Total number of asset holdings this account is sponsoring for other accounts.
+	TotalAssetsDelegated  uint64 // Total number of asset holdings other accounts are sponsoring for this account.
+	TotalAssetsDelegating uint64 // Total number of asset holdings this account is sponsoring for other accounts.
 
 	TotalAccountsBootstrapping uint64         // Total number of accounts this account is bootstrapping.
 	Bootstrapper               basics.Address // Address of the account bootstrapping this account
@@ -81,8 +81,8 @@ func ToAccountData(acct basics.AccountData) AccountData {
 			LastProposed:  acct.LastProposed,
 			LastHeartbeat: acct.LastHeartbeat,
 
-			TotalAssetsSponsored:  acct.TotalAssetsSponsored,
-			TotalAssetsSponsoring: acct.TotalAssetsSponsoring,
+			TotalAssetsDelegated:  acct.TotalAssetsDelegated,
+			TotalAssetsDelegating: acct.TotalAssetsDelegating,
 
 			TotalAccountsBootstrapping: acct.TotalAccountsBootstrapping,
 			Bootstrapper:               acct.Bootstrapper,
@@ -123,8 +123,8 @@ func AssignAccountData(a *basics.AccountData, acct AccountData) {
 	a.LastProposed = acct.LastProposed
 	a.LastHeartbeat = acct.LastHeartbeat
 
-	a.TotalAssetsSponsored = acct.TotalAssetsSponsored
-	a.TotalAssetsSponsoring = acct.TotalAssetsSponsoring
+	a.TotalAssetsDelegated = acct.TotalAssetsDelegated
+	a.TotalAssetsDelegating = acct.TotalAssetsDelegating
 
 	a.TotalAccountsBootstrapping = acct.TotalAccountsBootstrapping
 	a.Bootstrapper = acct.Bootstrapper
@@ -175,8 +175,8 @@ func (u AccountData) MinBalance(proto *config.ConsensusParams) basics.MicroAlgos
 		u.TotalAppParams, u.TotalAppLocalStates,
 		uint64(u.TotalExtraAppPages),
 		u.TotalBoxes, u.TotalBoxBytes,
-		u.TotalAssetsSponsored,
-		u.TotalAssetsSponsoring,
+		u.TotalAssetsDelegated,
+		u.TotalAssetsDelegating,
 	)
 }
 

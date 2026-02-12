@@ -32,7 +32,7 @@ func TestAxferWellFormedErrors(t *testing.T) {
 	partitiontest.PartitionTest(t)
 	t.Parallel()
 
-	// TODO: Actually add tests for AssetSponsorship
+	// TODO: Actually add tests for AssetDelegation
 	cases := []struct {
 		axfer         AssetTransferTxnFields
 		cv            protocol.ConsensusVersion

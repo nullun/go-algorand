@@ -228,14 +228,14 @@ type Account struct {
 	// TotalAppsOptedIn The count of all applications that have been opted in, equivalent to the count of application local data (AppLocalState objects) stored in this account.
 	TotalAppsOptedIn uint64 `json:"total-apps-opted-in"`
 
+	// TotalAssetsDelegated \[tadl\] The number of asset holdings delegated to this account by others
+	TotalAssetsDelegated *uint64 `json:"total-assets-delegated,omitempty"`
+
+	// TotalAssetsDelegating \[tadg\] The number of asset holdings this account is delegating for others
+	TotalAssetsDelegating *uint64 `json:"total-assets-delegating,omitempty"`
+
 	// TotalAssetsOptedIn The count of all assets that have been opted in, equivalent to the count of AssetHolding objects held by this account.
 	TotalAssetsOptedIn uint64 `json:"total-assets-opted-in"`
-
-	// TotalAssetsSponsored \[tasd\] The number of asset holdings this account has sponsored by others
-	TotalAssetsSponsored *uint64 `json:"total-assets-sponsored,omitempty"`
-
-	// TotalAssetsSponsoring \[tasg\] The number of asset holdings this account is sponsoring for others
-	TotalAssetsSponsoring *uint64 `json:"total-assets-sponsoring,omitempty"`
 
 	// TotalBoxBytes \[tbxb\] The total number of bytes used by this account's app's box keys and values.
 	TotalBoxBytes *uint64 `json:"total-box-bytes,omitempty"`
@@ -450,11 +450,11 @@ type AssetHolding struct {
 	// AssetID Asset ID of the holding.
 	AssetID basics.AssetIndex `json:"asset-id"`
 
+	// Delegator \[d\] Address of the delegating account for this asset holding. If empty, the asset holding is not delegated.
+	Delegator *string `json:"delegator,omitempty"`
+
 	// IsFrozen \[f\] whether or not the holding is frozen.
 	IsFrozen bool `json:"is-frozen"`
-
-	// Sponsor \[s\] Address of the sponsoring account for this asset holding. If empty, the asset holding is not sponsored.
-	Sponsor *string `json:"sponsor,omitempty"`
 }
 
 // AssetHoldingReference References an asset held by an account.

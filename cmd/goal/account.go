@@ -695,12 +695,12 @@ func printAccountInfo(client libgoal.Client, address string, onlyShowAssetIDs bo
 			return *s
 		}
 
-		sponsor := derefString(assetHolding.Sponsor)
-		if sponsor != "" {
-			sponsor = fmt.Sprintf(" (Sponsor: %s)", sponsor)
+		delegator := derefString(assetHolding.Delegator)
+		if delegator != "" {
+			delegator = fmt.Sprintf(" (Delegator: %s)", delegator)
 		}
 
-		fmt.Fprintf(report, "\tID %d, %s, balance %s %s%s%s\n", assetHolding.AssetID, assetName, amount, unitName, frozen, sponsor)
+		fmt.Fprintf(report, "\tID %d, %s, balance %s %s%s%s\n", assetHolding.AssetID, assetName, amount, unitName, frozen, delegator)
 	}
 
 	fmt.Fprintln(report, "Created Apps:")

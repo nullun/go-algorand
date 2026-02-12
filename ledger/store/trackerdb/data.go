@@ -49,8 +49,8 @@ type BaseAccountData struct {
 	IncentiveEligible          bool              `codec:"o"`
 	LastProposed               basics.Round      `codec:"p"`
 	LastHeartbeat              basics.Round      `codec:"q"`
-	TotalAssetsSponsored       uint64            `codec:"r"`
-	TotalAssetsSponsoring      uint64            `codec:"s"`
+	TotalAssetsDelegated       uint64            `codec:"r"`
+	TotalAssetsDelegating      uint64            `codec:"s"`
 	TotalAccountsBootstrapping uint64            `codec:"t"`
 	Bootstrapper               basics.Address    `codec:"u"`
 
@@ -140,7 +140,7 @@ type ResourcesData struct {
 
 	SizeSponsor basics.Address `codec:"B"`
 
-	Sponsor basics.Address `codec:"C"`
+	Delegator basics.Address `codec:"C"`
 }
 
 // BaseVotingData is the base struct used to store voting data
@@ -314,8 +314,8 @@ func (ba *BaseAccountData) SetCoreAccountData(ad *ledgercore.AccountData) {
 	ba.LastProposed = ad.LastProposed
 	ba.LastHeartbeat = ad.LastHeartbeat
 
-	ba.TotalAssetsSponsored = ad.TotalAssetsSponsored
-	ba.TotalAssetsSponsoring = ad.TotalAssetsSponsoring
+	ba.TotalAssetsDelegated = ad.TotalAssetsDelegated
+	ba.TotalAssetsDelegating = ad.TotalAssetsDelegating
 	ba.TotalAccountsBootstrapping = ad.TotalAccountsBootstrapping
 	ba.Bootstrapper = ad.Bootstrapper
 
@@ -343,8 +343,8 @@ func (ba *BaseAccountData) SetAccountData(ad *basics.AccountData) {
 	ba.LastProposed = ad.LastProposed
 	ba.LastHeartbeat = ad.LastHeartbeat
 
-	ba.TotalAssetsSponsored = ad.TotalAssetsSponsored
-	ba.TotalAssetsSponsoring = ad.TotalAssetsSponsoring
+	ba.TotalAssetsDelegated = ad.TotalAssetsDelegated
+	ba.TotalAssetsDelegating = ad.TotalAssetsDelegating
 	ba.TotalAccountsBootstrapping = ad.TotalAccountsBootstrapping
 	ba.Bootstrapper = ad.Bootstrapper
 
@@ -388,8 +388,8 @@ func (ba *BaseAccountData) GetLedgerCoreAccountBaseData() ledgercore.AccountBase
 		LastProposed:  ba.LastProposed,
 		LastHeartbeat: ba.LastHeartbeat,
 
-		TotalAssetsSponsored:       ba.TotalAssetsSponsored,
-		TotalAssetsSponsoring:      ba.TotalAssetsSponsoring,
+		TotalAssetsDelegated:       ba.TotalAssetsDelegated,
+		TotalAssetsDelegating:      ba.TotalAssetsDelegating,
 		TotalAccountsBootstrapping: ba.TotalAccountsBootstrapping,
 		Bootstrapper:               ba.Bootstrapper,
 	}
@@ -434,8 +434,8 @@ func (ba *BaseAccountData) GetAccountData() basics.AccountData {
 		LastProposed:  ba.LastProposed,
 		LastHeartbeat: ba.LastHeartbeat,
 
-		TotalAssetsSponsored:       ba.TotalAssetsSponsored,
-		TotalAssetsSponsoring:      ba.TotalAssetsSponsoring,
+		TotalAssetsDelegated:       ba.TotalAssetsDelegated,
+		TotalAssetsDelegating:      ba.TotalAssetsDelegating,
 		TotalAccountsBootstrapping: ba.TotalAccountsBootstrapping,
 		Bootstrapper:               ba.Bootstrapper,
 	}
@@ -460,8 +460,8 @@ func (ba *BaseAccountData) IsEmpty() bool {
 		ba.TotalBoxBytes == 0 &&
 		ba.LastProposed == 0 &&
 		ba.LastHeartbeat == 0 &&
-		ba.TotalAssetsSponsored == 0 &&
-		ba.TotalAssetsSponsoring == 0 &&
+		ba.TotalAssetsDelegated == 0 &&
+		ba.TotalAssetsDelegating == 0 &&
 		ba.TotalAccountsBootstrapping == 0 &&
 		ba.Bootstrapper.IsZero() &&
 		ba.BaseVotingData.IsEmpty()
@@ -613,7 +613,7 @@ func (rd *ResourcesData) IsEmptyAssetFields() bool {
 		rd.Reserve.IsZero() &&
 		rd.Freeze.IsZero() &&
 		rd.Clawback.IsZero() &&
-		rd.Sponsor.IsZero()
+		rd.Delegator.IsZero()
 }
 
 // IsAsset returns true if the flag is ResourceFlagsEmptyAsset and the fields are not empty.
@@ -690,7 +690,7 @@ func (rd *ResourcesData) GetAssetParams() basics.AssetParams {
 func (rd *ResourcesData) ClearAssetHolding() {
 	rd.Amount = 0
 	rd.Frozen = false
-	rd.Sponsor = basics.Address{}
+	rd.Delegator = basics.Address{}
 
 	rd.ResourceFlags |= ResourceFlagsNotHolding
 	hadParams := (rd.ResourceFlags & ResourceFlagsOwnership) == ResourceFlagsOwnership
@@ -705,7 +705,7 @@ func (rd *ResourcesData) ClearAssetHolding() {
 func (rd *ResourcesData) SetAssetHolding(ah basics.AssetHolding) {
 	rd.Amount = ah.Amount
 	rd.Frozen = ah.Frozen
-	rd.Sponsor = ah.Sponsor
+	rd.Delegator = ah.Delegator
 	rd.ResourceFlags &= ^(ResourceFlagsNotHolding + ResourceFlagsEmptyAsset)
 	// ResourceFlagsHolding is set implicitly since it is zero
 	if rd.IsEmptyAssetFields() {
@@ -716,9 +716,9 @@ func (rd *ResourcesData) SetAssetHolding(ah basics.AssetHolding) {
 // GetAssetHolding getter for asset holding.
 func (rd *ResourcesData) GetAssetHolding() basics.AssetHolding {
 	return basics.AssetHolding{
-		Amount:  rd.Amount,
-		Frozen:  rd.Frozen,
-		Sponsor: rd.Sponsor,
+		Amount:    rd.Amount,
+		Frozen:    rd.Frozen,
+		Delegator: rd.Delegator,
 	}
 }
 

@@ -33,10 +33,10 @@ import (
 // AssetHolding converts between basics.AssetHolding and model.AssetHolding
 func AssetHolding(ah basics.AssetHolding, ai basics.AssetIndex) model.AssetHolding {
 	return model.AssetHolding{
-		Amount:   ah.Amount,
-		AssetID:  ai,
-		IsFrozen: ah.Frozen,
-		Sponsor:  addrOrNil(ah.Sponsor),
+		Amount:    ah.Amount,
+		AssetID:   ai,
+		IsFrozen:  ah.Frozen,
+		Delegator: addrOrNil(ah.Delegator),
 	}
 }
 
@@ -141,8 +141,8 @@ func AccountDataToAccount(
 		MinBalance:                  minBalance.Raw,
 		LastProposed:                omitEmpty(record.LastProposed),
 		LastHeartbeat:               omitEmpty(record.LastHeartbeat),
-		TotalAssetsSponsored:        omitEmpty(record.TotalAssetsSponsored),
-		TotalAssetsSponsoring:       omitEmpty(record.TotalAssetsSponsoring),
+		TotalAssetsDelegated:        omitEmpty(record.TotalAssetsDelegated),
+		TotalAssetsDelegating:       omitEmpty(record.TotalAssetsDelegating),
 		TotalAccountsBootstrapping:  omitEmpty(record.TotalAccountsBootstrapping),
 		Bootstrapper:                addrOrNil(record.Bootstrapper),
 	}, nil
@@ -268,14 +268,14 @@ func AccountToAccountData(a *model.Account) (basics.AccountData, error) {
 	if a.Assets != nil && len(*a.Assets) > 0 {
 		assets = make(map[basics.AssetIndex]basics.AssetHolding, len(*a.Assets))
 		for _, h := range *a.Assets {
-			sponsor, err := nilToZeroAddr(h.Sponsor)
+			delegate, err := nilToZeroAddr(h.Delegator)
 			if err != nil {
 				return basics.AccountData{}, err
 			}
 			assets[h.AssetID] = basics.AssetHolding{
-				Amount:  h.Amount,
-				Frozen:  h.IsFrozen,
-				Sponsor: sponsor,
+				Amount:    h.Amount,
+				Frozen:    h.IsFrozen,
+				Delegator: delegate,
 			}
 		}
 	}
@@ -350,8 +350,8 @@ func AccountToAccountData(a *model.Account) (basics.AccountData, error) {
 		TotalBoxBytes:              nilToZero(a.TotalBoxBytes),
 		LastProposed:               nilToZero(a.LastProposed),
 		LastHeartbeat:              nilToZero(a.LastHeartbeat),
-		TotalAssetsSponsored:       nilToZero(a.TotalAssetsSponsored),
-		TotalAssetsSponsoring:      nilToZero(a.TotalAssetsSponsoring),
+		TotalAssetsDelegated:       nilToZero(a.TotalAssetsDelegated),
+		TotalAssetsDelegating:      nilToZero(a.TotalAssetsDelegating),
 		TotalAccountsBootstrapping: nilToZero(a.TotalAccountsBootstrapping),
 	}
 

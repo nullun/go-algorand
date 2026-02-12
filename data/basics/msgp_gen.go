@@ -316,11 +316,11 @@ func (z *AccountData) MarshalMsg(b []byte) (o []byte) {
 		zb0009Len--
 		zb0009Mask |= 0x10000
 	}
-	if (*z).TotalAssetsSponsored == 0 {
+	if (*z).TotalAssetsDelegating == 0 {
 		zb0009Len--
 		zb0009Mask |= 0x20000
 	}
-	if (*z).TotalAssetsSponsoring == 0 {
+	if (*z).TotalAssetsDelegated == 0 {
 		zb0009Len--
 		zb0009Mask |= 0x40000
 	}
@@ -500,14 +500,14 @@ func (z *AccountData) MarshalMsg(b []byte) (o []byte) {
 			o = msgp.AppendUint64(o, (*z).TotalAccountsBootstrapping)
 		}
 		if (zb0009Mask & 0x20000) == 0 { // if not empty
-			// string "tasd"
-			o = append(o, 0xa4, 0x74, 0x61, 0x73, 0x64)
-			o = msgp.AppendUint64(o, (*z).TotalAssetsSponsored)
+			// string "tadg"
+			o = append(o, 0xa4, 0x74, 0x61, 0x64, 0x67)
+			o = msgp.AppendUint64(o, (*z).TotalAssetsDelegating)
 		}
 		if (zb0009Mask & 0x40000) == 0 { // if not empty
-			// string "tasg"
-			o = append(o, 0xa4, 0x74, 0x61, 0x73, 0x67)
-			o = msgp.AppendUint64(o, (*z).TotalAssetsSponsoring)
+			// string "tadl"
+			o = append(o, 0xa4, 0x74, 0x61, 0x64, 0x6c)
+			o = msgp.AppendUint64(o, (*z).TotalAssetsDelegated)
 		}
 		if (zb0009Mask & 0x80000) == 0 { // if not empty
 			// string "tbx"
@@ -972,17 +972,17 @@ func (z *AccountData) UnmarshalMsgWithState(bts []byte, st msgp.UnmarshalState) 
 		}
 		if zb0009 > 0 {
 			zb0009--
-			(*z).TotalAssetsSponsored, bts, err = msgp.ReadUint64Bytes(bts)
+			(*z).TotalAssetsDelegated, bts, err = msgp.ReadUint64Bytes(bts)
 			if err != nil {
-				err = msgp.WrapError(err, "struct-from-array", "TotalAssetsSponsored")
+				err = msgp.WrapError(err, "struct-from-array", "TotalAssetsDelegated")
 				return
 			}
 		}
 		if zb0009 > 0 {
 			zb0009--
-			(*z).TotalAssetsSponsoring, bts, err = msgp.ReadUint64Bytes(bts)
+			(*z).TotalAssetsDelegating, bts, err = msgp.ReadUint64Bytes(bts)
 			if err != nil {
-				err = msgp.WrapError(err, "struct-from-array", "TotalAssetsSponsoring")
+				err = msgp.WrapError(err, "struct-from-array", "TotalAssetsDelegating")
 				return
 			}
 		}
@@ -1353,16 +1353,16 @@ func (z *AccountData) UnmarshalMsgWithState(bts []byte, st msgp.UnmarshalState) 
 					err = msgp.WrapError(err, "TotalBoxBytes")
 					return
 				}
-			case "tasd":
-				(*z).TotalAssetsSponsored, bts, err = msgp.ReadUint64Bytes(bts)
+			case "tadl":
+				(*z).TotalAssetsDelegated, bts, err = msgp.ReadUint64Bytes(bts)
 				if err != nil {
-					err = msgp.WrapError(err, "TotalAssetsSponsored")
+					err = msgp.WrapError(err, "TotalAssetsDelegated")
 					return
 				}
-			case "tasg":
-				(*z).TotalAssetsSponsoring, bts, err = msgp.ReadUint64Bytes(bts)
+			case "tadg":
+				(*z).TotalAssetsDelegating, bts, err = msgp.ReadUint64Bytes(bts)
 				if err != nil {
-					err = msgp.WrapError(err, "TotalAssetsSponsoring")
+					err = msgp.WrapError(err, "TotalAssetsDelegating")
 					return
 				}
 			case "tabs":
@@ -1438,7 +1438,7 @@ func (z *AccountData) Msgsize() (s int) {
 
 // MsgIsZero returns whether this is a zero value
 func (z *AccountData) MsgIsZero() bool {
-	return ((*z).Status == 0) && ((*z).MicroAlgos.MsgIsZero()) && ((*z).RewardsBase == 0) && ((*z).RewardedMicroAlgos.MsgIsZero()) && ((*z).VoteID.MsgIsZero()) && ((*z).SelectionID.MsgIsZero()) && ((*z).StateProofID.MsgIsZero()) && ((*z).VoteFirstValid == 0) && ((*z).VoteLastValid == 0) && ((*z).VoteKeyDilution == 0) && ((*z).LastProposed == 0) && ((*z).LastHeartbeat == 0) && (len((*z).AssetParams) == 0) && (len((*z).Assets) == 0) && ((*z).AuthAddr.MsgIsZero()) && ((*z).IncentiveEligible == false) && (len((*z).AppLocalStates) == 0) && (len((*z).AppParams) == 0) && (((*z).TotalAppSchema.NumUint == 0) && ((*z).TotalAppSchema.NumByteSlice == 0)) && ((*z).TotalExtraAppPages == 0) && ((*z).TotalBoxes == 0) && ((*z).TotalBoxBytes == 0) && ((*z).TotalAssetsSponsored == 0) && ((*z).TotalAssetsSponsoring == 0) && ((*z).TotalAccountsBootstrapping == 0) && ((*z).Bootstrapper.MsgIsZero())
+	return ((*z).Status == 0) && ((*z).MicroAlgos.MsgIsZero()) && ((*z).RewardsBase == 0) && ((*z).RewardedMicroAlgos.MsgIsZero()) && ((*z).VoteID.MsgIsZero()) && ((*z).SelectionID.MsgIsZero()) && ((*z).StateProofID.MsgIsZero()) && ((*z).VoteFirstValid == 0) && ((*z).VoteLastValid == 0) && ((*z).VoteKeyDilution == 0) && ((*z).LastProposed == 0) && ((*z).LastHeartbeat == 0) && (len((*z).AssetParams) == 0) && (len((*z).Assets) == 0) && ((*z).AuthAddr.MsgIsZero()) && ((*z).IncentiveEligible == false) && (len((*z).AppLocalStates) == 0) && (len((*z).AppParams) == 0) && (((*z).TotalAppSchema.NumUint == 0) && ((*z).TotalAppSchema.NumByteSlice == 0)) && ((*z).TotalExtraAppPages == 0) && ((*z).TotalBoxes == 0) && ((*z).TotalBoxBytes == 0) && ((*z).TotalAssetsDelegated == 0) && ((*z).TotalAssetsDelegating == 0) && ((*z).TotalAccountsBootstrapping == 0) && ((*z).Bootstrapper.MsgIsZero())
 }
 
 // AccountDataMaxSize returns a maximum valid message size for this message type
@@ -2659,11 +2659,11 @@ func (z *AssetHolding) MarshalMsg(b []byte) (o []byte) {
 		zb0001Len--
 		zb0001Mask |= 0x2
 	}
-	if (*z).Frozen == false {
+	if (*z).Delegator.MsgIsZero() {
 		zb0001Len--
 		zb0001Mask |= 0x4
 	}
-	if (*z).Sponsor.MsgIsZero() {
+	if (*z).Frozen == false {
 		zb0001Len--
 		zb0001Mask |= 0x8
 	}
@@ -2676,14 +2676,14 @@ func (z *AssetHolding) MarshalMsg(b []byte) (o []byte) {
 			o = msgp.AppendUint64(o, (*z).Amount)
 		}
 		if (zb0001Mask & 0x4) == 0 { // if not empty
+			// string "d"
+			o = append(o, 0xa1, 0x64)
+			o = (*z).Delegator.MarshalMsg(o)
+		}
+		if (zb0001Mask & 0x8) == 0 { // if not empty
 			// string "f"
 			o = append(o, 0xa1, 0x66)
 			o = msgp.AppendBool(o, (*z).Frozen)
-		}
-		if (zb0001Mask & 0x8) == 0 { // if not empty
-			// string "s"
-			o = append(o, 0xa1, 0x73)
-			o = (*z).Sponsor.MarshalMsg(o)
 		}
 	}
 	return
@@ -2730,9 +2730,9 @@ func (z *AssetHolding) UnmarshalMsgWithState(bts []byte, st msgp.UnmarshalState)
 		}
 		if zb0001 > 0 {
 			zb0001--
-			bts, err = (*z).Sponsor.UnmarshalMsgWithState(bts, st)
+			bts, err = (*z).Delegator.UnmarshalMsgWithState(bts, st)
 			if err != nil {
-				err = msgp.WrapError(err, "struct-from-array", "Sponsor")
+				err = msgp.WrapError(err, "struct-from-array", "Delegator")
 				return
 			}
 		}
@@ -2771,10 +2771,10 @@ func (z *AssetHolding) UnmarshalMsgWithState(bts []byte, st msgp.UnmarshalState)
 					err = msgp.WrapError(err, "Frozen")
 					return
 				}
-			case "s":
-				bts, err = (*z).Sponsor.UnmarshalMsgWithState(bts, st)
+			case "d":
+				bts, err = (*z).Delegator.UnmarshalMsgWithState(bts, st)
 				if err != nil {
-					err = msgp.WrapError(err, "Sponsor")
+					err = msgp.WrapError(err, "Delegator")
 					return
 				}
 			default:
@@ -2800,13 +2800,13 @@ func (_ *AssetHolding) CanUnmarshalMsg(z interface{}) bool {
 
 // Msgsize returns an upper bound estimate of the number of bytes occupied by the serialized message
 func (z *AssetHolding) Msgsize() (s int) {
-	s = 1 + 2 + msgp.Uint64Size + 2 + msgp.BoolSize + 2 + (*z).Sponsor.Msgsize()
+	s = 1 + 2 + msgp.Uint64Size + 2 + msgp.BoolSize + 2 + (*z).Delegator.Msgsize()
 	return
 }
 
 // MsgIsZero returns whether this is a zero value
 func (z *AssetHolding) MsgIsZero() bool {
-	return ((*z).Amount == 0) && ((*z).Frozen == false) && ((*z).Sponsor.MsgIsZero())
+	return ((*z).Amount == 0) && ((*z).Frozen == false) && ((*z).Delegator.MsgIsZero())
 }
 
 // AssetHoldingMaxSize returns a maximum valid message size for this message type
@@ -3362,11 +3362,11 @@ func (z *BalanceRecord) MarshalMsg(b []byte) (o []byte) {
 		zb0009Len--
 		zb0009Mask |= 0x40000
 	}
-	if (*z).AccountData.TotalAssetsSponsored == 0 {
+	if (*z).AccountData.TotalAssetsDelegating == 0 {
 		zb0009Len--
 		zb0009Mask |= 0x80000
 	}
-	if (*z).AccountData.TotalAssetsSponsoring == 0 {
+	if (*z).AccountData.TotalAssetsDelegated == 0 {
 		zb0009Len--
 		zb0009Mask |= 0x100000
 	}
@@ -3551,14 +3551,14 @@ func (z *BalanceRecord) MarshalMsg(b []byte) (o []byte) {
 			o = msgp.AppendUint64(o, (*z).AccountData.TotalAccountsBootstrapping)
 		}
 		if (zb0009Mask & 0x80000) == 0 { // if not empty
-			// string "tasd"
-			o = append(o, 0xa4, 0x74, 0x61, 0x73, 0x64)
-			o = msgp.AppendUint64(o, (*z).AccountData.TotalAssetsSponsored)
+			// string "tadg"
+			o = append(o, 0xa4, 0x74, 0x61, 0x64, 0x67)
+			o = msgp.AppendUint64(o, (*z).AccountData.TotalAssetsDelegating)
 		}
 		if (zb0009Mask & 0x100000) == 0 { // if not empty
-			// string "tasg"
-			o = append(o, 0xa4, 0x74, 0x61, 0x73, 0x67)
-			o = msgp.AppendUint64(o, (*z).AccountData.TotalAssetsSponsoring)
+			// string "tadl"
+			o = append(o, 0xa4, 0x74, 0x61, 0x64, 0x6c)
+			o = msgp.AppendUint64(o, (*z).AccountData.TotalAssetsDelegated)
 		}
 		if (zb0009Mask & 0x200000) == 0 { // if not empty
 			// string "tbx"
@@ -4031,17 +4031,17 @@ func (z *BalanceRecord) UnmarshalMsgWithState(bts []byte, st msgp.UnmarshalState
 		}
 		if zb0009 > 0 {
 			zb0009--
-			(*z).AccountData.TotalAssetsSponsored, bts, err = msgp.ReadUint64Bytes(bts)
+			(*z).AccountData.TotalAssetsDelegated, bts, err = msgp.ReadUint64Bytes(bts)
 			if err != nil {
-				err = msgp.WrapError(err, "struct-from-array", "TotalAssetsSponsored")
+				err = msgp.WrapError(err, "struct-from-array", "TotalAssetsDelegated")
 				return
 			}
 		}
 		if zb0009 > 0 {
 			zb0009--
-			(*z).AccountData.TotalAssetsSponsoring, bts, err = msgp.ReadUint64Bytes(bts)
+			(*z).AccountData.TotalAssetsDelegating, bts, err = msgp.ReadUint64Bytes(bts)
 			if err != nil {
-				err = msgp.WrapError(err, "struct-from-array", "TotalAssetsSponsoring")
+				err = msgp.WrapError(err, "struct-from-array", "TotalAssetsDelegating")
 				return
 			}
 		}
@@ -4418,16 +4418,16 @@ func (z *BalanceRecord) UnmarshalMsgWithState(bts []byte, st msgp.UnmarshalState
 					err = msgp.WrapError(err, "TotalBoxBytes")
 					return
 				}
-			case "tasd":
-				(*z).AccountData.TotalAssetsSponsored, bts, err = msgp.ReadUint64Bytes(bts)
+			case "tadl":
+				(*z).AccountData.TotalAssetsDelegated, bts, err = msgp.ReadUint64Bytes(bts)
 				if err != nil {
-					err = msgp.WrapError(err, "TotalAssetsSponsored")
+					err = msgp.WrapError(err, "TotalAssetsDelegated")
 					return
 				}
-			case "tasg":
-				(*z).AccountData.TotalAssetsSponsoring, bts, err = msgp.ReadUint64Bytes(bts)
+			case "tadg":
+				(*z).AccountData.TotalAssetsDelegating, bts, err = msgp.ReadUint64Bytes(bts)
 				if err != nil {
-					err = msgp.WrapError(err, "TotalAssetsSponsoring")
+					err = msgp.WrapError(err, "TotalAssetsDelegating")
 					return
 				}
 			case "tabs":
@@ -4503,7 +4503,7 @@ func (z *BalanceRecord) Msgsize() (s int) {
 
 // MsgIsZero returns whether this is a zero value
 func (z *BalanceRecord) MsgIsZero() bool {
-	return ((*z).Addr.MsgIsZero()) && ((*z).AccountData.Status == 0) && ((*z).AccountData.MicroAlgos.MsgIsZero()) && ((*z).AccountData.RewardsBase == 0) && ((*z).AccountData.RewardedMicroAlgos.MsgIsZero()) && ((*z).AccountData.VoteID.MsgIsZero()) && ((*z).AccountData.SelectionID.MsgIsZero()) && ((*z).AccountData.StateProofID.MsgIsZero()) && ((*z).AccountData.VoteFirstValid == 0) && ((*z).AccountData.VoteLastValid == 0) && ((*z).AccountData.VoteKeyDilution == 0) && ((*z).AccountData.LastProposed == 0) && ((*z).AccountData.LastHeartbeat == 0) && (len((*z).AccountData.AssetParams) == 0) && (len((*z).AccountData.Assets) == 0) && ((*z).AccountData.AuthAddr.MsgIsZero()) && ((*z).AccountData.IncentiveEligible == false) && (len((*z).AccountData.AppLocalStates) == 0) && (len((*z).AccountData.AppParams) == 0) && (((*z).AccountData.TotalAppSchema.NumUint == 0) && ((*z).AccountData.TotalAppSchema.NumByteSlice == 0)) && ((*z).AccountData.TotalExtraAppPages == 0) && ((*z).AccountData.TotalBoxes == 0) && ((*z).AccountData.TotalBoxBytes == 0) && ((*z).AccountData.TotalAssetsSponsored == 0) && ((*z).AccountData.TotalAssetsSponsoring == 0) && ((*z).AccountData.TotalAccountsBootstrapping == 0) && ((*z).AccountData.Bootstrapper.MsgIsZero())
+	return ((*z).Addr.MsgIsZero()) && ((*z).AccountData.Status == 0) && ((*z).AccountData.MicroAlgos.MsgIsZero()) && ((*z).AccountData.RewardsBase == 0) && ((*z).AccountData.RewardedMicroAlgos.MsgIsZero()) && ((*z).AccountData.VoteID.MsgIsZero()) && ((*z).AccountData.SelectionID.MsgIsZero()) && ((*z).AccountData.StateProofID.MsgIsZero()) && ((*z).AccountData.VoteFirstValid == 0) && ((*z).AccountData.VoteLastValid == 0) && ((*z).AccountData.VoteKeyDilution == 0) && ((*z).AccountData.LastProposed == 0) && ((*z).AccountData.LastHeartbeat == 0) && (len((*z).AccountData.AssetParams) == 0) && (len((*z).AccountData.Assets) == 0) && ((*z).AccountData.AuthAddr.MsgIsZero()) && ((*z).AccountData.IncentiveEligible == false) && (len((*z).AccountData.AppLocalStates) == 0) && (len((*z).AccountData.AppParams) == 0) && (((*z).AccountData.TotalAppSchema.NumUint == 0) && ((*z).AccountData.TotalAppSchema.NumByteSlice == 0)) && ((*z).AccountData.TotalExtraAppPages == 0) && ((*z).AccountData.TotalBoxes == 0) && ((*z).AccountData.TotalBoxBytes == 0) && ((*z).AccountData.TotalAssetsDelegated == 0) && ((*z).AccountData.TotalAssetsDelegating == 0) && ((*z).AccountData.TotalAccountsBootstrapping == 0) && ((*z).AccountData.Bootstrapper.MsgIsZero())
 }
 
 // BalanceRecordMaxSize returns a maximum valid message size for this message type

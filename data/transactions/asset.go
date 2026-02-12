@@ -24,22 +24,22 @@ import (
 	"github.com/algorand/go-algorand/data/basics"
 )
 
-// AssetSponsorship indicates the type of sponsorship operation.
-type AssetSponsorship uint8
+// AssetDelegation indicates the type of asset delegation operation.
+type AssetDelegation uint8
 
-// ApproveAssetSponsorship indicates that the AssetReceiver's asset holdings
-// will be sponsored by the Sender. Placing the asset holdings minimum balance
-// requirement on the Sender.
-const ApproveAssetSponsorship AssetSponsorship = 1
+// ApproveAssetDelegation indicates that the AssetReceiver's asset holding will be
+// delegated by the Sender, shifting the asset holding minimum balance requirement
+// to the Sender.
+const ApproveAssetDelegation AssetDelegation = 1
 
-// RevokeAssetSponsorship indicates that the AssetReceiver's asset holdings
-// will no longer be sponsored by the Sender (who must be the current Sponsor).
-// This will only succeed if the AssetReceiver's asset holdings are zero.
+// RescindAssetDelegation indicates that the AssetReceiver's delegated asset holding
+// will no longer be delegated by the Sender (who must be the current Delegator).
+// This will only succeed if the AssetReceiver's asset holding balance is zero.
 // TODO: Should it be possible for someone else takeover an existing Asset
-// Sponsorship? How would you prevent someone immediately taking over and
-// revoking someone who temporarily has zero units but may intend to hold more
+// Delegation? How would you prevent someone immediately taking over and
+// rescinding someone who temporarily has zero units but may intend to hold more
 // again soon?
-const RevokeAssetSponsorship AssetSponsorship = 2
+const RescindAssetDelegation AssetDelegation = 2
 
 // AssetConfigTxnFields captures the fields used for asset
 // allocation, re-configuration, and destruction.
@@ -81,8 +81,8 @@ type AssetTransferTxnFields struct {
 	// remaining asset holdings to the creator account.
 	AssetCloseTo basics.Address `codec:"aclose"`
 
-	// AssetSponsorship indicates the type of sponsorship operation.
-	AssetSponsorship AssetSponsorship `codec:"aspsr"`
+	// AssetDelegation indicates the type of sponsorship operation.
+	AssetDelegation AssetDelegation `codec:"ad"`
 }
 
 // AssetFreezeTxnFields captures the fields used for freezing asset slots.
@@ -129,12 +129,12 @@ func (ax AssetTransferTxnFields) wellFormed(header Header, proto config.Consensu
 		return errors.New("cannot close asset by clawback")
 	}
 
-	if !proto.SupportAssetSponsorship && ax.AssetSponsorship != 0 {
-		return errors.New("transaction tries to set asset sponsorship, but asset sponsorship is not supported")
+	if !proto.SupportAssetDelegation && ax.AssetDelegation != 0 {
+		return errors.New("transaction tries to set asset delegation, but asset delegation is not supported")
 	}
 
-	if ax.AssetSponsorship != 0 && ax.AssetReceiver == header.Sender {
-		return errors.New("asset sponsorships cannot be performed on self")
+	if ax.AssetDelegation != 0 && ax.AssetReceiver == header.Sender {
+		return errors.New("asset delegations cannot be performed on self")
 	}
 
 	return nil

@@ -315,36 +315,36 @@ func AssetTransfer(ct transactions.AssetTransferTxnFields, header transactions.H
 			}
 		} else {
 			// When an account performs an Asset "OptIn" transaction whilst a holding
-			// already exists for the asset and it's sponsored, the account is
-			// discharging the sponsor from their MBR responsibility. The required MBR
+			// already exists for the asset and it's delegated, the account is
+			// discharging the delegator from their MBR responsibility. The required MBR
 			// must now be maintained on the asset holding's account itself.
-			if sponsor := sndHolding.Sponsor; !sponsor.IsZero() {
+			if sponsor := sndHolding.Delegator; !sponsor.IsZero() {
 
 				// Deallocate MBR from Sponsor
-				// -1 to their TotalAssetsSponsoring
+				// -1 to their TotalAssetsDelegating
 				sponsorRecord, err := balances.Get(sponsor, false)
 				if err != nil {
 					return err
 				}
-				sponsorRecord.TotalAssetsSponsoring = basics.SubSaturate(sponsorRecord.TotalAssetsSponsoring, 1)
+				sponsorRecord.TotalAssetsDelegating = basics.SubSaturate(sponsorRecord.TotalAssetsDelegating, 1)
 				err = balances.Put(sponsor, sponsorRecord)
 				if err != nil {
 					return err
 				}
 
-				// -1 from Senders TotalAssetsSponsored
+				// -1 from Senders TotalAssetsDelegated
 				sndRecord, err := balances.Get(source, false)
 				if err != nil {
 					return err
 				}
-				sndRecord.TotalAssetsSponsored = basics.SubSaturate(sndRecord.TotalAssetsSponsored, 1)
+				sndRecord.TotalAssetsDelegated = basics.SubSaturate(sndRecord.TotalAssetsDelegated, 1)
 				err = balances.Put(source, sndRecord)
 				if err != nil {
 					return err
 				}
 
 				// Remove Sponsor from the holdings
-				sndHolding.Sponsor = basics.Address{}
+				sndHolding.Delegator = basics.Address{}
 				err = balances.PutAssetHolding(source, ct.XferAsset, sndHolding)
 				if err != nil {
 					return err
@@ -357,7 +357,7 @@ func AssetTransfer(ct transactions.AssetTransferTxnFields, header transactions.H
 	// This results in the sender (not AssetSender) increasing their own Minimum
 	// Balance Requirement and Opting In the AssetReceiver into to the asset
 	// rather than failing and only if required.
-	if ct.AssetSponsorship == transactions.ApproveAssetSponsorship {
+	if ct.AssetDelegation == transactions.ApproveAssetDelegation {
 		rcvHolding, ok, err := balances.GetAssetHolding(ct.AssetReceiver, ct.XferAsset)
 		if err != nil {
 			return err
@@ -376,7 +376,7 @@ func AssetTransfer(ct transactions.AssetTransferTxnFields, header transactions.H
 			}
 
 			rcvHolding.Frozen = params.DefaultFrozen
-			rcvHolding.Sponsor = header.Sender
+			rcvHolding.Delegator = header.Sender
 
 			totalRcvAssets := rcvRecord.TotalAssets
 			maxAssetsPerAccount := balances.ConsensusParams().MaxAssetsPerAccount
@@ -385,7 +385,7 @@ func AssetTransfer(ct transactions.AssetTransferTxnFields, header transactions.H
 			}
 
 			rcvRecord.TotalAssets = basics.AddSaturate(rcvRecord.TotalAssets, 1)
-			rcvRecord.TotalAssetsSponsored = basics.AddSaturate(rcvRecord.TotalAssetsSponsored, 1)
+			rcvRecord.TotalAssetsDelegated = basics.AddSaturate(rcvRecord.TotalAssetsDelegated, 1)
 			err = balances.Put(ct.AssetReceiver, rcvRecord)
 			if err != nil {
 				return err
@@ -401,28 +401,28 @@ func AssetTransfer(ct transactions.AssetTransferTxnFields, header transactions.H
 				return err
 			}
 
-			// Allocate MBR on Sender by incrementing their TotalAssetsSponsoring.
+			// Allocate MBR on Sender by incrementing their TotalAssetsDelegating.
 			sndRecord, err := balances.Get(header.Sender, false)
 			if err != nil {
 				return err
 			}
-			sndRecord.TotalAssetsSponsoring = basics.AddSaturate(sndRecord.TotalAssetsSponsoring, 1)
+			sndRecord.TotalAssetsDelegating = basics.AddSaturate(sndRecord.TotalAssetsDelegating, 1)
 			err = balances.Put(header.Sender, sndRecord)
 			if err != nil {
 				return err
 			}
 		} else {
-			return fmt.Errorf("cannot approve sponsorship for an existing asset holding")
+			return fmt.Errorf("cannot approve delegation for an existing asset holding")
 		}
 	}
 
-	// Allow a Sponsor to revoke their sponsorship for accounts that hold zero
-	// units of the sponsored assed.
-	// This results in the Sponsor decreasing their Minimum Balance Requirement
+	// Allow a Delegator to rescind their delegation for accounts that hold zero
+	// units of the delegated asset.
+	// This results in the Delegator decreasing their Minimum Balance Requirement
 	// and Closing Out the asset of the AssetReceiver.
 	// Must not contain an AssetCloseTo field, since no assets should actually
 	// be getting moved.
-	if ct.AssetSponsorship == transactions.RevokeAssetSponsorship {
+	if ct.AssetDelegation == transactions.RescindAssetDelegation {
 		rcvHolding, ok, err := balances.GetAssetHolding(ct.AssetReceiver, ct.XferAsset)
 		if err != nil {
 			return err
@@ -435,15 +435,15 @@ func AssetTransfer(ct transactions.AssetTransferTxnFields, header transactions.H
 			}
 
 			if rcvHolding.Amount != 0 {
-				return fmt.Errorf("cannot revoke sponsorship from an asset holding with non-zero balance: %d", rcvHolding.Amount)
+				return fmt.Errorf("cannot rescind delegation from an asset holding with non-zero balance: %d", rcvHolding.Amount)
 			}
 
-			if rcvHolding.Sponsor != header.Sender {
-				return fmt.Errorf("only the sponsor can revoke their sponsorship: sender %v, sponsor: %v", header.Sender, rcvHolding.Sponsor)
+			if rcvHolding.Delegator != header.Sender {
+				return fmt.Errorf("only the delegator can rescind their delegation: sender %v, delegator: %v", header.Sender, rcvHolding.Delegator)
 			}
 
 			rcvRecord.TotalAssets = basics.SubSaturate(rcvRecord.TotalAssets, 1)
-			rcvRecord.TotalAssetsSponsored = basics.SubSaturate(rcvRecord.TotalAssetsSponsored, 1)
+			rcvRecord.TotalAssetsDelegated = basics.SubSaturate(rcvRecord.TotalAssetsDelegated, 1)
 			err = balances.Put(ct.AssetReceiver, rcvRecord)
 			if err != nil {
 				return err
@@ -459,18 +459,18 @@ func AssetTransfer(ct transactions.AssetTransferTxnFields, header transactions.H
 				return err
 			}
 
-			// Decrement Sponsors TotalAssetsSponsoring.
+			// Decrement Sponsors TotalAssetsDelegating.
 			sndRecord, err := balances.Get(header.Sender, false)
 			if err != nil {
 				return err
 			}
-			sndRecord.TotalAssetsSponsoring = basics.SubSaturate(sndRecord.TotalAssetsSponsoring, 1)
+			sndRecord.TotalAssetsDelegating = basics.SubSaturate(sndRecord.TotalAssetsDelegating, 1)
 			err = balances.Put(header.Sender, sndRecord)
 			if err != nil {
 				return err
 			}
 		} else {
-			return fmt.Errorf("cannot revoke sponsorship for a non-existent asset holding")
+			return fmt.Errorf("cannot rescind delegation for a non-existent asset holding")
 		}
 	}
 
@@ -570,17 +570,17 @@ func AssetTransfer(ct transactions.AssetTransferTxnFields, header transactions.H
 			return fmt.Errorf("asset %v not zero (%d) after closing", ct.XferAsset, sndHolding.Amount)
 		}
 
-		// Update TotalAssetsSponsored for asset holder and TotalAssetsSponsoring for
+		// Update TotalAssetsDelegated for asset holder and TotalAssetsDelegating for
 		// asset sponsor if asset holding was sponsored.
-		if !sndHolding.Sponsor.IsZero() {
-			record.TotalAssetsSponsored = basics.SubSaturate(record.TotalAssetsSponsored, 1)
+		if !sndHolding.Delegator.IsZero() {
+			record.TotalAssetsDelegated = basics.SubSaturate(record.TotalAssetsDelegated, 1)
 
-			sponsorRecord, err2 := balances.Get(sndHolding.Sponsor, false)
+			sponsorRecord, err2 := balances.Get(sndHolding.Delegator, false)
 			if err2 != nil {
 				return err2
 			}
-			sponsorRecord.TotalAssetsSponsoring = basics.SubSaturate(sponsorRecord.TotalAssetsSponsoring, 1)
-			err = balances.Put(sndHolding.Sponsor, sponsorRecord)
+			sponsorRecord.TotalAssetsDelegating = basics.SubSaturate(sponsorRecord.TotalAssetsDelegating, 1)
+			err = balances.Put(sndHolding.Delegator, sponsorRecord)
 			if err != nil {
 				return err
 			}

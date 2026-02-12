@@ -228,11 +228,11 @@ type AccountData struct {
 	// TotalBoxBytes stores the sum of all len(keys) and len(values) of Boxes
 	TotalBoxBytes uint64 `codec:"tbxb"`
 
-	// TotalAssetsSponsored is the number of asset holdings other accounts are sponsoring for this account.
-	TotalAssetsSponsored uint64 `codec:"tasd"`
+	// TotalAssetsDelegated is the number of asset holdings delegated to this account by other accounts.
+	TotalAssetsDelegated uint64 `codec:"tadl"`
 
-	// TotalAssetsSponsoring is the number of asset holdings this account is sponsoring for other accounts.
-	TotalAssetsSponsoring uint64 `codec:"tasg"`
+	// TotalAssetsDelegating is the number of asset holdings this account is delegating for other accounts.
+	TotalAssetsDelegating uint64 `codec:"tadg"`
 
 	// TotalAccountsBootstrapping is the number of accounts this account is bootstrapping.
 	TotalAccountsBootstrapping uint64 `codec:"tabs"`
@@ -380,9 +380,9 @@ type CreatableLocator struct {
 type AssetHolding struct {
 	_struct struct{} `codec:",omitempty,omitemptyarray"`
 
-	Amount  uint64  `codec:"a"`
-	Frozen  bool    `codec:"f"`
-	Sponsor Address `codec:"s"`
+	Amount    uint64  `codec:"a"`
+	Frozen    bool    `codec:"f"`
+	Delegator Address `codec:"d"`
 }
 
 // AssetParams describes the parameters of an asset.
@@ -519,8 +519,8 @@ func (u AccountData) MinBalance(reqs BalanceRequirements) MicroAlgos {
 		uint64(len(u.AppParams)), uint64(len(u.AppLocalStates)),
 		uint64(u.TotalExtraAppPages),
 		u.TotalBoxes, u.TotalBoxBytes,
-		u.TotalAssetsSponsored,
-		u.TotalAssetsSponsoring,
+		u.TotalAssetsDelegated,
+		u.TotalAssetsDelegating,
 	)
 }
 

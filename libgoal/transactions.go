@@ -96,6 +96,86 @@ func (c *Client) SignProgramWithWallet(walletHandle, pw []byte, addr string, pro
 	return
 }
 
+// SignTransactionAsSponsor signs a transaction as a sponsor.
+// The sponsor pays the transaction fee instead of the sender.
+// The sponsorAddr is the address of the sponsor account.
+// The signerAddr is optional - use it if the sponsor account has been rekeyed.
+func (c *Client) SignTransactionAsSponsor(walletHandle, pw []byte, sponsorAddr string, signerAddr string, stx transactions.SignedTxn) (stxn transactions.SignedTxn, err error) {
+	sponsor, err := basics.UnmarshalChecksumAddress(sponsorAddr)
+	if err != nil {
+		return
+	}
+
+	// Verify transaction is marked as fee-sponsored
+	if !stx.Txn.FeeSponsored {
+		err = fmt.Errorf("transaction is not marked as fee-sponsored")
+		return
+	}
+
+	// Verify sponsor is not the sender
+	if sponsor == stx.Txn.Sender {
+		err = fmt.Errorf("sponsor cannot be the same as the transaction sender")
+		return
+	}
+
+	stxn = stx
+	stxn.Ssig.Sponsor = sponsor
+
+	// Determine signing address
+	signAddr := sponsorAddr
+	if signerAddr != "" {
+		signAddr = signerAddr
+		authAddr, err2 := basics.UnmarshalChecksumAddress(signerAddr)
+		if err2 != nil {
+			err = err2
+			return
+		}
+		stxn.Ssig.AuthAddr = authAddr
+	}
+
+	// Sign the transaction
+	signed, err := c.SignTransactionWithWalletAndSigner(walletHandle, pw, signAddr, stx.Txn)
+	if err != nil {
+		return
+	}
+
+	stxn.Ssig.Sig = signed.Sig
+	return
+}
+
+// MultisigSignTransactionAsSponsor adds a multisig signature to a transaction as a sponsor.
+// The sponsor pays the transaction fee instead of the sender.
+func (c *Client) MultisigSignTransactionAsSponsor(walletHandle, pw []byte, sponsorAddr string, signerAddr string, stx transactions.SignedTxn, partial crypto.MultisigSig) (stxn transactions.SignedTxn, err error) {
+	sponsor, err := basics.UnmarshalChecksumAddress(sponsorAddr)
+	if err != nil {
+		return
+	}
+
+	// Verify transaction is marked as fee-sponsored
+	if !stx.Txn.FeeSponsored {
+		err = fmt.Errorf("transaction is not marked as fee-sponsored")
+		return
+	}
+
+	// Verify sponsor is not the sender
+	if sponsor == stx.Txn.Sender {
+		err = fmt.Errorf("sponsor cannot be the same as the transaction sender")
+		return
+	}
+
+	stxn = stx
+	stxn.Ssig.Sponsor = sponsor
+
+	// Sign the transaction as multisig
+	msig, err := c.MultisigSignTransactionWithWallet(walletHandle, pw, stx.Txn, signerAddr, partial)
+	if err != nil {
+		return
+	}
+
+	stxn.Ssig.Msig = msig
+	return
+}
+
 // MultisigSignTransactionWithWallet creates a multisig (or adds to an existing partial multisig, if one is provided), signing with the key corresponding to the given address and using the specified wallet
 // TODO instead of returning MultisigSigs, accept and return blobs
 func (c *Client) MultisigSignTransactionWithWallet(walletHandle, pw []byte, utx transactions.Transaction, signerAddr string, partial crypto.MultisigSig) (msig crypto.MultisigSig, err error) {

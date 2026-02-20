@@ -131,12 +131,14 @@ func stxnToInspect(stxn transactions.SignedTxn) inspectSignedTxn {
 
 func stxnFromInspect(sti inspectSignedTxn) transactions.SignedTxn {
 	return transactions.SignedTxn{
-		Txn:      sti.Txn,
-		Sig:      sti.Sig,
-		Msig:     msigFromInspect(sti.Msig),
-		Lsig:     lsigFromInspect(sti.Lsig),
-		PQsig:    sti.PQsig,
-		AuthAddr: sti.AuthAddr,
+		Txn: sti.Txn,
+		SignatureFields: transactions.SignatureFields{
+			Sig:      sti.Sig,
+			Msig:     msigFromInspect(sti.Msig),
+			Lsig:     lsigFromInspect(sti.Lsig),
+			PQsig:    sti.PQsig,
+			AuthAddr: sti.AuthAddr,
+		},
 	}
 }
 

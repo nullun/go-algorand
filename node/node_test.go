@@ -1323,7 +1323,9 @@ func TestNodeHybridP2PGossipSend(t *testing.T) {
 	}
 	signature := secrets2.Sign(txn)
 	stxn := transactions.SignedTxn{
-		Sig: signature,
+		SignatureFields: transactions.SignatureFields{
+			Sig: signature,
+		},
 		Txn: txn,
 	}
 

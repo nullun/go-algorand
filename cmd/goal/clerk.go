@@ -71,6 +71,10 @@ var (
 	requestOutFilename string
 	inspectTxid        bool
 
+	// Fee sponsorship flags
+	sponsorAddress string
+	feeSponsored   bool
+
 	simulateStartRound            basics.Round
 	simulateAllowEmptySignatures  bool
 	simulateAllowMoreLogging      bool
@@ -96,6 +100,7 @@ func init() {
 	clerkCmd.AddCommand(dryrunCmd)
 	clerkCmd.AddCommand(dryrunRemoteCmd)
 	clerkCmd.AddCommand(simulateCmd)
+	clerkCmd.AddCommand(sponsorCmd)
 
 	// Wallet to be used for the clerk operation
 	clerkCmd.PersistentFlags().StringVarP(&walletName, "wallet", "w", "", "Set the wallet to be used for the selected operation")
@@ -182,6 +187,21 @@ func init() {
 	simulateCmd.Flags().BoolVar(&simulateScratchChange, "scratch", false, "Report scratch change during simulation time")
 	simulateCmd.Flags().BoolVar(&simulateAppStateChange, "state", false, "Report application state changes during simulation time")
 	simulateCmd.Flags().BoolVar(&simulateAllowUnnamedResources, "allow-unnamed-resources", false, "Allow access to unnamed resources during simulation")
+
+	// sponsor flags
+	sponsorCmd.Flags().StringVarP(&txFilename, "infile", "i", "", "Transaction file to add sponsor signature to")
+	sponsorCmd.Flags().StringVarP(&outFilename, "outfile", "o", "", "Filename for writing the sponsored transaction")
+	sponsorCmd.Flags().StringVar(&sponsorAddress, "sponsor", "", "Address of sponsor account that will pay the transaction fee (required)")
+	sponsorCmd.Flags().StringVarP(&signerAddress, "signer", "S", "", "Address of key to sign with, if sponsor account is rekeyed")
+	sponsorCmd.Flags().StringVarP(&programSource, "program", "p", "", "Program source file to use as sponsor logic signature")
+	sponsorCmd.Flags().StringVarP(&logicSigFile, "logic-sig", "L", "", "LogicSig to apply as sponsor signature")
+	sponsorCmd.Flags().StringSliceVar(&argB64Strings, "argb64", nil, "Base64 encoded args to pass to sponsor logic signature")
+	sponsorCmd.MarkFlagRequired("infile")
+	sponsorCmd.MarkFlagRequired("outfile")
+	sponsorCmd.MarkFlagRequired("sponsor")
+
+	// Add --fee-sponsored flag to send command
+	sendCmd.Flags().BoolVar(&feeSponsored, "fee-sponsored", false, "Mark transaction as fee-sponsored (fee will be paid by a sponsor)")
 }
 
 var clerkCmd = &cobra.Command{
@@ -436,6 +456,11 @@ var sendCmd = &cobra.Command{
 		}
 		if !rekeyTo.IsZero() {
 			payment.RekeyTo = rekeyTo
+		}
+
+		// Set fee-sponsored flag if requested
+		if feeSponsored {
+			payment.FeeSponsored = true
 		}
 
 		// ConstructPayment fills in the suggested fee when fee=0. But if the user actually used --fee=0 on the
@@ -905,6 +930,150 @@ var signCmd = &cobra.Command{
 				}
 				outData = append(outData, protocol.Encode(&signedTxn)...)
 			}
+		}
+
+		err = writeFile(outFilename, outData, 0600)
+		if err != nil {
+			reportErrorf(fileWriteError, outFilename, err)
+		}
+	},
+}
+
+var sponsorCmd = &cobra.Command{
+	Use:   "sponsor -i [input file] -o [output file] --sponsor [address]",
+	Short: "Add sponsor signature to a fee-sponsored transaction",
+	Long: `Sign a fee-sponsored transaction as the sponsor. The sponsor pays the transaction fee instead of the sender.
+
+The input transaction must have been created with the --fee-sponsored flag.
+The sponsor address must be different from the transaction sender.
+
+For multisig sponsor accounts, run this command multiple times with different --signer addresses
+to collect the required signatures.
+
+Example workflow:
+  1. Create fee-sponsored transaction: goal clerk send --from=SENDER --to=RECEIVER --amount=1000 --fee-sponsored -o unsigned.txn
+  2. Sender signs the transaction: goal clerk sign -i unsigned.txn -o sender-signed.txn
+  3. Sponsor signs the transaction: goal clerk sponsor -i sender-signed.txn -o sponsored.txn --sponsor=SPONSOR
+  4. Submit the transaction: goal clerk rawsend -f sponsored.txn`,
+	Args: validateNoPosArgsFn,
+	Run: func(cmd *cobra.Command, _ []string) {
+		data, err := readFile(txFilename)
+		if err != nil {
+			reportErrorf(fileReadError, txFilename, err)
+		}
+
+		// Parse sponsor address
+		sponsor, err := basics.UnmarshalChecksumAddress(sponsorAddress)
+		if err != nil {
+			reportErrorf(errorParseAddr, err)
+		}
+
+		dataDir := datadir.EnsureSingleDataDir()
+		client := ensureKmdClient(dataDir)
+		wh, pw := ensureWalletHandleMaybePassword(dataDir, walletName, true)
+
+		// Parse optional logic signature
+		var lsig transactions.LogicSig
+		if programSource != "" {
+			if logicSigFile != "" {
+				reportErrorln("goal clerk sponsor should have at most one of --program/-p or --logic-sig/-L")
+			}
+			lsig.Logic = assembleFile(programSource, false)
+			lsig.Args = getProgramArgs()
+		} else if logicSigFile != "" {
+			lsigFromArgs(&lsig)
+		}
+
+		var outData []byte
+		dec := protocol.NewMsgpDecoderBytes(data)
+		for {
+			var stxn transactions.SignedTxn
+			err = dec.Decode(&stxn)
+			if err == io.EOF {
+				break
+			}
+			if err != nil {
+				reportErrorf(txDecodeError, txFilename, err)
+			}
+
+			// Validate that the transaction is fee-sponsored
+			if !stxn.Txn.FeeSponsored {
+				reportErrorln(errorTxNotFeeSponsored)
+			}
+
+			// Validate sponsor is not the sender
+			if sponsor == stxn.Txn.Sender {
+				reportErrorln(errorSponsorSameAsSender)
+			}
+
+			// Check if sponsor signature is already present
+			if !stxn.Ssig.Blank() && !stxn.Ssig.Msig.Blank() {
+				// For multisig, we allow adding more signatures
+				// but for single sig, error out
+				if !stxn.Ssig.Sig.Blank() {
+					reportErrorln(errorSponsorSigPresent)
+				}
+			}
+
+			// Set the sponsor address in the SponsorSig
+			stxn.Ssig.Sponsor = sponsor
+
+			if lsig.Logic != nil {
+				// Apply logic signature as sponsor signature
+				stxn.Ssig.Lsig = lsig
+				if signerAddress != "" {
+					var authAddr basics.Address
+					authAddr, err = basics.UnmarshalChecksumAddress(signerAddress)
+					if err != nil {
+						reportErrorf("Signer invalid (%s): %v", signerAddress, err)
+					}
+					if authAddr == sponsor {
+						reportErrorf("Sponsor AuthAddr cannot be the same as the sponsor address")
+					}
+					stxn.Ssig.AuthAddr = authAddr
+				}
+			} else {
+				// Sign with kmd
+				// Determine which address to use for signing
+				signingAddr := sponsorAddress
+				if signerAddress != "" {
+					signingAddr = signerAddress
+					// Set AuthAddr if sponsor is rekeyed
+					var authAddr basics.Address
+					authAddr, err = basics.UnmarshalChecksumAddress(signerAddress)
+					if err != nil {
+						reportErrorf("Signer invalid (%s): %v", signerAddress, err)
+					}
+					if authAddr == sponsor {
+						reportErrorf("Sponsor signer cannot be the same as the sponsor address when using --signer")
+					}
+					stxn.Ssig.AuthAddr = authAddr
+				}
+
+				// Check if this is a multisig sponsor
+				var msigInfo libgoal.MultisigInfo
+				msigInfo, err = client.LookupMultisigAccount(wh, sponsorAddress)
+				if err == nil && len(msigInfo.PKs) > 0 {
+					// Multisig sponsor - add signature to the multisig
+					var msig crypto.MultisigSig
+					msig, err = client.MultisigSignTransactionWithWallet(wh, pw, stxn.Txn, signingAddr, stxn.Ssig.Msig)
+					if err != nil {
+						reportErrorf(errorSponsorSigningTX, err)
+					}
+					stxn.Ssig.Msig = msig
+				} else {
+					// Single signature sponsor
+					var sig transactions.SignedTxn
+					sig, err = client.SignTransactionWithWallet(wh, pw, stxn.Txn)
+					if err != nil {
+						reportErrorf(errorSponsorSigningTX, err)
+					}
+					stxn.Ssig.Sig = sig.Sig
+				}
+			}
+
+			reportInfof(infoSponsorSigAdded, sponsorAddress, stxn.ID().String())
+			outData = append(outData, protocol.Encode(&stxn)...)
 		}
 
 		err = writeFile(outFilename, outData, 0600)

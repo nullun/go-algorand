@@ -134,6 +134,13 @@ const (
 	infoAutoFeeSet             = "Automatically set fee to %d MicroAlgos"
 	errorTransactionExpired    = "Transaction %s expired before it could be included in a block"
 
+	// Fee Sponsorship
+	errorSponsorSameAsSender = "Sponsor address cannot be the same as the transaction sender"
+	errorTxNotFeeSponsored   = "Transaction is not marked as fee-sponsored. Use --fee-sponsored flag when creating the transaction"
+	errorSponsorSigPresent   = "Transaction already has a sponsor signature"
+	errorSponsorSigningTX    = "Couldn't sign transaction as sponsor: %s"
+	infoSponsorSigAdded      = "Added sponsor signature from %s to transaction %s"
+
 	loggingNotConfigured = "Remote logging is not currently configured and won't be enabled"
 	loggingNotEnabled    = "Remote logging is current disabled"
 	loggingEnabled       = "Remote logging is enabled.  Node = %s, Guid = %s"

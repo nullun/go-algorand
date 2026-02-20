@@ -26,6 +26,7 @@ import (
 	"github.com/algorand/go-algorand/data/transactions"
 	"github.com/algorand/go-algorand/data/transactions/logic"
 	"github.com/algorand/go-algorand/ledger/ledgercore"
+	"github.com/algorand/go-algorand/protocol"
 	"github.com/algorand/go-algorand/util/execpool"
 )
 
@@ -232,24 +233,44 @@ func (ue UnverifiedTxnSigJob) GetNumberOfBatchableItems() (batchSigs uint64, err
 }
 
 func getNumberOfBatchableSigsInTxn(stx *transactions.SignedTxn, groupIndex int) (uint64, error) {
-	sigType, err := checkTxnSigTypeCounts(stx, groupIndex)
+	sigCount := uint64(0)
+
+	// Check sender signature
+	senderSigType, err := checkTxnSigTypeCounts(&stx.SignatureFields, groupIndex)
 	if err != nil {
 		return 0, err
 	}
-	switch sigType {
-	case regularSig:
-		return 1, nil
+	switch senderSigType {
+	case singleSig:
+		sigCount++
 	case multiSig:
-		return uint64(stx.Msig.Signatures()), nil
+		sigCount += uint64(stx.Msig.Signatures())
 	case logicSig:
 		// Currently the sigs in here are not batched. Something to consider later.
-		return 0, nil
-	case stateProofTxn:
-		return 0, nil
-	default:
-		// this case is impossible
-		return 0, nil
+	case missingSig:
+		// Special case for state proof transactions - no signature required
+		if stx.Txn.Sender == transactions.StateProofSender && stx.Txn.Type == protocol.StateProofTx {
+			return 0, nil
+		}
 	}
+
+	// Check sponsor signature if present
+	if !stx.Ssig.Blank() {
+		sponsorSigType, err := checkTxnSigTypeCounts(&stx.Ssig.SignatureFields, groupIndex)
+		if err != nil {
+			return 0, err
+		}
+		switch sponsorSigType {
+		case singleSig:
+			sigCount++
+		case multiSig:
+			sigCount += uint64(stx.Ssig.Msig.Signatures())
+		case logicSig:
+			// Currently the sigs in here are not batched. Something to consider later.
+		}
+	}
+
+	return sigCount, nil
 }
 
 func (tbp *txnSigBatchProcessor) postProcessVerifiedJobs(ctx interface{}, failed []bool, err error) {

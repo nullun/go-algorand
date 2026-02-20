@@ -987,6 +987,11 @@ func (eval *BlockEvaluator) testTransaction(txn transactions.SignedTxn) error {
 		return err
 	}
 
+	// Rudamentary well-formedness checks on the SignedTxn so we can fail fast.
+	if txn.Txn.FeeSponsored && txn.Ssig.Blank() {
+		return fmt.Errorf("transaction %v: fee sponsor required but no sponsor signature present", txn.ID())
+	}
+
 	err = txn.Txn.WellFormed(eval.specials, eval.proto)
 	if err != nil {
 		txnErr := ledgercore.TxnNotWellFormedError(fmt.Sprintf("transaction %v: malformed: %v", txn.ID(), err))
@@ -1168,6 +1173,12 @@ func (eval *BlockEvaluator) transaction(txn transactions.SignedTxn, evalParams *
 			return err
 		}
 
+		// Rudamentary well-formedness checks on the SignedTxn so we can fail fast.
+		// Note that applyTransaction will do more detailed checks later.
+		if txn.Txn.FeeSponsored && txn.Ssig.Blank() {
+			return fmt.Errorf("transaction %v: fee sponsor required but no sponsor signature present", txid)
+		}
+
 		err = txn.Txn.WellFormed(eval.specials, eval.proto)
 		if err != nil {
 			txnErr := ledgercore.TxnNotWellFormedError(fmt.Sprintf("transaction %v: malformed: %v", txn.ID(), err))
@@ -1193,10 +1204,25 @@ func (eval *BlockEvaluator) transaction(txn transactions.SignedTxn, evalParams *
 		if txn.Authorizer() != correctAuthorizer {
 			return fmt.Errorf("transaction %v: should have been authorized by %v but was actually authorized by %v", txn.ID(), correctAuthorizer, txn.Authorizer())
 		}
+
+		// If Sponsor is present, similarly check if the correct authoratative address was used.
+		if !txn.Ssig.Blank() {
+			acctspsrdata, lookupErr := cow.lookup(txn.Ssig.Sponsor)
+			if lookupErr != nil {
+				return lookupErr
+			}
+			correctSponsorAuthorizer := acctspsrdata.AuthAddr
+			if correctSponsorAuthorizer.IsZero() {
+				correctSponsorAuthorizer = txn.Ssig.Sponsor
+			}
+			if txn.SponsorAuthorizer() != correctSponsorAuthorizer {
+				return fmt.Errorf("transaction %v: should have been authorized by sponsor %v but was actually authorized by sponsor %v", txn.ID(), correctSponsorAuthorizer, txn.SponsorAuthorizer())
+			}
+		}
 	}
 
 	// Apply the transaction, updating the cow balances
-	applyData, err := eval.applyTransaction(txn.Txn, cow, evalParams, gi, cow.Counter())
+	applyData, err := eval.applyTransaction(txn, cow, evalParams, gi, cow.Counter())
 	if err != nil {
 		if eval.Tracer != nil {
 			// If there is a tracer, save the ApplyData so that it's viewable by the tracer
@@ -1243,65 +1269,72 @@ func (eval *BlockEvaluator) transaction(txn transactions.SignedTxn, evalParams *
 	return nil
 }
 
-func (cs *roundCowState) takeFee(tx *transactions.Transaction, senderRewards *basics.MicroAlgos, ep *logic.EvalParams) error {
-	err := cs.Move(tx.Sender, ep.Specials.FeeSink, tx.Fee, senderRewards, nil)
+func (cs *roundCowState) takeFee(stx *transactions.SignedTxn, senderRewards *basics.MicroAlgos, sponsorRewards *basics.MicroAlgos, ep *logic.EvalParams) error {
+	feePayer := stx.Txn.Sender
+	feePayerRewards := senderRewards
+
+	if !stx.Ssig.Sponsor.IsZero() {
+		feePayer = stx.Ssig.Sponsor
+		feePayerRewards = sponsorRewards
+	}
+
+	err := cs.Move(feePayer, ep.Specials.FeeSink, stx.Txn.Fee, feePayerRewards, nil)
 	if err != nil {
 		return err
 	}
 	// transactions from FeeSink should be exceedingly rare. But we can't count
 	// them in feesCollected because there are no net algos added to the Sink
-	if tx.Sender == ep.Specials.FeeSink {
+	if feePayer == ep.Specials.FeeSink {
 		return nil
 	}
 	// overflow impossible, since these sum the fees actually paid and max supply is uint64
-	cs.feesCollected, _ = basics.OAddA(cs.feesCollected, tx.Fee)
+	cs.feesCollected, _ = basics.OAddA(cs.feesCollected, stx.Txn.Fee)
 	return nil
-
 }
 
 // applyTransaction changes the balances according to this transaction.
-func (eval *BlockEvaluator) applyTransaction(tx transactions.Transaction, cow *roundCowState, evalParams *logic.EvalParams, gi int, ctr uint64) (ad transactions.ApplyData, err error) {
+func (eval *BlockEvaluator) applyTransaction(stx transactions.SignedTxn, cow *roundCowState, evalParams *logic.EvalParams, gi int, ctr uint64) (ad transactions.ApplyData, err error) {
 	params := cow.ConsensusParams()
 
-	err = cow.takeFee(&tx, &ad.SenderRewards, evalParams)
+	err = cow.takeFee(&stx, &ad.SenderRewards, &ad.SponsorRewards, evalParams)
 	if err != nil {
 		return
 	}
 
-	err = apply.Rekey(cow, &tx)
+	err = apply.Rekey(cow, &stx.Txn)
 	if err != nil {
 		return
 	}
 
-	switch tx.Type {
+	switch stx.Txn.Type {
 	case protocol.PaymentTx:
-		err = apply.Payment(tx.PaymentTxnFields, tx.Header, cow, eval.specials, &ad)
+		err = apply.Payment(stx.Txn.PaymentTxnFields, stx.Txn.Header, cow, eval.specials, &ad)
 
 	case protocol.KeyRegistrationTx:
-		err = apply.Keyreg(tx.KeyregTxnFields, tx.Header, cow, eval.specials, &ad, cow.Round())
+		err = apply.Keyreg(stx.Txn.KeyregTxnFields, stx.Txn.Header, cow, eval.specials, &ad, cow.Round())
 
 	case protocol.AssetConfigTx:
-		err = apply.AssetConfig(tx.AssetConfigTxnFields, tx.Header, cow, eval.specials, &ad, ctr)
+		err = apply.AssetConfig(stx.Txn.AssetConfigTxnFields, stx.Txn.Header, cow, eval.specials, &ad, ctr)
 
 	case protocol.AssetTransferTx:
-		err = apply.AssetTransfer(tx.AssetTransferTxnFields, tx.Header, cow, eval.specials, &ad)
+		err = apply.AssetTransfer(stx.Txn.AssetTransferTxnFields, stx.Txn.Header, cow, eval.specials, &ad)
 
 	case protocol.AssetFreezeTx:
-		err = apply.AssetFreeze(tx.AssetFreezeTxnFields, tx.Header, cow, eval.specials, &ad)
+		err = apply.AssetFreeze(stx.Txn.AssetFreezeTxnFields, stx.Txn.Header, cow, eval.specials, &ad)
 
 	case protocol.ApplicationCallTx:
-		err = apply.ApplicationCall(tx.ApplicationCallTxnFields, tx.Header, cow, &ad, gi, evalParams, ctr)
+		err = apply.ApplicationCall(stx.Txn.ApplicationCallTxnFields, stx.Txn.Header, cow, &ad, gi, evalParams, ctr)
 
 	case protocol.StateProofTx:
 		// Applying the StateProof transaction will advance the cow's StateProofNextRound field.
 		// Validation of the StateProof transaction before applying will only occur in validate mode.
-		err = apply.StateProof(tx.StateProofTxnFields, tx.Header.FirstValid, cow, eval.validate)
+		err = apply.StateProof(stx.Txn.StateProofTxnFields, stx.Txn.Header.FirstValid, cow, eval.validate)
 
 	case protocol.HeartbeatTx:
-		err = apply.Heartbeat(*tx.HeartbeatTxnFields, tx.Header, cow, cow, cow.Round())
+		err = apply.Heartbeat(*stx.Txn.HeartbeatTxnFields, stx.Txn.Header, cow, cow, cow.Round())
 
 	default:
-		err = fmt.Errorf("unknown transaction type %v", tx.Type)
+		err = fmt.Errorf("unknown transaction type %v", stx.Txn.Type)
 	}
 
 	// Record first, so that details can all be used in logic evaluation, even

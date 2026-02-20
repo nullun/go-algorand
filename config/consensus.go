@@ -580,6 +580,10 @@ type ConsensusParams struct {
 	// specify the current app. This parameter can be removed and assumed true
 	// after the first consensus release in which it is set true.
 	AllowZeroLocalAppRef bool
+
+	// SupportFeeSponsored indicates support for a transaction's fee to
+	// be paid by another account.
+	SupportFeeSponsored bool
 }
 
 // ProposerPayoutRules puts several related consensus parameters in one place. The same
@@ -1466,6 +1470,7 @@ func initConsensusProtocols() {
 	vFuture.AppSizeUpdates = true
 	vFuture.AllowZeroLocalAppRef = true
 	vFuture.EnforceAuthAddrSenderDiff = true
+	vFuture.SupportFeeSponsored = true
 
 	Consensus[protocol.ConsensusFuture] = vFuture
 

@@ -79,6 +79,11 @@ type Header struct {
 	// This allows "re-keying" a long-lived account -- rotating the signing key, changing
 	// membership of a multisig account, etc.
 	RekeyTo basics.Address `codec:"rekey"`
+
+	// FeeSponsored indicates whether the transaction fee MUST be paid by a sponsor.
+	// The absence of this field (false) doesn't prevent an opportunistic sponsor
+	// from providing their signature and paying the transaction fee.
+	FeeSponsored bool `codec:"fs"`
 }
 
 // Transaction describes a transaction that can appear in a block.
@@ -116,10 +121,11 @@ type ApplyData struct {
 	// Closing amount for asset transaction.
 	AssetClosingAmount uint64 `codec:"aca"`
 
-	// Rewards applied to the Sender, Receiver, and CloseRemainderTo accounts.
+	// Rewards applied to the Sender, Receiver, CloseRemainderTo, and Fee Sponsor accounts.
 	SenderRewards   basics.MicroAlgos `codec:"rs"`
 	ReceiverRewards basics.MicroAlgos `codec:"rr"`
 	CloseRewards    basics.MicroAlgos `codec:"rc"`
+	SponsorRewards  basics.MicroAlgos `codec:"rf"`
 	EvalDelta       EvalDelta         `codec:"dt"`
 
 	// If asa or app is being created, the id used. Else 0.
@@ -145,6 +151,9 @@ func (ad ApplyData) Equal(o ApplyData) bool {
 		return false
 	}
 	if ad.CloseRewards != o.CloseRewards {
+		return false
+	}
+	if ad.SponsorRewards != o.SponsorRewards {
 		return false
 	}
 	if ad.ConfigAsset != o.ConfigAsset {
@@ -274,6 +283,26 @@ func (tx Transaction) Sign(secrets *crypto.SignatureSecrets) SignedTxn {
 	if basics.Address(secrets.SignatureVerifier) != tx.Sender {
 		s.AuthAddr = basics.Address(secrets.SignatureVerifier)
 	}
+	return s
+}
+
+// SignAsSponsor signs a transaction as a sponsor using a given Account's secrets.
+func (tx Transaction) SignAsSponsor(secrets *crypto.SignatureSecrets) SignedTxn {
+	ssig := secrets.Sign(tx)
+
+	s := SignedTxn{
+		Txn: tx,
+		Ssig: SponsorSig{
+			Sponsor: basics.Address(secrets.SignatureVerifier),
+			SignatureFields: SignatureFields{
+				Sig: ssig,
+			},
+		},
+	}
+	// // Set the Sponsor AuthAddr if the signing key doesn't match the transaction sponsor
+	// if basics.Address(secrets.SignatureVerifier) != tx.Sponsor.Address {
+	// 	s.Sponsor.AuthAddr = basics.Address(secrets.SignatureVerifier)
+	// }
 	return s
 }
 
@@ -473,6 +502,12 @@ func (tx Transaction) WellFormed(spec SpecialAddresses, proto config.ConsensusPa
 	}
 	if !proto.SupportRekeying && (tx.RekeyTo != basics.Address{}) {
 		return fmt.Errorf("transaction has RekeyTo set but rekeying not yet enabled")
+	}
+	// NOTE: Do we even get to this point, if the signed transaction does a
+	// similar check? Maybe it's useful for inner transactions, not sure how that
+	// should even work.
+	if !proto.SupportFeeSponsored && tx.FeeSponsored {
+		return fmt.Errorf("transaction has FeeSponsored set but fee sponsoring not yet enabled")
 	}
 	return nil
 }

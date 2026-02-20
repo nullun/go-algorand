@@ -33,7 +33,8 @@ type SignedTxn struct {
 	_struct struct{} `codec:",omitempty,omitemptyarray"`
 
 	SignatureFields
-	Txn Transaction `codec:"txn"`
+	Ssig SponsorSig  `codec:"ssig"`
+	Txn  Transaction `codec:"txn"`
 }
 
 // SignatureFields contain the different type of signatures
@@ -113,6 +114,24 @@ func (s SignedTxn) Authorizer() basics.Address {
 		return s.Txn.Sender
 	}
 	return s.AuthAddr
+}
+
+// SponsorAuthorizer returns the address against which the sponsor's signature/msig/lsig
+// should be checked, or so the sponsored SignedTxn claims.
+// This is just s.Ssig.AuthAddr or, if s.Ssig.AuthAddr is zero, s.Ssig.Sponsor.
+// It's provided as a convenience method.
+func (s SignedTxn) SponsorAuthorizer() basics.Address {
+	if s.Ssig.AuthAddr.IsZero() {
+		return s.Ssig.Sponsor
+	}
+	return s.Ssig.AuthAddr
+}
+
+// IsSponsored returns true if the signed transaction contains a sponsor
+// signature, as opposed to checking the transaction's "FeeSponsored" field,
+// which simply stats the transaction must be sponsored.
+func (s SignedTxn) IsSponsored() bool {
+	return !s.Ssig.Blank()
 }
 
 // AssembleSignedTxn assembles a multisig-signed transaction from a transaction an optional sig, and an optional multisig.

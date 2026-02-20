@@ -610,6 +610,10 @@ type ConsensusParams struct {
 	// EnableSelectF128 changes the sortition algorithm to use a 128-bit software
 	// floating point binomial CDF implementation for committee selection.
 	EnableSelectF128 bool
+
+	// SupportFeeSponsored indicates support for a transaction's fee to
+	// be paid by another account.
+	SupportFeeSponsored bool
 }
 
 // ProposerPayoutRules puts several related consensus parameters in one place. The same
@@ -1560,6 +1564,8 @@ func initConsensusProtocols() {
 	vFuture.ApprovedUpgrades = map[protocol.ConsensusVersion]uint64{}
 
 	vFuture.LogicSigVersion = 14 // When moving this to a release, put a new higher LogicSigVersion here
+
+	vFuture.SupportFeeSponsored = true
 
 	Consensus[protocol.ConsensusFuture] = vFuture
 

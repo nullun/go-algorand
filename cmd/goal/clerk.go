@@ -83,6 +83,8 @@ var (
 	simulateScratchChange         bool
 	simulateAppStateChange        bool
 	simulateAllowUnnamedResources bool
+
+	rescind bool
 )
 
 func init() {
@@ -96,6 +98,7 @@ func init() {
 	clerkCmd.AddCommand(dryrunCmd)
 	clerkCmd.AddCommand(dryrunRemoteCmd)
 	clerkCmd.AddCommand(simulateCmd)
+	clerkCmd.AddCommand(bootstrapCmd)
 
 	// Wallet to be used for the clerk operation
 	clerkCmd.PersistentFlags().StringVarP(&walletName, "wallet", "w", "", "Set the wallet to be used for the selected operation")
@@ -182,6 +185,14 @@ func init() {
 	simulateCmd.Flags().BoolVar(&simulateScratchChange, "scratch", false, "Report scratch change during simulation time")
 	simulateCmd.Flags().BoolVar(&simulateAppStateChange, "state", false, "Report application state changes during simulation time")
 	simulateCmd.Flags().BoolVar(&simulateAllowUnnamedResources, "allow-unnamed-resources", false, "Allow access to unnamed resources during simulation")
+
+	// bootstrap flags
+	bootstrapCmd.Flags().StringVarP(&account, "from", "f", "", "Account address to bootstrap from (If not specified, uses default account)")
+	bootstrapCmd.Flags().StringVarP(&toAddress, "to", "t", "", "Address to be bootstrapped (required)")
+	bootstrapCmd.Flags().BoolVar(&rescind, "rescind", false, "Rescind an existing bootstrap instead of creating one")
+	bootstrapCmd.MarkFlagRequired("to")
+
+	addTxnFlags(bootstrapCmd)
 }
 
 var clerkCmd = &cobra.Command{
@@ -568,6 +579,90 @@ var sendCmd = &cobra.Command{
 			} else {
 				err = writeFile(outFilename, protocol.Encode(&stx), 0600)
 			}
+			if err != nil {
+				reportErrorln(err)
+			}
+		}
+	},
+}
+
+var bootstrapCmd = &cobra.Command{
+	Use:   "bootstrap",
+	Short: "Bootstrap or rescind an account",
+	Long:  "Send a zero Algo payment transaction with the boot flag set. Use --rescind to rescind an existing bootstrap.",
+	Args:  validateNoPosArgsFn,
+	Run: func(cmd *cobra.Command, args []string) {
+		checkTxValidityPeriodCmdFlags(cmd)
+
+		dataDir := datadir.EnsureSingleDataDir()
+		client := ensureFullClient(dataDir)
+		accountList := makeAccountsList(dataDir)
+
+		// Check if from was specified, else use default
+		if account == "" {
+			account = accountList.getDefaultAccount()
+		}
+
+		fromAddressResolved := accountList.getAddressByName(account)
+		toAddressResolved := accountList.getAddressByName(toAddress)
+
+		noteBytes := parseNoteField(cmd)
+		leaseBytes := parseLease(cmd)
+
+		firstValid, lastValid, _, err := client.ComputeValidityRounds(firstValid, lastValid, numValidRounds)
+		if err != nil {
+			reportErrorln(err)
+		}
+
+		// Bootstrap/rescind is a zero-amount payment
+		const bootstrapAmount uint64 = 0
+		payment, err := client.ConstructPayment(
+			fromAddressResolved, toAddressResolved, fee, bootstrapAmount, noteBytes, "",
+			leaseBytes, firstValid, lastValid,
+		)
+		if err != nil {
+			reportErrorf(errorConstructingTX, err)
+		}
+
+		// Set the bootstrap or rescind flag
+		if rescind {
+			payment.AccountBootstrap = transactions.RescindAccount
+		} else {
+			payment.AccountBootstrap = transactions.BootstrapAccount
+		}
+
+		explicitFee := cmd.Flags().Changed("fee")
+		if explicitFee {
+			payment.Fee = basics.MicroAlgos{Raw: fee}
+		}
+
+		if outFilename == "" {
+			wh, pw := ensureWalletHandleMaybePassword(dataDir, walletName, true)
+			stx, err1 := client.SignTransactionWithWalletAndSigner(wh, pw, signerAddress, payment)
+			if err1 != nil {
+				reportErrorf(errorSigningTX, err1)
+			}
+
+			txid, err1 := client.BroadcastTransaction(stx)
+			if err1 != nil {
+				reportErrorf(errorBroadcastingTX, err1)
+			}
+
+			// Report tx details to user
+			action := "bootstrap"
+			if rescind {
+				action = "rescind"
+			}
+			reportInfof("Issued %s transaction from account %s to %s, txid %s (fee %d)", action, fromAddressResolved, toAddressResolved, txid, stx.Txn.Fee.Raw)
+
+			if !noWaitAfterSend {
+				_, err1 = waitForCommit(client, txid, lastValid)
+				if err1 != nil {
+					reportErrorln(err1)
+				}
+			}
+		} else {
+			err = writeTxnToFile(client, sign, dataDir, walletName, payment, outFilename)
 			if err != nil {
 				reportErrorln(err)
 			}

@@ -691,7 +691,19 @@ func printAccountInfo(client libgoal.Client, address string, onlyShowAssetIDs bo
 			frozen = " (frozen)"
 		}
 
-		fmt.Fprintf(report, "\tID %d, %s, balance %s %s%s\n", assetHolding.AssetID, assetName, amount, unitName, frozen)
+		derefString := func(s *string) string {
+			if s == nil {
+				return ""
+			}
+			return *s
+		}
+
+		delegator := derefString(assetHolding.Delegator)
+		if delegator != "" {
+			delegator = fmt.Sprintf(" (Delegator: %s)", delegator)
+		}
+
+		fmt.Fprintf(report, "\tID %d, %s, balance %s %s%s%s\n", assetHolding.AssetID, assetName, amount, unitName, frozen, delegator)
 	}
 
 	fmt.Fprintln(report, "Created Apps:")
@@ -757,7 +769,19 @@ func printAccountInfo(client libgoal.Client, address string, onlyShowAssetIDs bo
 		fmt.Fprintf(report, "\tID %d, local state used %d/%d uints, %d/%d byte slices\n", localState.Id, usedInts, allocatedInts, usedBytes, allocatedBytes)
 	}
 
-	fmt.Fprintf(report, "Minimum Balance:\t%v microAlgos\n", account.MinBalance)
+	derefString := func(s *string) string {
+		if s == nil {
+			return ""
+		}
+		return *s
+	}
+
+	bootstrapper := derefString(account.Bootstrapper)
+	if bootstrapper != "" {
+		bootstrapper = fmt.Sprintf(" (Bootstrapper: %s)", bootstrapper)
+	}
+
+	fmt.Fprintf(report, "Minimum Balance:\t%v microAlgos%s\n", account.MinBalance, bootstrapper)
 
 	if hasError {
 		fmt.Fprint(os.Stderr, errorReport.String())

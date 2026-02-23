@@ -24,6 +24,7 @@ import (
 
 	"github.com/algorand/go-algorand/cmd/util/datadir"
 	"github.com/algorand/go-algorand/data/basics"
+	"github.com/algorand/go-algorand/data/transactions"
 	"github.com/algorand/go-algorand/libgoal"
 )
 
@@ -50,6 +51,8 @@ var (
 	assetNewReserve  string
 	assetNewFreezer  string
 	assetNewClawback string
+
+	revokeAsset bool
 )
 
 func init() {
@@ -60,6 +63,7 @@ func init() {
 	assetCmd.AddCommand(infoAssetCmd)
 	assetCmd.AddCommand(freezeAssetCmd)
 	assetCmd.AddCommand(optinAssetCmd)
+	assetCmd.AddCommand(delegateAssetCmd)
 
 	assetCmd.PersistentFlags().StringVarP(&walletName, "wallet", "w", "", "Set the wallet to be used for the selected operation")
 
@@ -123,6 +127,14 @@ func init() {
 	optinAssetCmd.Flags().StringVarP(&account, "account", "a", "", "Account address to opt in to using the asset (if not specified, uses default account)")
 	optinAssetCmd.Flags().StringVar(&assetCreator, "creator", "", "Account address for asset creator")
 
+	delegateAssetCmd.Flags().Uint64Var((*uint64)(&assetID), "assetid", 0, "ID of the asset being delegated (required)")
+	delegateAssetCmd.Flags().StringVarP(&account, "from", "f", "", "Account address to delegate from (if not specified, uses default account)")
+	delegateAssetCmd.Flags().StringVarP(&toAddress, "to", "t", "", "Address to delegate to (required)")
+	delegateAssetCmd.Flags().Uint64VarP(&amount, "amount", "a", 0, "The amount to be delegated")
+	delegateAssetCmd.Flags().BoolVar(&revokeAsset, "revoke", false, "Revoke an existing delegation instead of creating one")
+	delegateAssetCmd.MarkFlagRequired("assetid")
+	delegateAssetCmd.MarkFlagRequired("to")
+
 	// Add common transaction flags to all txn-generating asset commands
 	addTxnFlags(createAssetCmd)
 	addTxnFlags(destroyAssetCmd)
@@ -130,6 +142,7 @@ func init() {
 	addTxnFlags(sendAssetCmd)
 	addTxnFlags(freezeAssetCmd)
 	addTxnFlags(optinAssetCmd)
+	addTxnFlags(delegateAssetCmd)
 
 	infoAssetCmd.Flags().Uint64Var((*uint64)(&assetID), "assetid", 0, "ID of the asset to look up")
 	infoAssetCmd.Flags().StringVar(&assetUnitName, "unitname", "", "Unit name of the asset to look up")
@@ -727,6 +740,96 @@ var optinAssetCmd = &cobra.Command{
 
 			// Report tx details to user
 			reportInfof("Issued transaction from account %s, txid %s (fee %d)", tx.Sender, txid, tx.Fee.Raw)
+
+			if !noWaitAfterSend {
+				_, err2 = waitForCommit(client, txid, lastValid)
+				if err2 != nil {
+					reportErrorln(err2)
+				}
+			}
+		} else {
+			err = writeTxnToFile(client, sign, dataDir, walletName, tx, outFilename)
+			if err != nil {
+				reportErrorln(err)
+			}
+		}
+	},
+}
+
+var delegateAssetCmd = &cobra.Command{
+	Use:   "delegate",
+	Short: "Delegate or revoke delegated assets",
+	Long:  "Delegate asset holdings. Use --revoke to revoke an existing delegation (must be holding zero units).",
+	Args:  validateNoPosArgsFn,
+	Run: func(cmd *cobra.Command, _ []string) {
+		checkTxValidityPeriodCmdFlags(cmd)
+
+		dataDir := datadir.EnsureSingleDataDir()
+		client := ensureFullClient(dataDir)
+		accountList := makeAccountsList(dataDir)
+
+		// Check if from was specified, else use default
+		if account == "" {
+			account = accountList.getDefaultAccount()
+		}
+
+		sender := accountList.getAddressByName(account)
+		toAddressResolved := accountList.getAddressByName(toAddress)
+
+		// Revoke always uses amount 0, delegate uses the specified amount
+		delegateAmount := amount
+		if revokeAsset {
+			delegateAmount = 0
+		}
+
+		tx, err := client.MakeUnsignedAssetSendTx(assetID, delegateAmount, toAddressResolved, "", "")
+		if err != nil {
+			reportErrorf("Cannot construct transaction: %s", err)
+		}
+
+		tx.Note = parseNoteField(cmd)
+		tx.Lease = parseLease(cmd)
+
+		// Set delegation type based on revoke flag
+		if revokeAsset {
+			tx.AssetDelegation = transactions.RevokeAssetDelegation
+		} else {
+			tx.AssetDelegation = transactions.ApproveAssetDelegation
+		}
+
+		firstValid, lastValid, _, err = client.ComputeValidityRounds(firstValid, lastValid, numValidRounds)
+		if err != nil {
+			reportErrorf("Cannot determine last valid round: %s", err)
+		}
+
+		tx, err = client.FillUnsignedTxTemplate(sender, firstValid, lastValid, fee, tx)
+		if err != nil {
+			reportErrorf("Cannot construct transaction: %s", err)
+		}
+
+		explicitFee := cmd.Flags().Changed("fee")
+		if explicitFee {
+			tx.Fee = basics.MicroAlgos{Raw: fee}
+		}
+
+		if outFilename == "" {
+			wh, pw := ensureWalletHandleMaybePassword(dataDir, walletName, true)
+			signedTxn, err2 := client.SignTransactionWithWalletAndSigner(wh, pw, signerAddress, tx)
+			if err2 != nil {
+				reportErrorf(errorSigningTX, err2)
+			}
+
+			txid, err2 := client.BroadcastTransaction(signedTxn)
+			if err2 != nil {
+				reportErrorf(errorBroadcastingTX, err2)
+			}
+
+			// Report tx details to user
+			action := "delegate"
+			if revokeAsset {
+				action = "revoke"
+			}
+			reportInfof("Issued %s transaction from account %s, txid %s (fee %d)", action, tx.Sender, txid, tx.Fee.Raw)
 
 			if !noWaitAfterSend {
 				_, err2 = waitForCommit(client, txid, lastValid)

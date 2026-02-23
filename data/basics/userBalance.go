@@ -227,6 +227,18 @@ type AccountData struct {
 
 	// TotalBoxBytes stores the sum of all len(keys) and len(values) of Boxes
 	TotalBoxBytes uint64 `codec:"tbxb"`
+
+	// TotalAssetsDelegated is the number of asset holdings delegated to this account by other accounts.
+	TotalAssetsDelegated uint64 `codec:"tadl"`
+
+	// TotalAssetsDelegating is the number of asset holdings this account is delegating for other accounts.
+	TotalAssetsDelegating uint64 `codec:"tadg"`
+
+	// TotalAccountsBootstrapping is the number of accounts this account is bootstrapping.
+	TotalAccountsBootstrapping uint64 `codec:"tabs"`
+
+	// Bootstrapper is the address which holds the base MinBalance requirements for this account.
+	Bootstrapper Address `codec:"boot"`
 }
 
 // AppLocalState stores the LocalState associated with an application. It also
@@ -368,8 +380,9 @@ type CreatableLocator struct {
 type AssetHolding struct {
 	_struct struct{} `codec:",omitempty,omitemptyarray"`
 
-	Amount uint64 `codec:"a"`
-	Frozen bool   `codec:"f"`
+	Amount    uint64  `codec:"a"`
+	Frozen    bool    `codec:"f"`
+	Delegator Address `codec:"d"`
 }
 
 // AssetParams describes the parameters of an asset.
@@ -499,11 +512,15 @@ type BalanceRequirements struct {
 func (u AccountData) MinBalance(reqs BalanceRequirements) MicroAlgos {
 	return MinBalance(
 		reqs,
+		!u.Bootstrapper.IsZero(),
+		u.TotalAccountsBootstrapping,
 		uint64(len(u.Assets)),
 		u.TotalAppSchema,
 		uint64(len(u.AppParams)), uint64(len(u.AppLocalStates)),
 		uint64(u.TotalExtraAppPages),
 		u.TotalBoxes, u.TotalBoxBytes,
+		u.TotalAssetsDelegated,
+		u.TotalAssetsDelegating,
 	)
 }
 
@@ -512,19 +529,30 @@ func (u AccountData) MinBalance(reqs BalanceRequirements) MicroAlgos {
 // storage the account is allowed to store on disk.
 func MinBalance(
 	reqs BalanceRequirements,
+	bootstrapped bool,
+	totalAccountsBootstrapping uint64,
 	totalAssets uint64,
 	totalAppSchema StateSchema,
 	totalAppParams uint64, totalAppLocalStates uint64,
 	totalExtraAppPages uint64,
 	totalBoxes uint64, totalBoxBytes uint64,
+	totalAssetsSponsored uint64,
+	totalAssetsSponsoring uint64,
 ) MicroAlgos {
 	var min uint64
 
 	// First, base MinBalance
-	min = reqs.MinBalance
+	if !bootstrapped {
+		min = reqs.MinBalance
+	}
 
-	// MinBalance for each Asset
-	assetCost := MulSaturate(reqs.MinBalance, totalAssets)
+	// Multiple of base MinBalance for each account being bootstrapped
+	bootstrappedAccountsCost := reqs.MinBalance * totalAccountsBootstrapping
+	min = AddSaturate(min, bootstrappedAccountsCost)
+
+	// MinBalance for each Asset, adjusted for sponsors
+	adjustedTotalAssets := totalAssets - totalAssetsSponsored + totalAssetsSponsoring
+	assetCost := MulSaturate(reqs.MinBalance, adjustedTotalAssets)
 	min = AddSaturate(min, assetCost)
 
 	// Base MinBalance for each created application

@@ -49,6 +49,10 @@ type BaseAccountData struct {
 	IncentiveEligible          bool              `codec:"o"`
 	LastProposed               basics.Round      `codec:"p"`
 	LastHeartbeat              basics.Round      `codec:"q"`
+	TotalAssetsDelegated       uint64            `codec:"r"`
+	TotalAssetsDelegating      uint64            `codec:"s"`
+	TotalAccountsBootstrapping uint64            `codec:"t"`
+	Bootstrapper               basics.Address    `codec:"u"`
 
 	BaseVotingData
 
@@ -135,6 +139,8 @@ type ResourcesData struct {
 	Version uint64 `codec:"A"`
 
 	SizeSponsor basics.Address `codec:"B"`
+
+	Delegator basics.Address `codec:"C"`
 }
 
 // BaseVotingData is the base struct used to store voting data
@@ -308,6 +314,11 @@ func (ba *BaseAccountData) SetCoreAccountData(ad *ledgercore.AccountData) {
 	ba.LastProposed = ad.LastProposed
 	ba.LastHeartbeat = ad.LastHeartbeat
 
+	ba.TotalAssetsDelegated = ad.TotalAssetsDelegated
+	ba.TotalAssetsDelegating = ad.TotalAssetsDelegating
+	ba.TotalAccountsBootstrapping = ad.TotalAccountsBootstrapping
+	ba.Bootstrapper = ad.Bootstrapper
+
 	ba.BaseVotingData.SetCoreAccountData(ad)
 }
 
@@ -331,6 +342,11 @@ func (ba *BaseAccountData) SetAccountData(ad *basics.AccountData) {
 
 	ba.LastProposed = ad.LastProposed
 	ba.LastHeartbeat = ad.LastHeartbeat
+
+	ba.TotalAssetsDelegated = ad.TotalAssetsDelegated
+	ba.TotalAssetsDelegating = ad.TotalAssetsDelegating
+	ba.TotalAccountsBootstrapping = ad.TotalAccountsBootstrapping
+	ba.Bootstrapper = ad.Bootstrapper
 
 	ba.BaseVotingData.VoteID = ad.VoteID
 	ba.BaseVotingData.SelectionID = ad.SelectionID
@@ -371,6 +387,11 @@ func (ba *BaseAccountData) GetLedgerCoreAccountBaseData() ledgercore.AccountBase
 
 		LastProposed:  ba.LastProposed,
 		LastHeartbeat: ba.LastHeartbeat,
+
+		TotalAssetsDelegated:       ba.TotalAssetsDelegated,
+		TotalAssetsDelegating:      ba.TotalAssetsDelegating,
+		TotalAccountsBootstrapping: ba.TotalAccountsBootstrapping,
+		Bootstrapper:               ba.Bootstrapper,
 	}
 }
 
@@ -412,6 +433,11 @@ func (ba *BaseAccountData) GetAccountData() basics.AccountData {
 
 		LastProposed:  ba.LastProposed,
 		LastHeartbeat: ba.LastHeartbeat,
+
+		TotalAssetsDelegated:       ba.TotalAssetsDelegated,
+		TotalAssetsDelegating:      ba.TotalAssetsDelegating,
+		TotalAccountsBootstrapping: ba.TotalAccountsBootstrapping,
+		Bootstrapper:               ba.Bootstrapper,
 	}
 }
 
@@ -434,6 +460,10 @@ func (ba *BaseAccountData) IsEmpty() bool {
 		ba.TotalBoxBytes == 0 &&
 		ba.LastProposed == 0 &&
 		ba.LastHeartbeat == 0 &&
+		ba.TotalAssetsDelegated == 0 &&
+		ba.TotalAssetsDelegating == 0 &&
+		ba.TotalAccountsBootstrapping == 0 &&
+		ba.Bootstrapper.IsZero() &&
 		ba.BaseVotingData.IsEmpty()
 }
 
@@ -582,7 +612,8 @@ func (rd *ResourcesData) IsEmptyAssetFields() bool {
 		rd.Manager.IsZero() &&
 		rd.Reserve.IsZero() &&
 		rd.Freeze.IsZero() &&
-		rd.Clawback.IsZero()
+		rd.Clawback.IsZero() &&
+		rd.Delegator.IsZero()
 }
 
 // IsAsset returns true if the flag is ResourceFlagsEmptyAsset and the fields are not empty.
@@ -659,6 +690,7 @@ func (rd *ResourcesData) GetAssetParams() basics.AssetParams {
 func (rd *ResourcesData) ClearAssetHolding() {
 	rd.Amount = 0
 	rd.Frozen = false
+	rd.Delegator = basics.Address{}
 
 	rd.ResourceFlags |= ResourceFlagsNotHolding
 	hadParams := (rd.ResourceFlags & ResourceFlagsOwnership) == ResourceFlagsOwnership
@@ -673,6 +705,7 @@ func (rd *ResourcesData) ClearAssetHolding() {
 func (rd *ResourcesData) SetAssetHolding(ah basics.AssetHolding) {
 	rd.Amount = ah.Amount
 	rd.Frozen = ah.Frozen
+	rd.Delegator = ah.Delegator
 	rd.ResourceFlags &= ^(ResourceFlagsNotHolding + ResourceFlagsEmptyAsset)
 	// ResourceFlagsHolding is set implicitly since it is zero
 	if rd.IsEmptyAssetFields() {
@@ -683,8 +716,9 @@ func (rd *ResourcesData) SetAssetHolding(ah basics.AssetHolding) {
 // GetAssetHolding getter for asset holding.
 func (rd *ResourcesData) GetAssetHolding() basics.AssetHolding {
 	return basics.AssetHolding{
-		Amount: rd.Amount,
-		Frozen: rd.Frozen,
+		Amount:    rd.Amount,
+		Frozen:    rd.Frozen,
+		Delegator: rd.Delegator,
 	}
 }
 

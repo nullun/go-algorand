@@ -580,6 +580,17 @@ type ConsensusParams struct {
 	// specify the current app. This parameter can be removed and assumed true
 	// after the first consensus release in which it is set true.
 	AllowZeroLocalAppRef bool
+
+	// SupportAssetDelegation indicates support for asset delegation, allowing
+	// accounts to delegate the minimum balance requirement (MBR) of an asset holding
+	// to another account.
+	// This can also be revoked by the delegator if the delegated holding has a
+	// zero asset balance.
+	SupportAssetDelegation bool
+
+	// SupportAccountBootstrapping indicates support for account bootstrapping,
+	// allowing one account to cover the base MinBalance for a new 0-Algo account.
+	SupportAccountBootstrapping bool
 }
 
 // ProposerPayoutRules puts several related consensus parameters in one place. The same
@@ -1466,6 +1477,8 @@ func initConsensusProtocols() {
 	vFuture.AppSizeUpdates = true
 	vFuture.AllowZeroLocalAppRef = true
 	vFuture.EnforceAuthAddrSenderDiff = true
+	vFuture.SupportAssetDelegation = true
+	vFuture.SupportAccountBootstrapping = true
 
 	Consensus[protocol.ConsensusFuture] = vFuture
 

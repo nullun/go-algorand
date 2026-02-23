@@ -50,6 +50,12 @@ type AccountBaseData struct {
 
 	LastProposed  basics.Round // The last round that this account proposed the winning block.
 	LastHeartbeat basics.Round // The last round that this account sent a heartbeat to show it was online.
+
+	TotalAssetsDelegated  uint64 // Total number of asset holdings other accounts are sponsoring for this account.
+	TotalAssetsDelegating uint64 // Total number of asset holdings this account is sponsoring for other accounts.
+
+	TotalAccountsBootstrapping uint64         // Total number of accounts this account is bootstrapping.
+	Bootstrapper               basics.Address // Address of the account bootstrapping this account
 }
 
 // ToAccountData returns ledgercore.AccountData from basics.AccountData
@@ -74,6 +80,12 @@ func ToAccountData(acct basics.AccountData) AccountData {
 
 			LastProposed:  acct.LastProposed,
 			LastHeartbeat: acct.LastHeartbeat,
+
+			TotalAssetsDelegated:  acct.TotalAssetsDelegated,
+			TotalAssetsDelegating: acct.TotalAssetsDelegating,
+
+			TotalAccountsBootstrapping: acct.TotalAccountsBootstrapping,
+			Bootstrapper:               acct.Bootstrapper,
 		},
 		VotingData: basics.VotingData{
 			VoteID:          acct.VoteID,
@@ -110,6 +122,12 @@ func AssignAccountData(a *basics.AccountData, acct AccountData) {
 
 	a.LastProposed = acct.LastProposed
 	a.LastHeartbeat = acct.LastHeartbeat
+
+	a.TotalAssetsDelegated = acct.TotalAssetsDelegated
+	a.TotalAssetsDelegating = acct.TotalAssetsDelegating
+
+	a.TotalAccountsBootstrapping = acct.TotalAccountsBootstrapping
+	a.Bootstrapper = acct.Bootstrapper
 }
 
 // WithUpdatedRewards calls basics account data WithUpdatedRewards
@@ -150,11 +168,15 @@ func (u AccountData) LastSeen() basics.Round {
 func (u AccountData) MinBalance(proto *config.ConsensusParams) basics.MicroAlgos {
 	return basics.MinBalance(
 		proto.BalanceRequirements(),
+		!u.Bootstrapper.IsZero(),
+		u.TotalAccountsBootstrapping,
 		u.TotalAssets,
 		u.TotalAppSchema,
 		u.TotalAppParams, u.TotalAppLocalStates,
 		uint64(u.TotalExtraAppPages),
 		u.TotalBoxes, u.TotalBoxBytes,
+		u.TotalAssetsDelegated,
+		u.TotalAssetsDelegating,
 	)
 }
 

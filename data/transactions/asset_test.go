@@ -33,8 +33,11 @@ func TestAxferWellFormedErrors(t *testing.T) {
 	partitiontest.PartitionTest(t)
 	t.Parallel()
 
+	proto := config.Consensus[protocol.ConsensusFuture]
+
 	cases := []struct {
 		axfer         AssetTransferTxnFields
+		header        Header
 		expectedError string
 	}{
 		{
@@ -61,6 +64,18 @@ func TestAxferWellFormedErrors(t *testing.T) {
 			},
 			expectedError: "cannot close asset by clawback",
 		},
+		{
+			axfer: AssetTransferTxnFields{
+				XferAsset:       basics.AssetIndex(1),
+				AssetAmount:     0,
+				AssetReceiver:   basics.Address{0x01},
+				AssetDelegation: ApproveAssetDelegation,
+			},
+			header: Header{
+				Sender: basics.Address{0x01},
+			},
+			expectedError: "asset delegations cannot be performed on self",
+		},
 	}
 
 	for i, ax := range cases {
@@ -69,7 +84,7 @@ func TestAxferWellFormedErrors(t *testing.T) {
 			name = ax.expectedError
 		}
 		t.Run(name, func(t *testing.T) {
-			err := ax.axfer.wellFormed()
+			err := ax.axfer.wellFormed(ax.header, proto)
 			if ax.expectedError != "" {
 				require.ErrorContains(t, err, ax.expectedError)
 			} else {

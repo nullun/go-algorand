@@ -23,6 +23,23 @@ import (
 	"github.com/algorand/go-algorand/data/basics"
 )
 
+// AccountBootstrap indicates the type of account bootstrap operation.
+type AccountBootstrap uint8
+
+// BootstrapAccount indicates that the Receiver's initial minimum
+// balance requirement will be bootstrapped by the Sender.
+const BootstrapAccount AccountBootstrap = 1
+
+// RescindAccount indicates that the Receiver's initial minimum
+// balance requirement will no longer be bootstrapped by the Sender (who must be
+// the current Bootstrapper).
+// This will only succeed if the Receiver's holdings are zero.
+// TODO: Should it be possible for someone else takeover an existing Account
+// Bootstrap? How would you prevent someone immediately taking over and
+// rescinding someone who temporarily has zero units but may intend to hold more
+// again soon?
+const RescindAccount AccountBootstrap = 2
+
 // PaymentTxnFields captures the fields used by payment transactions.
 type PaymentTxnFields struct {
 	_struct struct{} `codec:",omitempty,omitemptyarray"`
@@ -35,6 +52,9 @@ type PaymentTxnFields struct {
 	// closed, and all remaining funds be transferred to this
 	// address.
 	CloseRemainderTo basics.Address `codec:"close"`
+
+	// AccountBootstrap indicates the type of account bootstrap operation.
+	AccountBootstrap AccountBootstrap `codec:"boot"`
 }
 
 // wellFormed performs some stateless checks on the Sender of a pay transaction
@@ -55,5 +75,10 @@ func (payment PaymentTxnFields) wellFormed(header Header, spec SpecialAddresses,
 			return fmt.Errorf("cannot close fee sink %v to %v", header.Sender, payment.CloseRemainderTo)
 		}
 	}
+
+	if !proto.SupportAccountBootstrapping && payment.AccountBootstrap != 0 {
+		return fmt.Errorf("transaction tries to set account bootstrap, but account bootstrapping is not supported")
+	}
+
 	return nil
 }

@@ -154,6 +154,9 @@ func RandomAssetHolding(forceFrozen bool) basics.AssetHolding {
 		Amount: amount,
 		Frozen: frozen,
 	}
+	if crypto.RandUint64()%3 == 0 {
+		ah.Delegator = RandomAddress()
+	}
 	return ah
 }
 
@@ -356,6 +359,13 @@ func RandomFullAccountData(rewardsLevel uint64, lastCreatableID *basics.Creatabl
 	if (crypto.RandUint64() % 3) == 1 {
 		data.TotalBoxes = crypto.RandUint64() % 100
 		data.TotalBoxBytes = crypto.RandUint64() % 10000
+	}
+
+	if (crypto.RandUint64() % 3) == 1 {
+		data.TotalAssetsDelegated = crypto.RandUint64() % 50
+		data.TotalAssetsDelegating = crypto.RandUint64() % 50
+		data.TotalAccountsBootstrapping = crypto.RandUint64() % 10
+		data.Bootstrapper = RandomAddress()
 	}
 
 	return data

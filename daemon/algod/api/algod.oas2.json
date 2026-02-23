@@ -2689,6 +2689,26 @@
           "description": "The round in which this account last went online, or explicitly renewed their online status.",
           "type": "integer",
           "x-go-type": "basics.Round"
+        },
+        "total-assets-delegated": {
+          "description": "\\[tadl\\] The number of asset holdings delegated to this account by others",
+          "type": "integer",
+          "format": "uint64"
+        },
+        "total-assets-delegating": {
+          "description": "\\[tadg\\] The number of asset holdings this account is delegating for others",
+          "type": "integer",
+          "format": "uint64"
+        },
+        "total-accounts-bootstrapping": {
+          "description": "\\[tabs\\] The number of accounts this account is bootstrapping",
+          "type": "integer",
+          "format": "uint64"
+        },
+        "bootstrapper": {
+          "description": "\\[boot\\] Address of the account that is bootstrapping this account. If empty, the account is not bootstrapped.",
+          "type": "string",
+          "x-algorand-format": "Address"
         }
       }
     },
@@ -2814,6 +2834,11 @@
         "is-frozen": {
           "description": "\\[f\\] whether or not the holding is frozen.",
           "type": "boolean"
+        },
+        "delegator": {
+          "description": "\\[d\\] Address of the delegating account for this asset holding. If empty, the asset holding is not delegated.",
+          "type": "string",
+          "x-algorand-format": "Address"
         }
       }
     },

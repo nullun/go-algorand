@@ -1182,6 +1182,26 @@
             "description": "The count of all assets (AssetParams objects) created by this account.",
             "format": "uint64",
             "type": "integer"
+          },
+          "total-assets-delegated": {
+            "description": "\\[tadl\\] The number of asset holdings delegated to this account by others",
+            "format": "uint64",
+            "type": "integer"
+          },
+          "total-assets-delegating": {
+            "description": "\\[tadg\\] The number of asset holdings this account is delegating for others",
+            "format": "uint64",
+            "type": "integer"
+          },
+          "total-accounts-bootstrapping": {
+            "description": "\\[tabs\\] The number of accounts this account is bootstrapping",
+            "format": "uint64",
+            "type": "integer"
+          },
+          "bootstrapper": {
+            "description": "\\[boot\\] Address of the account that is bootstrapping this account. If empty, the account is not bootstrapped.",
+            "type": "string",
+            "x-algorand-format": "Address"
           }
         },
         "required": [
@@ -1585,6 +1605,11 @@
           "is-frozen": {
             "description": "\\[f\\] whether or not the holding is frozen.",
             "type": "boolean"
+          },
+          "delegator": {
+            "description": "\\[d\\] Address of the delegating account for this asset holding. If empty, the asset holding is not delegated.",
+            "type": "string",
+            "x-algorand-format": "Address"
           }
         },
         "required": [

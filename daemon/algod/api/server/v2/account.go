@@ -33,9 +33,10 @@ import (
 // AssetHolding converts between basics.AssetHolding and model.AssetHolding
 func AssetHolding(ah basics.AssetHolding, ai basics.AssetIndex) model.AssetHolding {
 	return model.AssetHolding{
-		Amount:   ah.Amount,
-		AssetID:  ai,
-		IsFrozen: ah.Frozen,
+		Amount:    ah.Amount,
+		AssetID:   ai,
+		IsFrozen:  ah.Frozen,
+		Delegator: addrOrNil(ah.Delegator),
 	}
 }
 
@@ -162,6 +163,10 @@ func AccountDataToAccount(
 		MinBalance:                  minBalance.Raw,
 		LastProposed:                omitEmpty(record.LastProposed),
 		LastHeartbeat:               omitEmpty(record.LastHeartbeat),
+		TotalAssetsDelegated:        omitEmpty(record.TotalAssetsDelegated),
+		TotalAssetsDelegating:       omitEmpty(record.TotalAssetsDelegating),
+		TotalAccountsBootstrapping:  omitEmpty(record.TotalAccountsBootstrapping),
+		Bootstrapper:                addrOrNil(record.Bootstrapper),
 	}, nil
 }
 
@@ -288,9 +293,14 @@ func AccountToAccountData(a *model.Account) (basics.AccountData, error) {
 	if a.Assets != nil && len(*a.Assets) > 0 {
 		assets = make(map[basics.AssetIndex]basics.AssetHolding, len(*a.Assets))
 		for _, h := range *a.Assets {
+			delegate, err := nilToZeroAddr(h.Delegator)
+			if err != nil {
+				return basics.AccountData{}, err
+			}
 			assets[h.AssetID] = basics.AssetHolding{
-				Amount: h.Amount,
-				Frozen: h.IsFrozen,
+				Amount:    h.Amount,
+				Frozen:    h.IsFrozen,
+				Delegator: delegate,
 			}
 		}
 	}
@@ -363,13 +373,20 @@ func AccountToAccountData(a *model.Account) (basics.AccountData, error) {
 		AppParams:          appParams,
 		TotalAppSchema:     totalSchema,
 		TotalExtraAppPages: totalExtraPages,
-		TotalBoxes:         nilToZero(a.TotalBoxes),
-		TotalBoxBytes:      nilToZero(a.TotalBoxBytes),
-		LastProposed:       nilToZero(a.LastProposed),
-		LastHeartbeat:      nilToZero(a.LastHeartbeat),
+		TotalBoxes:                 nilToZero(a.TotalBoxes),
+		TotalBoxBytes:              nilToZero(a.TotalBoxBytes),
+		LastProposed:               nilToZero(a.LastProposed),
+		LastHeartbeat:              nilToZero(a.LastHeartbeat),
+		TotalAssetsDelegated:       nilToZero(a.TotalAssetsDelegated),
+		TotalAssetsDelegating:      nilToZero(a.TotalAssetsDelegating),
+		TotalAccountsBootstrapping: nilToZero(a.TotalAccountsBootstrapping),
 	}
 
 	ad.AuthAddr, err = nilToZeroAddr(a.AuthAddr)
+	if err != nil {
+		return basics.AccountData{}, err
+	}
+	ad.Bootstrapper, err = nilToZeroAddr(a.Bootstrapper)
 	if err != nil {
 		return basics.AccountData{}, err
 	}

@@ -39,6 +39,71 @@ func Payment(payment transactions.PaymentTxnFields, header transactions.Header, 
 		}
 	}
 
+	// Bootstrap a new account
+	if payment.AccountBootstrap == transactions.BootstrapAccount {
+		rcvRecord, err := balances.Get(payment.Receiver, false)
+		if err != nil {
+			return err
+		}
+		// if !rcvRecord.Bootstrapper.IsZero() {
+		// 	return fmt.Errorf("cannot bootstrap account: account is already bootstrapped by %s", rcvRecord.Bootstrapper.String())
+		// }
+		if !rcvRecord.IsZero() {
+			return fmt.Errorf("cannot bootstrap account: account already exists")
+		}
+		rcvRecord.Bootstrapper = header.Sender
+		err = balances.Put(payment.Receiver, rcvRecord)
+		if err != nil {
+			return err
+		}
+
+		sndRecord, err := balances.Get(header.Sender, false)
+		if err != nil {
+			return err
+		}
+		sndRecord.TotalAccountsBootstrapping = basics.AddSaturate(sndRecord.TotalAccountsBootstrapping, 1)
+		err = balances.Put(header.Sender, sndRecord)
+		if err != nil {
+			return err
+		}
+	}
+
+	// Rescind a bootstrapped account
+	if payment.AccountBootstrap == transactions.RescindAccount {
+		rcvRecord, err := balances.Get(payment.Receiver, false)
+		if err != nil {
+			return err
+		}
+		// if !rcvRecord.MicroAlgos.IsZero() {
+		// 	return fmt.Errorf("balance %d still not zero after CloseRemainderTo", rcvRecord.MicroAlgos.Raw)
+		// }
+		proto := balances.ConsensusParams()
+		minBal := rcvRecord.MinBalance(&proto).Raw
+		if minBal > 0 {
+			return fmt.Errorf("cannot rescind account bootstrap: account has non-zero minimum balance requirement %d", minBal)
+		}
+
+		if rcvRecord.TotalAssetsDelegated > 0 {
+			return fmt.Errorf("cannot rescind account bootstrap: %d outstanding delegated assets", rcvRecord.TotalAssetsDelegated)
+		}
+
+		// Clear out entire bootstrapped account record
+		err = balances.CloseAccount(payment.Receiver)
+		if err != nil {
+			return err
+		}
+
+		sndRecord, err := balances.Get(header.Sender, false)
+		if err != nil {
+			return err
+		}
+		sndRecord.TotalAccountsBootstrapping = basics.SubSaturate(sndRecord.TotalAccountsBootstrapping, 1)
+		err = balances.Put(header.Sender, sndRecord)
+		if err != nil {
+			return err
+		}
+	}
+
 	if payment.CloseRemainderTo != (basics.Address{}) {
 		rec, err := balances.Get(header.Sender, true)
 		if err != nil {
@@ -59,6 +124,39 @@ func Payment(payment transactions.PaymentTxnFields, header transactions.Header, 
 		}
 		if !rec.MicroAlgos.IsZero() {
 			return fmt.Errorf("balance %d still not zero after CloseRemainderTo", rec.MicroAlgos.Raw)
+		}
+
+		totalAccountsBootstrapping := rec.TotalAccountsBootstrapping
+		if totalAccountsBootstrapping > 0 {
+			if totalAccountsBootstrapping > 1 {
+				return fmt.Errorf("cannot close: %d outstanding bootstrapped accounts", totalAccountsBootstrapping)
+			}
+
+			if ad.ClosingAmount.Raw < balances.ConsensusParams().MinBalance {
+				return fmt.Errorf("cannot close: insufficient balance (%d) to remove account bootstrap", ad.ClosingAmount.Raw)
+			}
+
+			closeRecord, err2 := balances.Get(payment.CloseRemainderTo, false)
+			if err2 != nil {
+				return err2
+			}
+			if header.Sender != closeRecord.Bootstrapper {
+				return fmt.Errorf("cannot close: account is bootstrapping another account")
+			}
+			closeRecord.Bootstrapper = basics.Address{}
+			err2 = balances.Put(payment.CloseRemainderTo, closeRecord)
+			if err2 != nil {
+				return err2
+			}
+		}
+
+		// Confirm that there are no delegating asset holdings by the account.
+		if rec.TotalAssetsDelegating != 0 {
+			return fmt.Errorf("cannot close: %d outstanding delegating assets", rec.TotalAssetsDelegating)
+		}
+		// Confirm that there are no delegated asset holdings by the account.
+		if rec.TotalAssetsDelegated != 0 {
+			return fmt.Errorf("cannot close: %d outstanding delegated assets", rec.TotalAssetsDelegated)
 		}
 
 		// Confirm that there is no asset-related state in the account

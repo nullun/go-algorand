@@ -317,6 +317,164 @@ func AssetTransfer(ct transactions.AssetTransferTxnFields, header transactions.H
 			if err != nil {
 				return err
 			}
+		} else {
+			// When an account performs an Asset "OptIn" transaction whilst a holding
+			// already exists for the asset and it's delegated, the account is
+			// discharging the delegator from their MBR responsibility. The required MBR
+			// must now be maintained on the asset holding's account itself.
+			if sponsor := sndHolding.Delegator; !sponsor.IsZero() {
+
+				// Deallocate MBR from Sponsor
+				// -1 to their TotalAssetsDelegating
+				sponsorRecord, err := balances.Get(sponsor, false)
+				if err != nil {
+					return err
+				}
+				sponsorRecord.TotalAssetsDelegating = basics.SubSaturate(sponsorRecord.TotalAssetsDelegating, 1)
+				err = balances.Put(sponsor, sponsorRecord)
+				if err != nil {
+					return err
+				}
+
+				// -1 from Senders TotalAssetsDelegated
+				sndRecord, err := balances.Get(source, false)
+				if err != nil {
+					return err
+				}
+				sndRecord.TotalAssetsDelegated = basics.SubSaturate(sndRecord.TotalAssetsDelegated, 1)
+				err = balances.Put(source, sndRecord)
+				if err != nil {
+					return err
+				}
+
+				// Remove Sponsor from the holdings
+				sndHolding.Delegator = basics.Address{}
+				err = balances.PutAssetHolding(source, ct.XferAsset, sndHolding)
+				if err != nil {
+					return err
+				}
+			}
+		}
+	}
+
+	// Perform Benefactor Enforcement for AssetTransfer.
+	// This results in the sender (not AssetSender) increasing their own Minimum
+	// Balance Requirement and Opting In the AssetReceiver into to the asset
+	// rather than failing and only if required.
+	if ct.AssetDelegation == transactions.ApproveAssetDelegation {
+		rcvHolding, ok, err := balances.GetAssetHolding(ct.AssetReceiver, ct.XferAsset)
+		if err != nil {
+			return err
+		}
+
+		if !ok {
+			rcvRecord, err := balances.Get(ct.AssetReceiver, false)
+			if err != nil {
+				return err
+			}
+
+			// Initialize holding with default Frozen value.
+			params, _, err := getParams(balances, ct.XferAsset)
+			if err != nil {
+				return err
+			}
+
+			rcvHolding.Frozen = params.DefaultFrozen
+			rcvHolding.Delegator = header.Sender
+
+			totalRcvAssets := rcvRecord.TotalAssets
+			maxAssetsPerAccount := balances.ConsensusParams().MaxAssetsPerAccount
+			if maxAssetsPerAccount > 0 && totalRcvAssets >= uint64(maxAssetsPerAccount) {
+				return fmt.Errorf("too many assets in account: %d >= %d", totalRcvAssets, maxAssetsPerAccount)
+			}
+
+			rcvRecord.TotalAssets = basics.AddSaturate(rcvRecord.TotalAssets, 1)
+			rcvRecord.TotalAssetsDelegated = basics.AddSaturate(rcvRecord.TotalAssetsDelegated, 1)
+			err = balances.Put(ct.AssetReceiver, rcvRecord)
+			if err != nil {
+				return err
+			}
+
+			err = balances.PutAssetHolding(ct.AssetReceiver, ct.XferAsset, rcvHolding)
+			if err != nil {
+				return err
+			}
+
+			err = balances.AllocateAsset(ct.AssetReceiver, ct.XferAsset, false)
+			if err != nil {
+				return err
+			}
+
+			// Allocate MBR on Sender by incrementing their TotalAssetsDelegating.
+			sndRecord, err := balances.Get(header.Sender, false)
+			if err != nil {
+				return err
+			}
+			sndRecord.TotalAssetsDelegating = basics.AddSaturate(sndRecord.TotalAssetsDelegating, 1)
+			err = balances.Put(header.Sender, sndRecord)
+			if err != nil {
+				return err
+			}
+		} else {
+			return fmt.Errorf("cannot approve delegation for an existing asset holding")
+		}
+	}
+
+	// Allow a Delegator to revoke their delegation for accounts that hold zero
+	// units of the delegated asset.
+	// This results in the Delegator decreasing their Minimum Balance Requirement
+	// and Closing Out the asset of the AssetReceiver.
+	// Must not contain an AssetCloseTo field, since no assets should actually
+	// be getting moved.
+	if ct.AssetDelegation == transactions.RevokeAssetDelegation {
+		rcvHolding, ok, err := balances.GetAssetHolding(ct.AssetReceiver, ct.XferAsset)
+		if err != nil {
+			return err
+		}
+
+		if ok {
+			rcvRecord, err := balances.Get(ct.AssetReceiver, false)
+			if err != nil {
+				return err
+			}
+
+			if rcvHolding.Amount != 0 {
+				return fmt.Errorf("cannot revoke delegation from an asset holding with non-zero balance: %d", rcvHolding.Amount)
+			}
+
+			if rcvHolding.Delegator != header.Sender {
+				return fmt.Errorf("only the delegator can revoke their delegation: sender %v, delegator: %v", header.Sender, rcvHolding.Delegator)
+			}
+
+			rcvRecord.TotalAssets = basics.SubSaturate(rcvRecord.TotalAssets, 1)
+			rcvRecord.TotalAssetsDelegated = basics.SubSaturate(rcvRecord.TotalAssetsDelegated, 1)
+			err = balances.Put(ct.AssetReceiver, rcvRecord)
+			if err != nil {
+				return err
+			}
+
+			err = balances.DeleteAssetHolding(ct.AssetReceiver, ct.XferAsset)
+			if err != nil {
+				return err
+			}
+
+			err = balances.DeallocateAsset(ct.AssetReceiver, ct.XferAsset, false)
+			if err != nil {
+				return err
+			}
+
+			// Decrement Sponsors TotalAssetsDelegating.
+			sndRecord, err := balances.Get(header.Sender, false)
+			if err != nil {
+				return err
+			}
+			sndRecord.TotalAssetsDelegating = basics.SubSaturate(sndRecord.TotalAssetsDelegating, 1)
+			err = balances.Put(header.Sender, sndRecord)
+			if err != nil {
+				return err
+			}
+		} else {
+			return fmt.Errorf("cannot revoke delegation for a non-existent asset holding")
 		}
 	}
 
@@ -414,6 +572,22 @@ func AssetTransfer(ct transactions.AssetTransferTxnFields, header transactions.H
 
 		if sndHolding.Amount != 0 {
 			return fmt.Errorf("asset %v not zero (%d) after closing", ct.XferAsset, sndHolding.Amount)
+		}
+
+		// Update TotalAssetsDelegated for asset holder and TotalAssetsDelegating for
+		// asset sponsor if asset holding was sponsored.
+		if !sndHolding.Delegator.IsZero() {
+			record.TotalAssetsDelegated = basics.SubSaturate(record.TotalAssetsDelegated, 1)
+
+			sponsorRecord, err2 := balances.Get(sndHolding.Delegator, false)
+			if err2 != nil {
+				return err2
+			}
+			sponsorRecord.TotalAssetsDelegating = basics.SubSaturate(sponsorRecord.TotalAssetsDelegating, 1)
+			err = balances.Put(sndHolding.Delegator, sponsorRecord)
+			if err != nil {
+				return err
+			}
 		}
 
 		record.TotalAssets = basics.SubSaturate(record.TotalAssets, 1)

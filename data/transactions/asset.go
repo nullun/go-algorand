@@ -24,6 +24,23 @@ import (
 	"github.com/algorand/go-algorand/data/basics"
 )
 
+// AssetDelegation indicates the type of asset delegation operation.
+type AssetDelegation uint8
+
+// ApproveAssetDelegation indicates that the AssetReceiver's asset holding will be
+// delegated by the Sender, shifting the asset holding minimum balance requirement
+// to the Sender.
+const ApproveAssetDelegation AssetDelegation = 1
+
+// RevokeAssetDelegation indicates that the AssetReceiver's delegated asset holding
+// will no longer be delegated by the Sender (who must be the current Delegator).
+// This will only succeed if the AssetReceiver's asset holding balance is zero.
+// TODO: Should it be possible for someone else takeover an existing Asset
+// Delegation? How would you prevent someone immediately taking over and
+// revoking delegation for someone who temporarily has zero units but may intend to hold more
+// again soon?
+const RevokeAssetDelegation AssetDelegation = 2
+
 // AssetConfigTxnFields captures the fields used for asset
 // allocation, re-configuration, and destruction.
 type AssetConfigTxnFields struct {
@@ -63,6 +80,9 @@ type AssetTransferTxnFields struct {
 	// asset holdings should be transferred.  It's always valid to transfer
 	// remaining asset holdings to the creator account.
 	AssetCloseTo basics.Address `codec:"aclose"`
+
+	// AssetDelegation indicates the type of sponsorship operation.
+	AssetDelegation AssetDelegation `codec:"ad"`
 }
 
 // AssetFreezeTxnFields captures the fields used for freezing asset slots.
@@ -100,13 +120,21 @@ func (ac AssetConfigTxnFields) wellFormed(proto config.ConsensusParams) error {
 	return nil
 }
 
-func (ax AssetTransferTxnFields) wellFormed() error {
+func (ax AssetTransferTxnFields) wellFormed(header Header, proto config.ConsensusParams) error {
 	if ax.XferAsset == 0 && ax.AssetAmount != 0 {
 		return errors.New("asset ID cannot be zero")
 	}
 
 	if !ax.AssetSender.IsZero() && !ax.AssetCloseTo.IsZero() {
 		return errors.New("cannot close asset by clawback")
+	}
+
+	if !proto.SupportAssetDelegation && ax.AssetDelegation != 0 {
+		return errors.New("transaction tries to set asset delegation, but asset delegation is not supported")
+	}
+
+	if ax.AssetDelegation != 0 && ax.AssetReceiver == header.Sender {
+		return errors.New("asset delegations cannot be performed on self")
 	}
 
 	return nil

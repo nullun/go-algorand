@@ -610,6 +610,17 @@ type ConsensusParams struct {
 	// EnableSelectF128 changes the sortition algorithm to use a 128-bit software
 	// floating point binomial CDF implementation for committee selection.
 	EnableSelectF128 bool
+
+	// SupportAssetDelegation indicates support for asset delegation, allowing
+	// accounts to delegate the minimum balance requirement (MBR) of an asset holding
+	// to another account.
+	// This can also be revoked by the delegator if the delegated holding has a
+	// zero asset balance.
+	SupportAssetDelegation bool
+
+	// SupportAccountBootstrapping indicates support for account bootstrapping,
+	// allowing one account to cover the base MinBalance for a new 0-Algo account.
+	SupportAccountBootstrapping bool
 }
 
 // ProposerPayoutRules puts several related consensus parameters in one place. The same
@@ -1560,6 +1571,9 @@ func initConsensusProtocols() {
 	vFuture.ApprovedUpgrades = map[protocol.ConsensusVersion]uint64{}
 
 	vFuture.LogicSigVersion = 14 // When moving this to a release, put a new higher LogicSigVersion here
+
+	vFuture.SupportAssetDelegation = true
+	vFuture.SupportAccountBootstrapping = true
 
 	Consensus[protocol.ConsensusFuture] = vFuture
 

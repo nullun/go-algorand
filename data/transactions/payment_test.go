@@ -187,3 +187,112 @@ func TestWellFormedPaymentErrors(t *testing.T) {
 		assert.Equal(t, usecase.expectedError, err)
 	}
 }
+
+// TestAccountBootstrapWellFormed verifies that account bootstrap transactions
+// are properly validated in the wellFormed check.
+func TestAccountBootstrapWellFormed(t *testing.T) {
+	partitiontest.PartitionTest(t)
+	t.Parallel()
+
+	protoFuture := config.Consensus[protocol.ConsensusFuture]
+	protoCurrent := config.Consensus[protocol.ConsensusCurrentVersion]
+
+	secretSrc := keypair()
+	src := basics.Address(secretSrc.SignatureVerifier)
+
+	secretDst := keypair()
+	dst := basics.Address(secretDst.SignatureVerifier)
+
+	var spec = SpecialAddresses{
+		FeeSink:     basics.Address{0x01},
+		RewardsPool: basics.Address{0x02},
+	}
+
+	t.Run("bootstrap account - future protocol", func(t *testing.T) {
+		require.True(t, protoFuture.SupportAccountBootstrapping, "test requires a protocol with account bootstrapping support")
+
+		tx := Transaction{
+			Type: protocol.PaymentTx,
+			Header: Header{
+				Sender:     src,
+				Fee:        basics.MicroAlgos{Raw: protoFuture.MinTxnFee},
+				FirstValid: basics.Round(100),
+				LastValid:  basics.Round(1000),
+			},
+			PaymentTxnFields: PaymentTxnFields{
+				Receiver:         dst,
+				Amount:           basics.MicroAlgos{Raw: uint64(50)},
+				AccountBootstrap: BootstrapAccount,
+			},
+		}
+
+		err := tx.PaymentTxnFields.wellFormed(tx.Header, spec, protoFuture)
+		require.NoError(t, err)
+	})
+
+	t.Run("rescind account - future protocol", func(t *testing.T) {
+		require.True(t, protoFuture.SupportAccountBootstrapping, "test requires a protocol with account bootstrapping support")
+
+		tx := Transaction{
+			Type: protocol.PaymentTx,
+			Header: Header{
+				Sender:     src,
+				Fee:        basics.MicroAlgos{Raw: protoFuture.MinTxnFee},
+				FirstValid: basics.Round(100),
+				LastValid:  basics.Round(1000),
+			},
+			PaymentTxnFields: PaymentTxnFields{
+				Receiver:         dst,
+				Amount:           basics.MicroAlgos{Raw: uint64(0)},
+				AccountBootstrap: RescindAccount,
+			},
+		}
+
+		err := tx.PaymentTxnFields.wellFormed(tx.Header, spec, protoFuture)
+		require.NoError(t, err)
+	})
+
+	t.Run("bootstrap not supported in current protocol", func(t *testing.T) {
+		require.False(t, protoCurrent.SupportAccountBootstrapping, "test requires a protocol without account bootstrapping support")
+
+		tx := Transaction{
+			Type: protocol.PaymentTx,
+			Header: Header{
+				Sender:     src,
+				Fee:        basics.MicroAlgos{Raw: protoCurrent.MinTxnFee},
+				FirstValid: basics.Round(100),
+				LastValid:  basics.Round(1000),
+			},
+			PaymentTxnFields: PaymentTxnFields{
+				Receiver:         dst,
+				Amount:           basics.MicroAlgos{Raw: uint64(50)},
+				AccountBootstrap: BootstrapAccount,
+			},
+		}
+
+		err := tx.PaymentTxnFields.wellFormed(tx.Header, spec, protoCurrent)
+		require.ErrorContains(t, err, "account bootstrapping is not supported")
+	})
+
+	t.Run("rescind not supported in current protocol", func(t *testing.T) {
+		require.False(t, protoCurrent.SupportAccountBootstrapping, "test requires a protocol without account bootstrapping support")
+
+		tx := Transaction{
+			Type: protocol.PaymentTx,
+			Header: Header{
+				Sender:     src,
+				Fee:        basics.MicroAlgos{Raw: protoCurrent.MinTxnFee},
+				FirstValid: basics.Round(100),
+				LastValid:  basics.Round(1000),
+			},
+			PaymentTxnFields: PaymentTxnFields{
+				Receiver:         dst,
+				Amount:           basics.MicroAlgos{Raw: uint64(0)},
+				AccountBootstrap: RescindAccount,
+			},
+		}
+
+		err := tx.PaymentTxnFields.wellFormed(tx.Header, spec, protoCurrent)
+		require.ErrorContains(t, err, "account bootstrapping is not supported")
+	})
+}

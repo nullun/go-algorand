@@ -76,6 +76,44 @@ func TestAxferWellFormedErrors(t *testing.T) {
 			},
 			expectedError: "asset delegations cannot be performed on self",
 		},
+		{
+			axfer: AssetTransferTxnFields{
+				XferAsset:       basics.AssetIndex(1),
+				AssetAmount:     0,
+				AssetReceiver:   basics.Address{0x01},
+				AssetDelegation: RevokeAssetDelegation,
+			},
+			header: Header{
+				Sender: basics.Address{0x01},
+			},
+			expectedError: "asset delegations cannot be performed on self",
+		},
+		// Valid asset delegation - approve (sender != receiver)
+		{
+			axfer: AssetTransferTxnFields{
+				XferAsset:       basics.AssetIndex(1),
+				AssetAmount:     0,
+				AssetReceiver:   basics.Address{0x01},
+				AssetDelegation: ApproveAssetDelegation,
+			},
+			header: Header{
+				Sender: basics.Address{0x02},
+			},
+			expectedError: "",
+		},
+		// Valid asset delegation - revoke (sender != receiver)
+		{
+			axfer: AssetTransferTxnFields{
+				XferAsset:       basics.AssetIndex(1),
+				AssetAmount:     0,
+				AssetReceiver:   basics.Address{0x01},
+				AssetDelegation: RevokeAssetDelegation,
+			},
+			header: Header{
+				Sender: basics.Address{0x02},
+			},
+			expectedError: "",
+		},
 	}
 
 	for i, ax := range cases {
@@ -209,6 +247,50 @@ func TestAfrzWellFormedErrors(t *testing.T) {
 			} else {
 				require.NoError(t, err)
 			}
+		})
+	}
+}
+
+// TestAssetDelegationNotSupported verifies that asset delegation transactions
+// fail in protocols that do not support asset delegation.
+func TestAssetDelegationNotSupported(t *testing.T) {
+	partitiontest.PartitionTest(t)
+	t.Parallel()
+
+	// Use a protocol that doesn't support asset delegation
+	proto := config.Consensus[protocol.ConsensusCurrentVersion]
+	require.False(t, proto.SupportAssetDelegation, "test requires a protocol without asset delegation support")
+
+	cases := []struct {
+		name            string
+		assetDelegation AssetDelegation
+		expectedError   string
+	}{
+		{
+			name:            "approve delegation not supported",
+			assetDelegation: ApproveAssetDelegation,
+			expectedError:   "asset delegation is not supported",
+		},
+		{
+			name:            "revoke delegation not supported",
+			assetDelegation: RevokeAssetDelegation,
+			expectedError:   "asset delegation is not supported",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			axfer := AssetTransferTxnFields{
+				XferAsset:       basics.AssetIndex(1),
+				AssetAmount:     0,
+				AssetReceiver:   basics.Address{0x01},
+				AssetDelegation: tc.assetDelegation,
+			}
+			header := Header{
+				Sender: basics.Address{0x02},
+			}
+			err := axfer.wellFormed(header, proto)
+			require.ErrorContains(t, err, tc.expectedError)
 		})
 	}
 }

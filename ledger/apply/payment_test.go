@@ -175,3 +175,359 @@ func generateTestPays(numTxs int) []transactions.Transaction {
 	}
 	return txs
 }
+
+// TestAccountBootstrapApply tests the BootstrapAccount flow where a
+// bootstrapper creates a new account and covers their initial MBR.
+func TestAccountBootstrapApply(t *testing.T) {
+	partitiontest.PartitionTest(t)
+
+	bootstrapper := ledgertesting.RandomAddress()
+	newAccount := ledgertesting.RandomAddress()
+
+	addrs := map[basics.Address]basics.AccountData{
+		bootstrapper: {
+			MicroAlgos: basics.MicroAlgos{Raw: uint64(50)},
+		},
+		// newAccount intentionally not in map - it doesn't exist yet
+	}
+
+	mockBal := makeMockBalancesWithAccounts(protocol.ConsensusFuture, addrs)
+
+	tx := transactions.Transaction{
+		Type: protocol.PaymentTx,
+		Header: transactions.Header{
+			Sender:     bootstrapper,
+			Fee:        basics.MicroAlgos{Raw: 1},
+			FirstValid: basics.Round(100),
+			LastValid:  basics.Round(1000),
+		},
+		PaymentTxnFields: transactions.PaymentTxnFields{
+			Receiver:         newAccount,
+			Amount:           basics.MicroAlgos{Raw: 0},
+			AccountBootstrap: transactions.BootstrapAccount,
+		},
+	}
+
+	var ad transactions.ApplyData
+	err := Payment(tx.PaymentTxnFields, tx.Header, mockBal, transactions.SpecialAddresses{}, &ad)
+	require.NoError(t, err)
+
+	// Verify the new account was bootstrapped
+	newAcctData, err := mockBal.Get(newAccount, false)
+	require.NoError(t, err)
+	require.Equal(t, bootstrapper, newAcctData.Bootstrapper)
+
+	// Verify the bootstrapper's TotalAccountsBootstrapping was incremented
+	bootstrapperData, err := mockBal.Get(bootstrapper, false)
+	require.NoError(t, err)
+	require.Equal(t, uint64(1), bootstrapperData.TotalAccountsBootstrapping)
+}
+
+// TestAccountBootstrapExistingAccountFails tests that bootstrapping an
+// existing account fails.
+func TestAccountBootstrapExistingAccountFails(t *testing.T) {
+	partitiontest.PartitionTest(t)
+
+	bootstrapper := ledgertesting.RandomAddress()
+	existingAccount := ledgertesting.RandomAddress()
+
+	addrs := map[basics.Address]basics.AccountData{
+		bootstrapper: {
+			MicroAlgos: basics.MicroAlgos{Raw: 10000000},
+		},
+		existingAccount: {
+			MicroAlgos: basics.MicroAlgos{Raw: 100}, // Account already exists with balance
+		},
+	}
+
+	mockBal := makeMockBalancesWithAccounts(protocol.ConsensusFuture, addrs)
+
+	tx := transactions.Transaction{
+		Type: protocol.PaymentTx,
+		Header: transactions.Header{
+			Sender:     bootstrapper,
+			Fee:        basics.MicroAlgos{Raw: 1},
+			FirstValid: basics.Round(100),
+			LastValid:  basics.Round(1000),
+		},
+		PaymentTxnFields: transactions.PaymentTxnFields{
+			Receiver:         existingAccount,
+			Amount:           basics.MicroAlgos{Raw: 0},
+			AccountBootstrap: transactions.BootstrapAccount,
+		},
+	}
+
+	var ad transactions.ApplyData
+	err := Payment(tx.PaymentTxnFields, tx.Header, mockBal, transactions.SpecialAddresses{}, &ad)
+	require.ErrorContains(t, err, "cannot bootstrap account: account already exists")
+}
+
+// TestAccountRescindApply tests the RescindAccount flow where a
+// bootstrapper rescinds their bootstrap from an empty account.
+func TestAccountRescindApply(t *testing.T) {
+	partitiontest.PartitionTest(t)
+
+	bootstrapper := ledgertesting.RandomAddress()
+	bootstrappedAccount := ledgertesting.RandomAddress()
+
+	addrs := map[basics.Address]basics.AccountData{
+		bootstrapper: {
+			MicroAlgos:                 basics.MicroAlgos{Raw: 10000000},
+			TotalAccountsBootstrapping: 1,
+		},
+		bootstrappedAccount: {
+			MicroAlgos:   basics.MicroAlgos{Raw: 0},
+			Bootstrapper: bootstrapper,
+		},
+	}
+
+	mockBal := makeMockBalancesWithAccounts(protocol.ConsensusFuture, addrs)
+
+	tx := transactions.Transaction{
+		Type: protocol.PaymentTx,
+		Header: transactions.Header{
+			Sender:     bootstrapper,
+			Fee:        basics.MicroAlgos{Raw: 1},
+			FirstValid: basics.Round(100),
+			LastValid:  basics.Round(1000),
+		},
+		PaymentTxnFields: transactions.PaymentTxnFields{
+			Receiver:         bootstrappedAccount,
+			Amount:           basics.MicroAlgos{Raw: 0},
+			AccountBootstrap: transactions.RescindAccount,
+		},
+	}
+
+	var ad transactions.ApplyData
+	err := Payment(tx.PaymentTxnFields, tx.Header, mockBal, transactions.SpecialAddresses{}, &ad)
+	require.NoError(t, err)
+
+	// Verify the bootstrapped account was cleared
+	// (CloseAccount is called, so the record should be zeroed)
+	rescindedAcctData, err := mockBal.Get(bootstrappedAccount, false)
+	require.NoError(t, err)
+	require.True(t, rescindedAcctData.IsZero())
+
+	// Verify the bootstrapper's TotalAccountsBootstrapping was decremented
+	bootstrapperData, err := mockBal.Get(bootstrapper, false)
+	require.NoError(t, err)
+	require.Equal(t, uint64(0), bootstrapperData.TotalAccountsBootstrapping)
+}
+
+// TestAccountRescindWithDelegatedAssetsFails tests that rescinding a
+// bootstrapped account with delegated assets fails.
+func TestAccountRescindWithDelegatedAssetsFails(t *testing.T) {
+	partitiontest.PartitionTest(t)
+
+	bootstrapper := ledgertesting.RandomAddress()
+	bootstrappedAccount := ledgertesting.RandomAddress()
+
+	addrs := map[basics.Address]basics.AccountData{
+		bootstrapper: {
+			MicroAlgos:                 basics.MicroAlgos{Raw: 10000000},
+			TotalAccountsBootstrapping: 1,
+		},
+		bootstrappedAccount: {
+			MicroAlgos:           basics.MicroAlgos{Raw: 0},
+			Bootstrapper:         bootstrapper,
+			TotalAssetsDelegated: 1, // Has delegated assets
+			// Must include corresponding asset entry to avoid MinBalance underflow
+			// (MinBalance calculation: adjustedTotalAssets = len(Assets) - TotalAssetsDelegated)
+			Assets: map[basics.AssetIndex]basics.AssetHolding{
+				1: {Amount: 0, Frozen: false, Delegator: bootstrapper},
+			},
+		},
+	}
+
+	mockBal := makeMockBalancesWithAccounts(protocol.ConsensusFuture, addrs)
+
+	tx := transactions.Transaction{
+		Type: protocol.PaymentTx,
+		Header: transactions.Header{
+			Sender:     bootstrapper,
+			Fee:        basics.MicroAlgos{Raw: 1},
+			FirstValid: basics.Round(100),
+			LastValid:  basics.Round(1000),
+		},
+		PaymentTxnFields: transactions.PaymentTxnFields{
+			Receiver:         bootstrappedAccount,
+			Amount:           basics.MicroAlgos{Raw: 0},
+			AccountBootstrap: transactions.RescindAccount,
+		},
+	}
+
+	var ad transactions.ApplyData
+	err := Payment(tx.PaymentTxnFields, tx.Header, mockBal, transactions.SpecialAddresses{}, &ad)
+	require.ErrorContains(t, err, "outstanding delegated assets")
+}
+
+// TestCloseAccountWithBootstrapping tests that closing an account
+// that is bootstrapping another account requires sufficient balance.
+// Note: mockBalances.Move() doesn't actually move funds, so we can only test
+// the insufficient balance check here. Full integration tests would be needed
+// to test the complete close-with-bootstrap flow.
+func TestCloseAccountWithBootstrappingInsufficientBalance(t *testing.T) {
+	partitiontest.PartitionTest(t)
+
+	bootstrapper := ledgertesting.RandomAddress()
+	bootstrappedAccount := ledgertesting.RandomAddress()
+
+	addrs := map[basics.Address]basics.AccountData{
+		bootstrapper: {
+			// Balance is 0 - the close will fail because there's insufficient
+			// balance to remove the bootstrap (needs >= MinBalance).
+			MicroAlgos:                 basics.MicroAlgos{Raw: 0},
+			TotalAccountsBootstrapping: 1,
+		},
+		bootstrappedAccount: {
+			MicroAlgos:   basics.MicroAlgos{Raw: 0},
+			Bootstrapper: bootstrapper,
+		},
+	}
+
+	mockBal := makeMockBalancesWithAccounts(protocol.ConsensusFuture, addrs)
+
+	tx := transactions.Transaction{
+		Type: protocol.PaymentTx,
+		Header: transactions.Header{
+			Sender:     bootstrapper,
+			Fee:        basics.MicroAlgos{Raw: 1},
+			FirstValid: basics.Round(100),
+			LastValid:  basics.Round(1000),
+		},
+		PaymentTxnFields: transactions.PaymentTxnFields{
+			Receiver:         bootstrappedAccount,
+			Amount:           basics.MicroAlgos{Raw: 0},
+			CloseRemainderTo: bootstrappedAccount,
+		},
+	}
+
+	var ad transactions.ApplyData
+	err := Payment(tx.PaymentTxnFields, tx.Header, mockBal, transactions.SpecialAddresses{}, &ad)
+	require.ErrorContains(t, err, "insufficient balance")
+}
+
+// TestCloseAccountMultipleBootstrappedFails tests that closing an account
+// that is bootstrapping multiple accounts fails.
+func TestCloseAccountMultipleBootstrappedFails(t *testing.T) {
+	partitiontest.PartitionTest(t)
+
+	bootstrapper := ledgertesting.RandomAddress()
+	recipient := ledgertesting.RandomAddress()
+
+	addrs := map[basics.Address]basics.AccountData{
+		bootstrapper: {
+			// Balance is 0 because mockBalances.Move() doesn't actually move funds.
+			MicroAlgos:                 basics.MicroAlgos{Raw: 0},
+			TotalAccountsBootstrapping: 2, // Bootstrapping multiple accounts
+		},
+		recipient: {
+			MicroAlgos: basics.MicroAlgos{Raw: 10000000},
+		},
+	}
+
+	mockBal := makeMockBalancesWithAccounts(protocol.ConsensusFuture, addrs)
+
+	tx := transactions.Transaction{
+		Type: protocol.PaymentTx,
+		Header: transactions.Header{
+			Sender:     bootstrapper,
+			Fee:        basics.MicroAlgos{Raw: 1},
+			FirstValid: basics.Round(100),
+			LastValid:  basics.Round(1000),
+		},
+		PaymentTxnFields: transactions.PaymentTxnFields{
+			Receiver:         recipient,
+			Amount:           basics.MicroAlgos{Raw: 0},
+			CloseRemainderTo: recipient,
+		},
+	}
+
+	var ad transactions.ApplyData
+	err := Payment(tx.PaymentTxnFields, tx.Header, mockBal, transactions.SpecialAddresses{}, &ad)
+	require.ErrorContains(t, err, "outstanding bootstrapped accounts")
+}
+
+// TestCloseAccountWithDelegatingFails tests that closing an account
+// that is delegating assets fails.
+func TestCloseAccountWithDelegatingFails(t *testing.T) {
+	partitiontest.PartitionTest(t)
+
+	sender := ledgertesting.RandomAddress()
+	recipient := ledgertesting.RandomAddress()
+
+	addrs := map[basics.Address]basics.AccountData{
+		sender: {
+			// Balance is 0 because mockBalances.Move() doesn't actually move funds.
+			// In real scenarios, the balance would be moved by Move() before CloseAccount checks.
+			MicroAlgos:            basics.MicroAlgos{Raw: 0},
+			TotalAssetsDelegating: 1, // Is delegating an asset
+		},
+		recipient: {
+			MicroAlgos: basics.MicroAlgos{Raw: 10000000},
+		},
+	}
+
+	mockBal := makeMockBalancesWithAccounts(protocol.ConsensusFuture, addrs)
+
+	tx := transactions.Transaction{
+		Type: protocol.PaymentTx,
+		Header: transactions.Header{
+			Sender:     sender,
+			Fee:        basics.MicroAlgos{Raw: 1},
+			FirstValid: basics.Round(100),
+			LastValid:  basics.Round(1000),
+		},
+		PaymentTxnFields: transactions.PaymentTxnFields{
+			Receiver:         recipient,
+			Amount:           basics.MicroAlgos{Raw: 0},
+			CloseRemainderTo: recipient,
+		},
+	}
+
+	var ad transactions.ApplyData
+	err := Payment(tx.PaymentTxnFields, tx.Header, mockBal, transactions.SpecialAddresses{}, &ad)
+	require.ErrorContains(t, err, "outstanding delegating assets")
+}
+
+// TestCloseAccountWithDelegatedAssetsFails tests that closing an account
+// that has delegated assets fails.
+func TestCloseAccountWithDelegatedAssetsFails(t *testing.T) {
+	partitiontest.PartitionTest(t)
+
+	sender := ledgertesting.RandomAddress()
+	recipient := ledgertesting.RandomAddress()
+
+	addrs := map[basics.Address]basics.AccountData{
+		sender: {
+			// Balance is 0 because mockBalances.Move() doesn't actually move funds.
+			// In real scenarios, the balance would be moved by Move() before CloseAccount checks.
+			MicroAlgos:           basics.MicroAlgos{Raw: 0},
+			TotalAssetsDelegated: 1, // Has delegated assets
+		},
+		recipient: {
+			MicroAlgos: basics.MicroAlgos{Raw: 10000000},
+		},
+	}
+
+	mockBal := makeMockBalancesWithAccounts(protocol.ConsensusFuture, addrs)
+
+	tx := transactions.Transaction{
+		Type: protocol.PaymentTx,
+		Header: transactions.Header{
+			Sender:     sender,
+			Fee:        basics.MicroAlgos{Raw: 1},
+			FirstValid: basics.Round(100),
+			LastValid:  basics.Round(1000),
+		},
+		PaymentTxnFields: transactions.PaymentTxnFields{
+			Receiver:         recipient,
+			Amount:           basics.MicroAlgos{Raw: 0},
+			CloseRemainderTo: recipient,
+		},
+	}
+
+	var ad transactions.ApplyData
+	err := Payment(tx.PaymentTxnFields, tx.Header, mockBal, transactions.SpecialAddresses{}, &ad)
+	require.ErrorContains(t, err, "outstanding delegated assets")
+}

@@ -144,7 +144,7 @@
     },
     "/v1/key/list": {
       "post": {
-        "description": "Lists all of the public keys in this wallet. All of them have a stored private key.",
+        "description": "Lists all of the public keys in this wallet. All of them have a stored private key. For hardware wallets that support multiple accounts, you can specify an account_index to retrieve the key for a specific BIP-44 account.\n",
         "produces": [
           "application/json"
         ],
@@ -294,7 +294,7 @@
     },
     "/v1/multisig/sign": {
       "post": {
-        "description": "Start a multisig signature, or add a signature to a partially completed multisig signature object.\n",
+        "description": "Start a multisig signature, or add a signature to a partially completed multisig signature object. For hardware wallets that support multiple accounts, you can specify an account_index to sign with a specific BIP-44 account.\n",
         "produces": [
           "application/json"
         ],
@@ -369,7 +369,7 @@
     },
     "/v1/transaction/sign": {
       "post": {
-        "description": "Signs the passed transaction with a key from the wallet, determined by the sender encoded in the transaction.\n",
+        "description": "Signs the passed transaction with a key from the wallet, determined by the sender encoded in the transaction. For hardware wallets that support multiple accounts, you can specify an account_index to sign with a specific BIP-44 account.\n",
         "produces": [
           "application/json"
         ],
@@ -1029,6 +1029,11 @@
             "$ref": "#/definitions/TxType"
           },
           "x-go-name": "SupportedTransactions"
+        },
+        "supports_multi_account": {
+          "description": "SupportsMultiAccount indicates whether this wallet supports multiple\nBIP-44 accounts (e.g., hardware wallets like Ledger). When true, the\naccount_index parameter can be used in key listing and signing operations.",
+          "type": "boolean",
+          "x-go-name": "SupportsMultiAccount"
         }
       },
       "x-go-package": "github.com/algorand/go-algorand/daemon/kmd/lib/kmdapi"
@@ -1252,6 +1257,12 @@
       "description": "APIV1POSTKeyListRequest is the request for `POST /v1/key/list`",
       "type": "object",
       "properties": {
+        "account_index": {
+          "description": "AccountIndex specifies a specific BIP-44 account index for hardware wallets\nthat support multiple accounts. If not specified, defaults to account 0.\nOnly applicable to wallets that implement MultiAccountWallet (e.g., Ledger).",
+          "type": "integer",
+          "format": "uint32",
+          "x-go-name": "AccountIndex"
+        },
         "wallet_handle_token": {
           "type": "string",
           "x-go-name": "WalletHandleToken"
@@ -1377,6 +1388,12 @@
       "description": "APIV1POSTMultisigTransactionSignRequest is the request for `POST /v1/multisig/sign`",
       "type": "object",
       "properties": {
+        "account_index": {
+          "description": "AccountIndex specifies a specific BIP-44 account index for hardware wallets\nthat support multiple accounts. If not specified, defaults to account 0.\nOnly applicable to wallets that implement MultiAccountWallet (e.g., Ledger).",
+          "type": "integer",
+          "format": "uint32",
+          "x-go-name": "AccountIndex"
+        },
         "partial_multisig": {
           "$ref": "#/definitions/MultisigSig"
         },
@@ -1467,6 +1484,12 @@
       "description": "APIV1POSTTransactionSignRequest is the request for `POST /v1/transaction/sign`",
       "type": "object",
       "properties": {
+        "account_index": {
+          "description": "AccountIndex specifies a specific BIP-44 account index for hardware wallets\nthat support multiple accounts. If not specified, defaults to account 0.\nOnly applicable to wallets that implement MultiAccountWallet (e.g., Ledger).",
+          "type": "integer",
+          "format": "uint32",
+          "x-go-name": "AccountIndex"
+        },
         "public_key": {
           "$ref": "#/definitions/PublicKey"
         },

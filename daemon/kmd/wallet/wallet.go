@@ -59,6 +59,39 @@ type Wallet interface {
 	MultisigSignProgram(program []byte, src crypto.Digest, pk crypto.PublicKey, partial crypto.MultisigSig, pw []byte, useLegacyMsig bool) (crypto.MultisigSig, error)
 }
 
+// MultiAccountWallet is an optional interface for wallets that support
+// multiple accounts via BIP-44 derivation paths (like hardware wallets).
+// Wallets implementing this interface can derive multiple addresses from
+// a single master seed using different account indices.
+//
+// The account index corresponds to the third component in the BIP-44 path:
+// m/44'/283'/<accountIndex>'/0/0
+//
+// To check if a wallet supports multi-account operations, use a type assertion:
+//
+//	if maw, ok := wallet.(MultiAccountWallet); ok {
+//	    key, err := maw.GetPublicKeyForAccount(1)
+//	}
+type MultiAccountWallet interface {
+	Wallet
+
+	// GetPublicKeyForAccount retrieves the public key for a specific account index.
+	// Account indices start at 0 (the default account).
+	GetPublicKeyForAccount(accountIndex uint32) (crypto.Digest, error)
+
+	// ListKeysForAccounts retrieves public keys for multiple account indices.
+	// This is useful for account discovery operations.
+	ListKeysForAccounts(accountIndices []uint32) ([]crypto.Digest, error)
+
+	// SignTransactionWithAccount signs a transaction using the key at the
+	// specified account index.
+	SignTransactionWithAccount(tx transactions.Transaction, pk crypto.PublicKey, pw []byte, accountIndex uint32) ([]byte, error)
+
+	// MultisigSignTransactionWithAccount signs a transaction for a multisig
+	// using the key at the specified account index.
+	MultisigSignTransactionWithAccount(tx transactions.Transaction, pk crypto.PublicKey, partial crypto.MultisigSig, pw []byte, signer crypto.Digest, accountIndex uint32) (crypto.MultisigSig, error)
+}
+
 // Metadata represents high-level information about a wallet, like its name, id
 // and what operations it supports
 type Metadata struct {
@@ -69,6 +102,9 @@ type Metadata struct {
 	SupportsMnemonicUX    bool
 	SupportsMasterKey     bool
 	SupportedTransactions []protocol.TxType
+	// SupportsMultiAccount indicates whether this wallet supports
+	// multiple accounts via BIP-44 derivation (implements MultiAccountWallet)
+	SupportsMultiAccount bool
 }
 
 // GenerateWalletID generates a random hex wallet ID

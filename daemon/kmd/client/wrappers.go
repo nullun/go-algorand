@@ -233,3 +233,51 @@ func (kcl KMDClient) SignProgram(walletHandle, pw []byte, addr string, data []by
 	err = kcl.DoV1Request(req, &resp)
 	return
 }
+
+// ListKeysWithAccountIndex wraps kmdapi.APIV1POSTKeyListRequest with account index support.
+// This is used for hardware wallets (like Ledger) that support multiple BIP-44 accounts.
+// If accountIndex is nil, it behaves like ListKeys and returns all keys.
+// If accountIndex is specified, it returns only the key for that specific account.
+func (kcl KMDClient) ListKeysWithAccountIndex(walletHandle []byte, accountIndex *uint32) (resp kmdapi.APIV1POSTKeyListResponse, err error) {
+	req := kmdapi.APIV1POSTKeyListRequest{
+		WalletHandleToken: string(walletHandle),
+		AccountIndex:      accountIndex,
+	}
+	err = kcl.DoV1Request(req, &resp)
+	return
+}
+
+// SignTransactionWithAccountIndex wraps kmdapi.APIV1POSTTransactionSignRequest with account index support.
+// This is used for hardware wallets (like Ledger) that support multiple BIP-44 accounts.
+// If accountIndex is nil, it behaves like SignTransaction and uses the default account (0).
+// If accountIndex is specified, it signs using the key at that specific account index.
+func (kcl KMDClient) SignTransactionWithAccountIndex(walletHandle, pw []byte, pk crypto.PublicKey, tx transactions.Transaction, accountIndex *uint32) (resp kmdapi.APIV1POSTTransactionSignResponse, err error) {
+	txBytes := protocol.Encode(&tx)
+	req := kmdapi.APIV1POSTTransactionSignRequest{
+		WalletHandleToken: string(walletHandle),
+		WalletPassword:    string(pw),
+		PublicKey:         pk,
+		Transaction:       txBytes,
+		AccountIndex:      accountIndex,
+	}
+	err = kcl.DoV1Request(req, &resp)
+	return
+}
+
+// MultisigSignTransactionWithAccountIndex wraps kmdapi.APIV1POSTMultisigTransactionSignRequest with account index support.
+// This is used for hardware wallets (like Ledger) that support multiple BIP-44 accounts.
+// If accountIndex is nil, it behaves like MultisigSignTransaction and uses the default account (0).
+// If accountIndex is specified, it signs using the key at that specific account index.
+func (kcl KMDClient) MultisigSignTransactionWithAccountIndex(walletHandle, pw []byte, tx []byte, pk crypto.PublicKey, partial crypto.MultisigSig, msigSigner crypto.Digest, accountIndex *uint32) (resp kmdapi.APIV1POSTMultisigTransactionSignResponse, err error) {
+	req := kmdapi.APIV1POSTMultisigTransactionSignRequest{
+		WalletHandleToken: string(walletHandle),
+		WalletPassword:    string(pw),
+		Transaction:       tx,
+		PublicKey:         pk,
+		PartialMsig:       partial,
+		AuthAddr:          msigSigner,
+		AccountIndex:      accountIndex,
+	}
+	err = kcl.DoV1Request(req, &resp)
+	return
+}

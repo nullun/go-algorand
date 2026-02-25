@@ -51,6 +51,9 @@ const (
 	ledgerP1more           = uint8(0x80)
 	ledgerP2last           = uint8(0x00)
 	ledgerP2more           = uint8(0x80)
+
+	// ledgerAccountIDLen is the length of the account ID payload (4 bytes, big-endian uint32)
+	ledgerAccountIDLen = 4
 )
 
 var ledgerWalletSupportedTxs = []protocol.TxType{protocol.PaymentTx, protocol.KeyRegistrationTx}
@@ -80,6 +83,14 @@ type LedgerWallet struct {
 // This is not supported at the moment.
 func (lwd *LedgerWalletDriver) CreateWallet(name []byte, id []byte, pw []byte, mdk crypto.MasterDerivationKey) error {
 	return errNotSupported
+}
+
+// accountIDToBytes converts an account index to a 4-byte big-endian representation
+// as expected by the Ledger Algorand app APDU protocol.
+func accountIDToBytes(accountID uint32) []byte {
+	buf := make([]byte, ledgerAccountIDLen)
+	binary.BigEndian.PutUint32(buf, accountID)
+	return buf
 }
 
 // FetchWallet looks up a wallet by ID and returns it, failing if there's more
@@ -262,22 +273,75 @@ func (lw *LedgerWallet) Metadata() (wallet.Metadata, error) {
 		DriverName:            ledgerWalletDriverName,
 		DriverVersion:         ledgerWalletDriverVersion,
 		SupportedTransactions: ledgerWalletSupportedTxs,
+		SupportsMultiAccount:  true,
 	}, nil
 }
 
 // ListKeys implements the Wallet interface.
+// Returns the public key for account index 0 (default account).
 func (lw *LedgerWallet) ListKeys() ([]crypto.Digest, error) {
+	addr, err := lw.GetPublicKeyForAccount(0)
+	if err != nil {
+		return nil, err
+	}
+	return []crypto.Digest{addr}, nil
+}
+
+// GetPublicKeyForAccount retrieves the public key for a specific BIP-44 account index.
+// The account index corresponds to the third component in the derivation path:
+// m/44'/283'/<accountIndex>'/0/0
+func (lw *LedgerWallet) GetPublicKeyForAccount(accountIndex uint32) (crypto.Digest, error) {
 	lw.mu.Lock()
 	defer lw.mu.Unlock()
 
-	reply, err := lw.dev.Exchange([]byte{ledgerClass, ledgerInsGetPublicKey, 0x00, 0x00, 0x00})
+	return lw.getPublicKeyForAccountLocked(accountIndex)
+}
+
+// getPublicKeyForAccountLocked retrieves the public key for a specific account index.
+// Caller must hold lw.mu.
+func (lw *LedgerWallet) getPublicKeyForAccountLocked(accountIndex uint32) (crypto.Digest, error) {
+	// Build APDU command: CLA INS P1 P2 Lc [Data]
+	// For INS_GET_PUBLIC_KEY (0x03):
+	// - P1: 0x00 (no user confirmation) or 0x01 (request user confirmation)
+	// - P2: ignored (0x00)
+	// - Lc: length of data (0 for default account, 4 for specific account)
+	// - Data: 4-byte big-endian account ID (optional)
+	var cmd []byte
+	if accountIndex == 0 {
+		// For account 0, we can send an empty payload (backward compatible)
+		cmd = []byte{ledgerClass, ledgerInsGetPublicKey, 0x00, 0x00, 0x00}
+	} else {
+		// For other accounts, send the 4-byte account ID
+		cmd = []byte{ledgerClass, ledgerInsGetPublicKey, 0x00, 0x00, ledgerAccountIDLen}
+		cmd = append(cmd, accountIDToBytes(accountIndex)...)
+	}
+
+	reply, err := lw.dev.Exchange(cmd)
 	if err != nil {
-		return nil, err
+		return crypto.Digest{}, err
 	}
 
 	var addr crypto.Digest
 	copy(addr[:], reply)
-	return []crypto.Digest{addr}, nil
+	return addr, nil
+}
+
+// ListKeysForAccounts retrieves public keys for a range of account indices.
+// This is useful for account discovery - iterating through accounts to find
+// which ones have been used.
+func (lw *LedgerWallet) ListKeysForAccounts(accountIndices []uint32) ([]crypto.Digest, error) {
+	lw.mu.Lock()
+	defer lw.mu.Unlock()
+
+	keys := make([]crypto.Digest, 0, len(accountIndices))
+	for _, idx := range accountIndices {
+		addr, err := lw.getPublicKeyForAccountLocked(idx)
+		if err != nil {
+			return nil, fmt.Errorf("failed to get key for account %d: %w", idx, err)
+		}
+		keys = append(keys, addr)
+	}
+	return keys, nil
 }
 
 // ImportKey implements the Wallet interface.
@@ -321,25 +385,29 @@ func (lw *LedgerWallet) DeleteMultisigAddr(addr crypto.Digest, pw []byte) error 
 }
 
 // SignTransaction implements the Wallet interface.
+// This uses account index 0 (default account) for backward compatibility.
+// For signing with a specific account, use SignTransactionWithAccount.
 func (lw *LedgerWallet) SignTransaction(tx transactions.Transaction, pk crypto.PublicKey, pw []byte) ([]byte, error) {
-	pks, err := lw.ListKeys()
-	if err != nil {
-		return nil, err
-	}
-	// Right now the device only supports one key
-	if len(pks) > 1 {
-		return nil, errors.New("LedgerWallet device only supports one key but ListKeys returned more than one")
-	}
-	if len(pks) < 1 {
-		return nil, errKeyNotFound
-	}
-	if (pk != crypto.PublicKey{}) && pk != crypto.PublicKey(pks[0]) {
-		// A specific key was requested; return an error if it's not the one on the device.
-		return nil, errKeyNotFound
-	}
-	pk = crypto.PublicKey(pks[0])
+	return lw.SignTransactionWithAccount(tx, pk, pw, 0)
+}
 
-	sig, err := lw.signTransactionHelper(tx)
+// SignTransactionWithAccount signs a transaction using the key at the specified
+// BIP-44 account index. The account index corresponds to the derivation path:
+// m/44'/283'/<accountIndex>'/0/0
+func (lw *LedgerWallet) SignTransactionWithAccount(tx transactions.Transaction, pk crypto.PublicKey, pw []byte, accountIndex uint32) ([]byte, error) {
+	// Get the public key for the specified account
+	expectedPK, err := lw.GetPublicKeyForAccount(accountIndex)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get public key for account %d: %w", accountIndex, err)
+	}
+
+	// If a specific key was requested, verify it matches the account's key
+	if (pk != crypto.PublicKey{}) && pk != crypto.PublicKey(expectedPK) {
+		return nil, errKeyNotFound
+	}
+	pk = crypto.PublicKey(expectedPK)
+
+	sig, err := lw.signTransactionHelper(tx, accountIndex)
 	if err != nil {
 		return nil, err
 	}
@@ -368,7 +436,15 @@ func (lw *LedgerWallet) SignProgram(data []byte, src crypto.Digest, pw []byte) (
 }
 
 // MultisigSignTransaction implements the Wallet interface.
+// This uses account index 0 (default account) for backward compatibility.
+// For signing with a specific account, use MultisigSignTransactionWithAccount.
 func (lw *LedgerWallet) MultisigSignTransaction(tx transactions.Transaction, pk crypto.PublicKey, partial crypto.MultisigSig, pw []byte, signer crypto.Digest) (crypto.MultisigSig, error) {
+	return lw.MultisigSignTransactionWithAccount(tx, pk, partial, pw, signer, 0)
+}
+
+// MultisigSignTransactionWithAccount signs a transaction for a multisig using
+// the key at the specified BIP-44 account index.
+func (lw *LedgerWallet) MultisigSignTransactionWithAccount(tx transactions.Transaction, pk crypto.PublicKey, partial crypto.MultisigSig, pw []byte, signer crypto.Digest, accountIndex uint32) (crypto.MultisigSig, error) {
 	isValidKey := false
 	for i := 0; i < len(partial.Subsigs); i++ {
 		subsig := &partial.Subsigs[i]
@@ -382,7 +458,15 @@ func (lw *LedgerWallet) MultisigSignTransaction(tx transactions.Transaction, pk 
 		return partial, errMsigWrongKey
 	}
 
-	sig, err := lw.signTransactionHelper(tx)
+	expectedPK, err := lw.GetPublicKeyForAccount(accountIndex)
+	if err != nil {
+		return partial, fmt.Errorf("failed to get public key for account %d: %w", accountIndex, err)
+	}
+	if pk != crypto.PublicKey(expectedPK) {
+		return partial, errKeyNotFound
+	}
+
+	sig, err := lw.signTransactionHelper(tx, accountIndex)
 	if err != nil {
 		return partial, err
 	}
@@ -433,9 +517,16 @@ func uint64le(i uint64) []byte {
 	return buf[:]
 }
 
-func (lw *LedgerWallet) signTransactionHelper(tx transactions.Transaction) (sig crypto.Signature, err error) {
+func (lw *LedgerWallet) signTransactionHelper(tx transactions.Transaction, accountIndex uint32) (sig crypto.Signature, err error) {
 	lw.mu.Lock()
 	defer lw.mu.Unlock()
+
+	// First, select the account by requesting its public key.
+	// The Ledger app uses the most recently queried account for signing.
+	_, err = lw.getPublicKeyForAccountLocked(accountIndex)
+	if err != nil {
+		return sig, fmt.Errorf("failed to select account %d: %w", accountIndex, err)
+	}
 
 	sig, err = lw.sendTransactionMsgpack(tx)
 	if err == nil {

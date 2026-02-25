@@ -357,6 +357,22 @@ type ListedAddress struct {
 	Multisig bool
 }
 
+// ListAddressesWithAccountIndex takes a wallet handle and account index, and returns the address
+// for that specific account index. This is used for hardware wallets (like Ledger) that support
+// multiple BIP-44 accounts. The accountIndex parameter specifies which account to query.
+// If the wallet doesn't support multi-account, an error is returned.
+func (c *Client) ListAddressesWithAccountIndex(walletHandle []byte, accountIndex uint32) ([]string, error) {
+	kmd, err := c.ensureKmdClient()
+	if err != nil {
+		return nil, err
+	}
+	response, err := kmd.ListKeysWithAccountIndex(walletHandle, &accountIndex)
+	if err != nil {
+		return nil, err
+	}
+	return response.Addresses, nil
+}
+
 // DeleteAccount deletes an account.
 func (c *Client) DeleteAccount(walletHandle []byte, walletPassword []byte, addr string) error {
 	kmd, err := c.ensureKmdClient()

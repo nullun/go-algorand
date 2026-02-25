@@ -81,6 +81,7 @@ func apiWalletFromMetadata(metadata wallet.Metadata) kmdapi.APIV1Wallet {
 		DriverVersion:         metadata.DriverVersion,
 		SupportsMnemonicUX:    metadata.SupportsMnemonicUX,
 		SupportedTransactions: metadata.SupportedTransactions,
+		SupportsMultiAccount:  metadata.SupportsMultiAccount,
 	}
 }
 
@@ -751,7 +752,10 @@ func postKeyListHandler(ctx reqContext, w http.ResponseWriter, r *http.Request) 
 	// swagger:operation POST /v1/key/list ListKeysInWallet
 	//---
 	//    Summary: List keys in wallet
-	//    Description: Lists all of the public keys in this wallet. All of them have a stored private key.
+	//    Description: >
+	//      Lists all of the public keys in this wallet. All of them have a stored private key.
+	//      For hardware wallets that support multiple accounts, you can specify an account_index
+	//      to retrieve the key for a specific BIP-44 account.
 	//    Produces:
 	//    - application/json
 	//    Parameters:
@@ -774,17 +778,36 @@ func postKeyListHandler(ctx reqContext, w http.ResponseWriter, r *http.Request) 
 	}
 
 	// Fetch the wallet from the WalletHandleToken
-	wallet, _, err := ctx.sm.AuthWithWalletHandleToken([]byte(req.WalletHandleToken))
+	w0, _, err := ctx.sm.AuthWithWalletHandleToken([]byte(req.WalletHandleToken))
 	if err != nil {
 		errorResponse(w, http.StatusUnauthorized, err)
 		return
 	}
 
-	// List the addresses
-	addrs, err := wallet.ListKeys()
-	if err != nil {
-		errorResponse(w, http.StatusInternalServerError, err)
-		return
+	var addrs []crypto.Digest
+
+	// Check if account_index is specified and wallet supports multi-account
+	if req.AccountIndex != nil {
+		maw, ok := w0.(wallet.MultiAccountWallet)
+		if !ok {
+			errorResponse(w, http.StatusBadRequest, errWalletDoesNotSupportMultiAccount)
+			return
+		}
+		// Get the public key for the specific account index
+		var addr crypto.Digest
+		addr, err = maw.GetPublicKeyForAccount(*req.AccountIndex)
+		if err != nil {
+			errorResponse(w, http.StatusInternalServerError, err)
+			return
+		}
+		addrs = []crypto.Digest{addr}
+	} else {
+		// List all addresses (default behavior)
+		addrs, err = w0.ListKeys()
+		if err != nil {
+			errorResponse(w, http.StatusInternalServerError, err)
+			return
+		}
 	}
 
 	// Build the response
@@ -803,7 +826,9 @@ func postTransactionSignHandler(ctx reqContext, w http.ResponseWriter, r *http.R
 	//    Summary: Sign a transaction
 	//    Description: >
 	//      Signs the passed transaction with a key from the wallet, determined
-	//      by the sender encoded in the transaction.
+	//      by the sender encoded in the transaction. For hardware wallets that
+	//      support multiple accounts, you can specify an account_index to sign
+	//      with a specific BIP-44 account.
 	//    Produces:
 	//    - application/json
 	//    Parameters:
@@ -826,7 +851,7 @@ func postTransactionSignHandler(ctx reqContext, w http.ResponseWriter, r *http.R
 	}
 
 	// Fetch the wallet from the WalletHandleToken
-	wallet, _, err := ctx.sm.AuthWithWalletHandleToken([]byte(req.WalletHandleToken))
+	w0, _, err := ctx.sm.AuthWithWalletHandleToken([]byte(req.WalletHandleToken))
 	if err != nil {
 		errorResponse(w, http.StatusUnauthorized, err)
 		return
@@ -842,8 +867,22 @@ func postTransactionSignHandler(ctx reqContext, w http.ResponseWriter, r *http.R
 		return
 	}
 
-	// Sign the transaction
-	stx, err := wallet.SignTransaction(tx, req.PublicKey, []byte(req.WalletPassword))
+	var stx []byte
+
+	// Check if account_index is specified and wallet supports multi-account
+	if req.AccountIndex != nil {
+		maw, ok := w0.(wallet.MultiAccountWallet)
+		if !ok {
+			errorResponse(w, http.StatusBadRequest, errWalletDoesNotSupportMultiAccount)
+			return
+		}
+		// Sign using the specific account index
+		stx, err = maw.SignTransactionWithAccount(tx, req.PublicKey, []byte(req.WalletPassword), *req.AccountIndex)
+	} else {
+		// Sign using the default method
+		stx, err = w0.SignTransaction(tx, req.PublicKey, []byte(req.WalletPassword))
+	}
+
 	if err != nil {
 		errorResponse(w, http.StatusBadRequest, err)
 		return
@@ -1087,7 +1126,8 @@ func postMultisigTransactionSignHandler(ctx reqContext, w http.ResponseWriter, r
 	//    Summary: Sign a multisig transaction
 	//    Description: >
 	//      Start a multisig signature, or add a signature to a partially completed
-	//      multisig signature object.
+	//      multisig signature object. For hardware wallets that support multiple
+	//      accounts, you can specify an account_index to sign with a specific BIP-44 account.
 	//    Produces:
 	//    - application/json
 	//    Parameters:
@@ -1110,7 +1150,7 @@ func postMultisigTransactionSignHandler(ctx reqContext, w http.ResponseWriter, r
 	}
 
 	// Fetch the wallet from the WalletHandleToken
-	wallet, _, err := ctx.sm.AuthWithWalletHandleToken([]byte(req.WalletHandleToken))
+	w0, _, err := ctx.sm.AuthWithWalletHandleToken([]byte(req.WalletHandleToken))
 	if err != nil {
 		errorResponse(w, http.StatusUnauthorized, err)
 		return
@@ -1126,8 +1166,22 @@ func postMultisigTransactionSignHandler(ctx reqContext, w http.ResponseWriter, r
 		return
 	}
 
-	// Sign the transaction
-	msig, err := wallet.MultisigSignTransaction(tx, req.PublicKey, req.PartialMsig, []byte(req.WalletPassword), req.AuthAddr)
+	var msig crypto.MultisigSig
+
+	// Check if account_index is specified and wallet supports multi-account
+	if req.AccountIndex != nil {
+		maw, ok := w0.(wallet.MultiAccountWallet)
+		if !ok {
+			errorResponse(w, http.StatusBadRequest, errWalletDoesNotSupportMultiAccount)
+			return
+		}
+		// Sign using the specific account index
+		msig, err = maw.MultisigSignTransactionWithAccount(tx, req.PublicKey, req.PartialMsig, []byte(req.WalletPassword), req.AuthAddr, *req.AccountIndex)
+	} else {
+		// Sign using the default method
+		msig, err = w0.MultisigSignTransaction(tx, req.PublicKey, req.PartialMsig, []byte(req.WalletPassword), req.AuthAddr)
+	}
+
 	if err != nil {
 		errorResponse(w, http.StatusBadRequest, err)
 		return

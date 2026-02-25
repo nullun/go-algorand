@@ -158,6 +158,10 @@ type APIV1POSTKeyListRequest struct {
 	_struct struct{} `codec:",omitempty,omitemptyarray"`
 
 	WalletHandleToken string `json:"wallet_handle_token"`
+	// AccountIndex specifies a specific BIP-44 account index for hardware wallets
+	// that support multiple accounts. If not specified, defaults to account 0.
+	// Only applicable to wallets that implement MultiAccountWallet (e.g., Ledger).
+	AccountIndex *uint32 `json:"account_index,omitempty"`
 }
 
 // APIV1POSTTransactionSignRequest is the request for `POST /v1/transaction/sign`
@@ -176,6 +180,10 @@ type APIV1POSTTransactionSignRequest struct {
 	Transaction    []byte           `json:"transaction"`
 	PublicKey      crypto.PublicKey `json:"public_key"`
 	WalletPassword string           `json:"wallet_password"`
+	// AccountIndex specifies a specific BIP-44 account index for hardware wallets
+	// that support multiple accounts. If not specified, defaults to account 0.
+	// Only applicable to wallets that implement MultiAccountWallet (e.g., Ledger).
+	AccountIndex *uint32 `json:"account_index,omitempty"`
 }
 
 // APIV1POSTProgramSignRequest is the request for `POST /v1/program/sign`
@@ -246,6 +254,10 @@ type APIV1POSTMultisigTransactionSignRequest struct {
 	PartialMsig    crypto.MultisigSig `json:"partial_multisig"`
 	WalletPassword string             `json:"wallet_password"`
 	AuthAddr       crypto.Digest      `json:"signer"`
+	// AccountIndex specifies a specific BIP-44 account index for hardware wallets
+	// that support multiple accounts. If not specified, defaults to account 0.
+	// Only applicable to wallets that implement MultiAccountWallet (e.g., Ledger).
+	AccountIndex *uint32 `json:"account_index,omitempty"`
 }
 
 // APIV1POSTMultisigProgramSignRequest is the request for `POST /v1/multisig/signprogram`

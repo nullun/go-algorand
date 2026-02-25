@@ -45,6 +45,10 @@ type APIV1Wallet struct {
 	DriverVersion         uint32            `json:"driver_version"`
 	SupportsMnemonicUX    bool              `json:"mnemonic_ux"`
 	SupportedTransactions []protocol.TxType `json:"supported_txs"`
+	// SupportsMultiAccount indicates whether this wallet supports multiple
+	// BIP-44 accounts (e.g., hardware wallets like Ledger). When true, the
+	// account_index parameter can be used in key listing and signing operations.
+	SupportsMultiAccount bool `json:"supports_multi_account,omitempty"`
 }
 
 // APIV1WalletHandle includes the wallet the handle corresponds to

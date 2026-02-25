@@ -79,6 +79,38 @@ func (c *Client) SignTransactionWithWalletAndSigner(walletHandle, pw []byte, sig
 	return
 }
 
+// SignTransactionWithWalletAndAccountIndex signs the passed transaction using a specific
+// BIP-44 account index. This is used for hardware wallets (like Ledger) that support multiple accounts.
+// The accountIndex parameter specifies which account to use for signing (0 is the default account).
+// If signerAddr is non-empty, use it as the signer address (for rekeyed accounts).
+func (c *Client) SignTransactionWithWalletAndAccountIndex(walletHandle, pw []byte, signerAddr string, utx transactions.Transaction, accountIndex uint32) (stx transactions.SignedTxn, err error) {
+	kmd, err := c.ensureKmdClient()
+	if err != nil {
+		return
+	}
+
+	// Determine the public key to use for signing
+	var pk crypto.PublicKey
+	if signerAddr != "" {
+		authaddr, parseErr := basics.UnmarshalChecksumAddress(signerAddr)
+		if parseErr != nil {
+			err = parseErr
+			return
+		}
+		pk = crypto.PublicKey(authaddr)
+	}
+
+	// Sign the transaction with the specified account index
+	resp, err := kmd.SignTransactionWithAccountIndex(walletHandle, pw, pk, utx, &accountIndex)
+	if err != nil {
+		return
+	}
+
+	// Decode the SignedTxn
+	err = protocol.Decode(resp.SignedTransaction, &stx)
+	return
+}
+
 // SignProgramWithWallet signs the passed transaction with keys from the wallet associated with the passed walletHandle
 func (c *Client) SignProgramWithWallet(walletHandle, pw []byte, addr string, program []byte) (signature crypto.Signature, err error) {
 	kmd, err := c.ensureKmdClient()

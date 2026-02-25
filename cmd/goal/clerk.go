@@ -64,13 +64,14 @@ var (
 
 	skipPqAddressCheck bool
 
-	noProgramOutput bool
-	writeSourceMap  bool
-	signProgram     bool
-	disassemble     bool
-	verbose         bool
-	rawOutput       bool
-	inspectTxid     bool
+	noProgramOutput    bool
+	writeSourceMap     bool
+	signProgram        bool
+	disassemble        bool
+	verbose            bool
+	rawOutput          bool
+	inspectTxid        bool
+	ledgerAccountIndex int
 
 	timeStamp     int64
 	protoVersion  string
@@ -118,6 +119,7 @@ func init() {
 	sendCmd.Flags().StringSliceVar(&argB64Strings, "argb64", nil, "Base64 encoded args to pass to transaction logic")
 	sendCmd.Flags().StringVarP(&logicSigFile, "logic-sig", "L", "", "LogicSig to apply to transaction")
 	sendCmd.Flags().StringVar(&msigParams, "msig-params", "", "Multisig preimage parameters - [threshold] [Address 1] [Address 2] ...\nUsed to add the necessary fields in case the account was rekeyed to a multisig account")
+	sendCmd.Flags().IntVar(&ledgerAccountIndex, "ledger-account", -1, "Ledger hardware wallet account index (BIP-44 account). Use with Ledger wallets to sign with accounts other than the default (index 0)")
 	sendCmd.MarkFlagRequired("to")
 	sendCmd.MarkFlagRequired("amount")
 
@@ -138,6 +140,7 @@ func init() {
 	signCmd.Flags().StringVarP(&logicSigFile, "logic-sig", "L", "", "LogicSig to apply to transaction")
 	signCmd.Flags().StringSliceVar(&argB64Strings, "argb64", nil, "Base64 encoded args to pass to transaction logic")
 	signCmd.Flags().StringVarP(&protoVersion, "proto", "P", "", "Consensus protocol version id string")
+	signCmd.Flags().IntVar(&ledgerAccountIndex, "ledger-account", -1, "Ledger hardware wallet account index (BIP-44 account). Use with Ledger wallets to sign with accounts other than the default (index 0)")
 	signCmd.MarkFlagRequired("infile")
 	signCmd.MarkFlagRequired("outfile")
 
@@ -195,7 +198,7 @@ var clerkCmd = &cobra.Command{
 	Long:  `Collection of commands to support the management of transaction information.`,
 	Args:  validateNoPosArgsFn,
 	Run: func(cmd *cobra.Command, args []string) {
-		//If no arguments passed, we should fallback to help
+		// If no arguments passed, we should fallback to help
 		cmd.HelpFunc()(cmd, args)
 	},
 }
@@ -240,10 +243,18 @@ func waitForCommit(client libgoal.Client, txid string, transactionLastValidRound
 }
 
 func createSignedTransaction(client libgoal.Client, signTx bool, dataDir string, walletName string, tx transactions.Transaction, signer basics.Address) (stxn transactions.SignedTxn, err error) {
+	return createSignedTransactionWithAccountIndex(client, signTx, dataDir, walletName, tx, signer, -1)
+}
+
+func createSignedTransactionWithAccountIndex(client libgoal.Client, signTx bool, dataDir string, walletName string, tx transactions.Transaction, signer basics.Address, accountIndex int) (stxn transactions.SignedTxn, err error) {
 	if signTx {
 		// Sign the transaction
 		wh, pw := ensureWalletHandleMaybePassword(dataDir, walletName, true)
-		if signer.IsZero() {
+
+		// Use account index for Ledger wallets if specified
+		if accountIndex >= 0 {
+			stxn, err = client.SignTransactionWithWalletAndAccountIndex(wh, pw, signer.String(), tx, uint32(accountIndex))
+		} else if signer.IsZero() {
 			stxn, err = client.SignTransactionWithWallet(wh, pw, tx)
 		} else {
 			stxn, err = client.SignTransactionWithWalletAndSigner(wh, pw, signer.String(), tx)
@@ -268,7 +279,7 @@ func writeSignedTxnsToFile(stxns []transactions.SignedTxn, filename string) erro
 		outData = append(outData, protocol.Encode(&stxns[i])...)
 	}
 
-	return writeFile(filename, outData, 0600)
+	return writeFile(filename, outData, 0o600)
 }
 
 func writeTxnToFile(client libgoal.Client, signTx bool, dataDir string, walletName string, tx transactions.Transaction, filename string) error {
@@ -309,7 +320,6 @@ func getB64Args(args []string) [][]byte {
 		}
 	}
 	return programArgs
-
 }
 
 func getProgramArgs() [][]byte {
@@ -494,7 +504,7 @@ var sendCmd = &cobra.Command{
 					reportErrorf("Signer specified when txn won't be signed")
 				}
 			}
-			stx, err = createSignedTransaction(client, signTx, dataDir, walletName, payment, authAddr)
+			stx, err = createSignedTransactionWithAccountIndex(client, signTx, dataDir, walletName, payment, authAddr, ledgerAccountIndex)
 			if err != nil {
 				reportErrorf(errorSigningTX, err)
 			}
@@ -562,7 +572,7 @@ var sendCmd = &cobra.Command{
 			if dumpForDryrun {
 				err = writeDryrunReqToFile(client, stx, outFilename)
 			} else {
-				err = writeFile(outFilename, protocol.Encode(&stx), 0600)
+				err = writeFile(outFilename, protocol.Encode(&stx), 0o600)
 			}
 			if err != nil {
 				reportErrorln(err)
@@ -688,7 +698,7 @@ var rawsendCmd = &cobra.Command{
 				rejectsData = append(rejectsData, protocol.Encode(&txn)...)
 			}
 
-			f, err := os.OpenFile(rejectsFilename, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0666)
+			f, err := os.OpenFile(rejectsFilename, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o666)
 			if err != nil {
 				reportErrorf(fileWriteError, rejectsFilename, err.Error())
 			}
@@ -844,7 +854,6 @@ var signCmd = &cobra.Command{
 			if _, hasGroup := txnGroups[group]; !hasGroup {
 				// add a new group as needed.
 				groupsOrder = append(groupsOrder, group)
-
 			}
 			txnGroups[group] = append(txnGroups[group], uncheckedTxn)
 			txnIndex[uncheckedTxn] = count
@@ -890,7 +899,12 @@ var signCmd = &cobra.Command{
 					signedTxn = txnGroup[i]
 				} else {
 					// sign the usual way
-					signedTxn, err = client.SignTransactionWithWalletAndSigner(wh, pw, signerAddress, txnGroup[i].Txn)
+					if ledgerAccountIndex >= 0 {
+						// Use Ledger hardware wallet with specific account index
+						signedTxn, err = client.SignTransactionWithWalletAndAccountIndex(wh, pw, signerAddress, txnGroup[i].Txn, uint32(ledgerAccountIndex))
+					} else {
+						signedTxn, err = client.SignTransactionWithWalletAndSigner(wh, pw, signerAddress, txnGroup[i].Txn)
+					}
 					if err != nil {
 						reportErrorf(errorSigningTX, err)
 					}
@@ -899,7 +913,7 @@ var signCmd = &cobra.Command{
 			}
 		}
 
-		err = writeFile(outFilename, outData, 0600)
+		err = writeFile(outFilename, outData, 0o600)
 		if err != nil {
 			reportErrorf(fileWriteError, outFilename, err)
 		}
@@ -969,7 +983,7 @@ var splitCmd = &cobra.Command{
 		outBase := outFilename[:len(outFilename)-len(outExt)]
 		for idx := range txns {
 			fn := fmt.Sprintf("%s-%d%s", outBase, idx, outExt)
-			err := writeFile(fn, protocol.Encode(&txns[idx]), 0600)
+			err := writeFile(fn, protocol.Encode(&txns[idx]), 0o600)
 			if err != nil {
 				reportErrorf(fileWriteError, outFilename, err)
 			}
@@ -1076,7 +1090,7 @@ func disassembleFile(fname, outname string) {
 	if outname == "" {
 		os.Stdout.Write([]byte(text))
 	} else {
-		err = writeFile(outname, []byte(text), 0666)
+		err = writeFile(outname, []byte(text), 0o666)
 		if err != nil {
 			reportErrorf("%s: %s", outname, err)
 		}
@@ -1131,7 +1145,7 @@ var compileCmd = &cobra.Command{
 				outblob = protocol.Encode(&ls)
 			}
 			if !noProgramOutput {
-				err := writeFile(outname, outblob, 0666)
+				err := writeFile(outname, outblob, 0o666)
 				if err != nil {
 					reportErrorf("%s: %s", outname, err)
 				}
@@ -1145,7 +1159,7 @@ var compileCmd = &cobra.Command{
 				if err != nil {
 					reportErrorf("%s: %s", mapname, err)
 				}
-				err = writeFile(mapname, pcblob, 0666)
+				err = writeFile(mapname, pcblob, 0o666)
 				if err != nil {
 					reportErrorf("%s: %s", mapname, err)
 				}
@@ -1177,7 +1191,7 @@ var dryrunCmd = &cobra.Command{
 			if err != nil {
 				reportErrorln(err)
 			}
-			writeFile(outFilename, data, 0600)
+			writeFile(outFilename, data, 0o600)
 			return
 		}
 
@@ -1218,7 +1232,6 @@ var dryrunCmd = &cobra.Command{
 		if params.EnableLogicSigSizePooling && lSigPooledSize > lSigMaxPooledSize {
 			reportErrorf("total lsigs size too large: %d > %d", lSigPooledSize, lSigMaxPooledSize)
 		}
-
 	},
 }
 
@@ -1339,7 +1352,7 @@ var simulateCmd = &cobra.Command{
 				ExtraOpcodeBudget:     simulateExtraOpcodeBudget,
 				ExecTraceConfig:       traceCmdOptionToSimulateTraceConfigModel(),
 			}
-			err := writeFile(requestOutFilename, protocol.EncodeJSON(simulateRequest), 0600)
+			err := writeFile(requestOutFilename, protocol.EncodeJSON(simulateRequest), 0o600)
 			if err != nil {
 				reportErrorf("write file error: %s", err.Error())
 			}
@@ -1380,7 +1393,7 @@ var simulateCmd = &cobra.Command{
 
 		encodedResponse := protocol.EncodeJSON(&simulateResponse)
 		if outFilename != "" {
-			err := writeFile(outFilename, encodedResponse, 0600)
+			err := writeFile(outFilename, encodedResponse, 0o600)
 			if err != nil {
 				reportErrorf("write file error: %s", err.Error())
 			}

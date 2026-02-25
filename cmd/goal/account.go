@@ -49,29 +49,31 @@ import (
 )
 
 var (
-	accountAddress     string
-	walletName         string
-	defaultAccountName string
-	defaultAccount     bool
-	unencryptedWallet  bool
-	online             bool
-	accountName        string
-	transactionFee     uint64
-	statusChangeLease  string
-	statusChangeTxFile string
-	roundFirstValid    basics.Round
-	roundLastValid     basics.Round
-	keyDilution        uint64
-	threshold          uint8
-	partKeyOutDir      string
-	partKeyFile        string
-	partKeyDeleteInput bool
-	importDefault      bool
-	mnemonic           string
-	dumpOutFile        string
-	listAccountInfo    bool
-	onlyShowAssetIDs   bool
-	partKeyIDToDelete  string
+	accountAddress        string
+	walletName            string
+	defaultAccountName    string
+	defaultAccount        bool
+	unencryptedWallet     bool
+	online                bool
+	accountName           string
+	transactionFee        uint64
+	statusChangeLease     string
+	statusChangeTxFile    string
+	roundFirstValid       basics.Round
+	roundLastValid        basics.Round
+	keyDilution           uint64
+	threshold             uint8
+	partKeyOutDir         string
+	partKeyFile           string
+	partKeyDeleteInput    bool
+	importDefault         bool
+	mnemonic              string
+	dumpOutFile           string
+	listAccountInfo       bool
+	onlyShowAssetIDs      bool
+	partKeyIDToDelete     string
+	listLedgerAccountID   int
+	listLedgerNumAccounts int
 
 	next             string
 	limit            uint64
@@ -137,6 +139,8 @@ func init() {
 
 	// Account list flags
 	listCmd.Flags().BoolVar(&listAccountInfo, "info", false, "Include additional information about each account's assets and applications")
+	listCmd.Flags().IntVar(&listLedgerAccountID, "ledger-account", -1, "Query a specific Ledger hardware wallet account index (BIP-44 account). When specified, shows only the address for that account index")
+	listCmd.Flags().IntVar(&listLedgerNumAccounts, "ledger-accounts", 0, "Display the first N Ledger hardware wallet accounts (BIP-44). For example, --ledger-accounts 5 shows accounts 0-4")
 
 	// Info flags
 	infoCmd.Flags().StringVarP(&accountAddress, "address", "a", "", "Account address to look up (required)")
@@ -177,6 +181,7 @@ func init() {
 	changeOnlineCmd.Flags().StringVarP(&statusChangeTxFile, "txfile", "t", "", "Write status change transaction to this file")
 	changeOnlineCmd.Flags().BoolVarP(&noWaitAfterSend, "no-wait", "N", false, "Don't wait for transaction to commit")
 	changeOnlineCmd.Flags().StringVar(&rekeyToAddress, "rekey-to", "", "Rekey account to the given spending key/address. (Future transactions from this account will need to be signed with the new key.)")
+	changeOnlineCmd.Flags().IntVar(&ledgerAccountIndex, "ledger-account", -1, "Ledger hardware wallet account index (BIP-44 account). Use with Ledger wallets to sign with accounts other than the default (index 0)")
 
 	// addParticipationKey flags
 	addParticipationKeyCmd.Flags().StringVarP(&accountAddress, "address", "a", "", "Account to associate with the generated partkey")
@@ -185,6 +190,7 @@ func init() {
 	addParticipationKeyCmd.MarkFlagRequired("roundFirstValid")
 	addParticipationKeyCmd.Flags().Uint64VarP((*uint64)(&roundLastValid), "roundLastValid", "", 0, "The last round for which the generated partkey will be valid")
 	addParticipationKeyCmd.MarkFlagRequired("roundLastValid")
+	addParticipationKeyCmd.Flags().IntVar(&ledgerAccountIndex, "ledger-account", -1, "Ledger hardware wallet account index (BIP-44 account). Use with Ledger wallets to sign with accounts other than the default (index 0)")
 	addParticipationKeyCmd.Flags().StringVarP(&partKeyOutDir, "outdir", "o", "", "Save participation key file to specified output directory to (for offline creation)")
 	addParticipationKeyCmd.Flags().Uint64VarP(&keyDilution, "keyDilution", "", 0, "Key dilution for two-level participation keys (defaults to sqrt of validity window)")
 
@@ -501,7 +507,7 @@ var infoMultisigCmd = &cobra.Command{
 var listCmd = &cobra.Command{
 	Use:   "list",
 	Short: "Show the list of Algorand accounts on this machine",
-	Long:  `Show the list of Algorand accounts on this machine. Indicates whether the account is [offline] or [online], and if the account is the default account for goal. Also displays account information with --info.`,
+	Long:  `Show the list of Algorand accounts on this machine. Indicates whether the account is [offline] or [online], and if the account is the default account for goal. Also displays account information with --info. Use --ledger-account to query a specific Ledger hardware wallet account index, or --ledger-accounts to display multiple accounts.`,
 	Args:  validateNoPosArgsFn,
 	Run: func(cmd *cobra.Command, args []string) {
 		dataDir := datadir.EnsureSingleDataDir()
@@ -512,6 +518,54 @@ var listCmd = &cobra.Command{
 
 		// List the addresses in the wallet
 		client := ensureKmdClient(dataDir)
+
+		// If listing Ledger account(s)
+		if listLedgerNumAccounts > 0 && listLedgerAccountID >= 0 {
+			reportErrorf("--ledger-account and --ledger-accounts are mutually exclusive")
+		}
+		if listLedgerNumAccounts > 0 || listLedgerAccountID >= 0 {
+			startIdx, endIdx := 0, listLedgerNumAccounts-1
+			if listLedgerAccountID >= 0 {
+				startIdx, endIdx = listLedgerAccountID, listLedgerAccountID
+			}
+			accountInfoError := false
+
+			for i := startIdx; i <= endIdx; i++ {
+				addrs, err := client.ListAddressesWithAccountIndex(wh, uint32(i))
+				if err != nil {
+					reportErrorf(errorRequestFail, err)
+				}
+
+				if len(addrs) == 0 {
+					if listLedgerAccountID >= 0 {
+						reportInfoln(infoNoAccounts)
+						os.Exit(0)
+					}
+					continue
+				}
+
+				for _, addr := range addrs {
+					response, _ := client.AccountInformation(addr, true)
+
+					// Temporarily add ledger account with a friendly name
+					accountList.Accounts[addr] = fmt.Sprintf("account-%d", i)
+					accountList.outputAccount(addr, response, nil)
+
+					// Clean up temporary entry
+					delete(accountList.Accounts, addr)
+
+					if listAccountInfo {
+						hasError := printAccountInfo(client, addr, false, response)
+						accountInfoError = accountInfoError || hasError
+					}
+				}
+			}
+			if accountInfoError {
+				os.Exit(1)
+			}
+			return
+		}
+
 		addrs, err := client.ListAddressesWithInfo(wh)
 		if err != nil {
 			reportErrorf(errorRequestFail, err)
@@ -1019,7 +1073,7 @@ var changeOnlineCmd = &cobra.Command{
 		}
 		err = changeAccountOnlineStatus(
 			accountAddress, online, statusChangeTxFile, walletName,
-			firstTxRound, lastTxRound, transactionFee, scLeaseBytes(cmd), dataDir, client,
+			firstTxRound, lastTxRound, transactionFee, scLeaseBytes(cmd), dataDir, client, ledgerAccountIndex,
 		)
 		if err != nil {
 			reportErrorln(err)
@@ -1030,7 +1084,7 @@ var changeOnlineCmd = &cobra.Command{
 func changeAccountOnlineStatus(
 	acct string, goOnline bool, txFile string, wallet string,
 	firstTxRound, lastTxRound basics.Round, fee uint64, leaseBytes [32]byte,
-	dataDir string, client libgoal.Client,
+	dataDir string, client libgoal.Client, ledgerAccountIdx int,
 ) error {
 	// Generate an unsigned online/offline tx
 	var utx transactions.Transaction
@@ -1052,7 +1106,12 @@ func changeAccountOnlineStatus(
 
 	// Sign & broadcast the transaction
 	wh, pw := ensureWalletHandleMaybePassword(dataDir, wallet, true)
-	signedTxn, err := client.SignTransactionWithWalletAndSigner(wh, pw, signerAddress, utx)
+	var signedTxn transactions.SignedTxn
+	if ledgerAccountIdx >= 0 {
+		signedTxn, err = client.SignTransactionWithWalletAndAccountIndex(wh, pw, signerAddress, utx, uint32(ledgerAccountIdx))
+	} else {
+		signedTxn, err = client.SignTransactionWithWalletAndSigner(wh, pw, signerAddress, utx)
+	}
 	if err != nil {
 		return fmt.Errorf(errorSigningTX, err)
 	}
@@ -1222,7 +1281,7 @@ func generateAndRegisterPartKey(address string, currentRound, keyLastValidRound,
 	// Now register it as our new online participation key
 	goOnline := true
 	txFile := ""
-	err = changeAccountOnlineStatus(address, goOnline, txFile, wallet, currentRound, txLastValidRound, fee, leaseBytes, dataDir, client)
+	err = changeAccountOnlineStatus(address, goOnline, txFile, wallet, currentRound, txLastValidRound, fee, leaseBytes, dataDir, client, ledgerAccountIndex)
 	if err != nil {
 		os.Remove(keyPath)
 		fmt.Fprintf(os.Stderr, "  Error registering keys - deleting newly-generated key file: %s\n", keyPath)

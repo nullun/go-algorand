@@ -24,6 +24,7 @@ import (
 
 	"github.com/algorand/go-algorand/cmd/util/datadir"
 	"github.com/algorand/go-algorand/data/basics"
+	"github.com/algorand/go-algorand/data/transactions"
 	"github.com/algorand/go-algorand/libgoal"
 )
 
@@ -62,6 +63,7 @@ func init() {
 	assetCmd.AddCommand(optinAssetCmd)
 
 	assetCmd.PersistentFlags().StringVarP(&walletName, "wallet", "w", "", "Set the wallet to be used for the selected operation")
+	assetCmd.PersistentFlags().IntVar(&ledgerAccountIndex, "ledger-account", -1, "Ledger hardware wallet account index (BIP-44 account). Use with Ledger wallets to sign with accounts other than the default (index 0)")
 
 	createAssetCmd.Flags().StringVar(&assetCreator, "creator", "", "Account address for creating an asset")
 	createAssetCmd.Flags().Uint64Var(&assetTotal, "total", 0, "Total amount of tokens for created asset")
@@ -299,7 +301,13 @@ var createAssetCmd = &cobra.Command{
 
 		if outFilename == "" {
 			wh, pw := ensureWalletHandleMaybePassword(dataDir, walletName, true)
-			signedTxn, err2 := client.SignTransactionWithWalletAndSigner(wh, pw, signerAddress, tx)
+			var signedTxn transactions.SignedTxn
+			var err2 error
+			if ledgerAccountIndex >= 0 {
+				signedTxn, err2 = client.SignTransactionWithWalletAndAccountIndex(wh, pw, signerAddress, tx, uint32(ledgerAccountIndex))
+			} else {
+				signedTxn, err2 = client.SignTransactionWithWalletAndSigner(wh, pw, signerAddress, tx)
+			}
 			if err2 != nil {
 				reportErrorf(errorSigningTX, err2)
 			}
@@ -379,7 +387,13 @@ var destroyAssetCmd = &cobra.Command{
 
 		if outFilename == "" {
 			wh, pw := ensureWalletHandleMaybePassword(dataDir, walletName, true)
-			signedTxn, err2 := client.SignTransactionWithWalletAndSigner(wh, pw, signerAddress, tx)
+			var signedTxn transactions.SignedTxn
+			var err2 error
+			if ledgerAccountIndex >= 0 {
+				signedTxn, err2 = client.SignTransactionWithWalletAndAccountIndex(wh, pw, signerAddress, tx, uint32(ledgerAccountIndex))
+			} else {
+				signedTxn, err2 = client.SignTransactionWithWalletAndSigner(wh, pw, signerAddress, tx)
+			}
 			if err2 != nil {
 				reportErrorf(errorSigningTX, err2)
 			}
@@ -473,7 +487,13 @@ var configAssetCmd = &cobra.Command{
 
 		if outFilename == "" {
 			wh, pw := ensureWalletHandleMaybePassword(dataDir, walletName, true)
-			signedTxn, err2 := client.SignTransactionWithWalletAndSigner(wh, pw, signerAddress, tx)
+			var signedTxn transactions.SignedTxn
+			var err2 error
+			if ledgerAccountIndex >= 0 {
+				signedTxn, err2 = client.SignTransactionWithWalletAndAccountIndex(wh, pw, signerAddress, tx, uint32(ledgerAccountIndex))
+			} else {
+				signedTxn, err2 = client.SignTransactionWithWalletAndSigner(wh, pw, signerAddress, tx)
+			}
 			if err2 != nil {
 				reportErrorf(errorSigningTX, err2)
 			}
@@ -561,7 +581,13 @@ var sendAssetCmd = &cobra.Command{
 
 		if outFilename == "" {
 			wh, pw := ensureWalletHandleMaybePassword(dataDir, walletName, true)
-			signedTxn, err2 := client.SignTransactionWithWalletAndSigner(wh, pw, signerAddress, tx)
+			var signedTxn transactions.SignedTxn
+			var err2 error
+			if ledgerAccountIndex >= 0 {
+				signedTxn, err2 = client.SignTransactionWithWalletAndAccountIndex(wh, pw, signerAddress, tx, uint32(ledgerAccountIndex))
+			} else {
+				signedTxn, err2 = client.SignTransactionWithWalletAndSigner(wh, pw, signerAddress, tx)
+			}
 			if err2 != nil {
 				reportErrorf(errorSigningTX, err2)
 			}
@@ -631,7 +657,13 @@ var freezeAssetCmd = &cobra.Command{
 
 		if outFilename == "" {
 			wh, pw := ensureWalletHandleMaybePassword(dataDir, walletName, true)
-			signedTxn, err2 := client.SignTransactionWithWalletAndSigner(wh, pw, signerAddress, tx)
+			var signedTxn transactions.SignedTxn
+			var err2 error
+			if ledgerAccountIndex >= 0 {
+				signedTxn, err2 = client.SignTransactionWithWalletAndAccountIndex(wh, pw, signerAddress, tx, uint32(ledgerAccountIndex))
+			} else {
+				signedTxn, err2 = client.SignTransactionWithWalletAndSigner(wh, pw, signerAddress, tx)
+			}
 			if err2 != nil {
 				reportErrorf(errorSigningTX, err2)
 			}
@@ -721,7 +753,13 @@ var optinAssetCmd = &cobra.Command{
 
 		if outFilename == "" {
 			wh, pw := ensureWalletHandleMaybePassword(dataDir, walletName, true)
-			signedTxn, err2 := client.SignTransactionWithWalletAndSigner(wh, pw, signerAddress, tx)
+			var signedTxn transactions.SignedTxn
+			var err2 error
+			if ledgerAccountIndex >= 0 {
+				signedTxn, err2 = client.SignTransactionWithWalletAndAccountIndex(wh, pw, signerAddress, tx, uint32(ledgerAccountIndex))
+			} else {
+				signedTxn, err2 = client.SignTransactionWithWalletAndSigner(wh, pw, signerAddress, tx)
+			}
 			if err2 != nil {
 				reportErrorf(errorSigningTX, err2)
 			}

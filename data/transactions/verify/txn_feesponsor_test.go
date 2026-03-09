@@ -345,6 +345,51 @@ func TestFeeSponsoredBatchSigCountMultiSig(t *testing.T) {
 	require.Equal(t, uint64(3), count, "Expected 3 batchable signatures (1 sender + 2 sponsor multisig)")
 }
 
+// TestFeeSponsoredSignatureVulnerability demonstrates a vulnerability where a sponsorship signature
+// can be misused by replacing the sponsor address with another address that has been rekeyed
+// to the sponsor's address. Because the signature only covers the transaction and not the
+// sponsor address itself, the signature remains valid for any account rekeyed to the signer.
+func TestFeeSponsoredSignatureVulnerability(t *testing.T) {
+	partitiontest.PartitionTest(t)
+
+	// Create sender, sponsor S, and another account X
+	senderSecrets, senderAddrs, _ := generateAccounts(1)
+	sponsorSecrets, sponsorAddrs, _ := generateAccounts(1)
+	_, xAddrs, _ := generateAccounts(1)
+
+	sender := senderAddrs[0]
+	S := sponsorAddrs[0]
+	X := xAddrs[0]
+
+	// Create fee-sponsored transaction
+	tx := createFeeSponsoredPayment(sender, S, 1000, 1000)
+
+	// Sign transaction as sender
+	stxn := tx.Sign(senderSecrets[0])
+
+	// Sponsor S signs the transaction
+	stxn.Ssig.Sponsor = S
+	stxn.Ssig.Sig = sponsorSecrets[0].Sign(tx)
+
+	// Now an attacker modifies the transaction to make X pay instead of S.
+	// Assume X is rekeyed to S (this check happens at apply time, but we're testing the signature binding here).
+	stxn.Ssig.Sponsor = X
+	stxn.Ssig.AuthAddr = S
+	// The signature stxn.Ssig.Sig remains the SAME.
+
+	// In a secure implementation, this should FAIL because the signature was for S, not X.
+	// But currently, it will SUCCEED because the signature is only over the transaction tx,
+	// and S is a valid authorizer for X (assuming rekeying).
+	blkHdr := createFeeSponsoredBlockHeader()
+	groupCtx, err := PrepareGroupContext([]transactions.SignedTxn{stxn}, blkHdr, nil, nil)
+	require.NoError(t, err)
+
+	err = verifyTxn(0, groupCtx)
+	// IF SECURE: require.Error(t, err)
+	// CURRENTLY VULNERABLE:
+	require.NoError(t, err, "VULNERABILITY: Signature is valid even if sponsor address is changed to another address rekeyed to the same signer")
+}
+
 func TestFeeSponsoredFlagWithoutSponsorSig(t *testing.T) {
 	partitiontest.PartitionTest(t)
 

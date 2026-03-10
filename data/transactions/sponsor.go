@@ -16,7 +16,10 @@
 
 package transactions
 
-import "github.com/algorand/go-algorand/data/basics"
+import (
+	"github.com/algorand/go-algorand/data/basics"
+	"github.com/algorand/go-algorand/protocol"
+)
 
 // SponsorSig contains a signature that sponsors a transaction fee payment.
 type SponsorSig struct {
@@ -34,4 +37,18 @@ func (ssig *SponsorSig) Blank() bool {
 // Equal returns true if two SponsorSig are equal, including Address and AuthAddr.
 func (ssig *SponsorSig) Equal(b *SponsorSig) bool {
 	return ssig.Sponsor == b.Sponsor && ssig.Sig == b.Sig && ssig.Msig.Equal(b.Msig) && ssig.Lsig.Equal(&b.Lsig) && ssig.AuthAddr == b.AuthAddr
+}
+
+// SponsoredTransaction wraps a transaction with the sponsor address for domain-separated signing.
+// This ensures sponsor signatures commit to the sponsor address, preventing replay attacks
+// where a signature could be moved to a different sponsor account.
+type SponsoredTransaction struct {
+	_struct struct{}       `codec:",omitempty,omitemptyarray"`
+	Txn     Transaction    `codec:"txn"`
+	Sponsor basics.Address `codec:"sponsor"`
+}
+
+// ToBeHashed implements the crypto.Hashable interface for SponsoredTransaction.
+func (st SponsoredTransaction) ToBeHashed() (protocol.HashID, []byte) {
+	return protocol.FeeSponsor, protocol.Encode(&st)
 }

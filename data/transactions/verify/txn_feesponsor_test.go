@@ -61,6 +61,12 @@ func createFeeSponsoredPayment(sender, receiver basics.Address, amount uint64, f
 	}
 }
 
+// signAsSponsor creates a domain-separated sponsor signature using "FS" HashID
+func signAsSponsor(secrets *crypto.SignatureSecrets, tx transactions.Transaction, sponsor basics.Address) crypto.Signature {
+	st := transactions.SponsoredTransaction{Txn: tx, Sponsor: sponsor}
+	return secrets.Sign(st)
+}
+
 func TestFeeSponsoredSingleSig(t *testing.T) {
 	partitiontest.PartitionTest(t)
 
@@ -77,9 +83,9 @@ func TestFeeSponsoredSingleSig(t *testing.T) {
 	// Sign transaction as sender
 	stxn := tx.Sign(senderSecrets[0])
 
-	// Add sponsor signature
+	// Add sponsor signature using domain-separated signing
 	stxn.Ssig.Sponsor = sponsor
-	stxn.Ssig.Sig = sponsorSecrets[0].Sign(tx)
+	stxn.Ssig.Sig = signAsSponsor(sponsorSecrets[0], tx, sponsor)
 
 	// Verify with fee-sponsored consensus
 	blkHdr := createFeeSponsoredBlockHeader()
@@ -131,10 +137,9 @@ func TestFeeSponsoredNotEnabled(t *testing.T) {
 
 	// Add sponsor signature
 	stxn.Ssig.Sponsor = sponsor
-	stxn.Ssig.Sig = sponsorSecrets[0].Sign(tx)
+	stxn.Ssig.Sig = signAsSponsor(sponsorSecrets[0], tx, sponsor)
 
 	// Verify with non-future consensus (fee sponsorship not enabled)
-	// Use a consensus version that doesn't support fee sponsorship
 	blkHdr := &bookkeeping.BlockHeader{
 		RewardsState: bookkeeping.RewardsState{
 			FeeSink:     feeSink,
@@ -175,9 +180,9 @@ func TestFeeSponsoredInvalidSponsorSig(t *testing.T) {
 	// Sign transaction as sender
 	stxn := tx.Sign(senderSecrets[0])
 
-	// Add invalid sponsor signature (signed with wrong key)
+	// Add invalid sponsor signature (signed with wrong key, but correct domain)
 	stxn.Ssig.Sponsor = sponsor
-	stxn.Ssig.Sig = wrongSecrets[0].Sign(tx)
+	stxn.Ssig.Sig = signAsSponsor(wrongSecrets[0], tx, sponsor)
 
 	// Verify should fail - wrong sponsor signature
 	blkHdr := createFeeSponsoredBlockHeader()
@@ -206,9 +211,10 @@ func TestFeeSponsoredWithRekeying(t *testing.T) {
 	stxn := tx.Sign(senderSecrets[0])
 
 	// Add sponsor signature with rekeyed auth address
+	// The signature binds to the sponsor address via SponsoredTransaction
 	stxn.Ssig.Sponsor = sponsor
 	stxn.Ssig.AuthAddr = authAddr
-	stxn.Ssig.Sig = authSecrets[0].Sign(tx)
+	stxn.Ssig.Sig = signAsSponsor(authSecrets[0], tx, sponsor)
 
 	// Verify with fee-sponsored consensus
 	blkHdr := createFeeSponsoredBlockHeader()
@@ -236,10 +242,11 @@ func TestFeeSponsoredMultiSig(t *testing.T) {
 	// Sign transaction as sender
 	stxn := tx.Sign(senderSecrets[0])
 
-	// Create multisig sponsor signature (2 of 3 signers)
-	msig1, err := crypto.MultisigSign(tx, crypto.Digest(sponsor), 1, 2, sponsorPKs, *sponsorSecrets[0])
+	// Create multisig sponsor signature using SponsoredTransaction (2 of 3 signers)
+	st := transactions.SponsoredTransaction{Txn: tx, Sponsor: sponsor}
+	msig1, err := crypto.MultisigSign(st, crypto.Digest(sponsor), 1, 2, sponsorPKs, *sponsorSecrets[0])
 	require.NoError(t, err)
-	msig2, err := crypto.MultisigSign(tx, crypto.Digest(sponsor), 1, 2, sponsorPKs, *sponsorSecrets[1])
+	msig2, err := crypto.MultisigSign(st, crypto.Digest(sponsor), 1, 2, sponsorPKs, *sponsorSecrets[1])
 	require.NoError(t, err)
 	combinedMsig, err := crypto.MultisigAssemble([]crypto.MultisigSig{msig1, msig2})
 	require.NoError(t, err)
@@ -268,9 +275,9 @@ func TestFeeSponsoredSponsorSameAsSender(t *testing.T) {
 	// Sign transaction as sender
 	stxn := tx.Sign(secrets[0])
 
-	// Add sponsor signature (same as sender)
+	// Add sponsor signature (same as sender, domain-separated)
 	stxn.Ssig.Sponsor = addr
-	stxn.Ssig.Sig = secrets[0].Sign(tx)
+	stxn.Ssig.Sig = signAsSponsor(secrets[0], tx, addr)
 
 	// Verify - this should be allowed at the verification level
 	// (the economic impact is the same, just adds complexity)
@@ -300,7 +307,7 @@ func TestFeeSponsoredBatchSigCount(t *testing.T) {
 
 	// Add sponsor signature
 	stxn.Ssig.Sponsor = sponsor
-	stxn.Ssig.Sig = sponsorSecrets[0].Sign(tx)
+	stxn.Ssig.Sig = signAsSponsor(sponsorSecrets[0], tx, sponsor)
 
 	// Check batch sig count - should be 2 (sender + sponsor)
 	count, err := getNumberOfBatchableSigsInTxn(&stxn, 0)
@@ -327,10 +334,11 @@ func TestFeeSponsoredBatchSigCountMultiSig(t *testing.T) {
 	// Sign transaction as sender
 	stxn := tx.Sign(senderSecrets[0])
 
-	// Create multisig sponsor signature (2 of 3 signers)
-	msig1, err := crypto.MultisigSign(tx, crypto.Digest(sponsor), 1, 2, sponsorPKs, *sponsorSecrets[0])
+	// Create multisig sponsor signature using SponsoredTransaction (2 of 3 signers)
+	st := transactions.SponsoredTransaction{Txn: tx, Sponsor: sponsor}
+	msig1, err := crypto.MultisigSign(st, crypto.Digest(sponsor), 1, 2, sponsorPKs, *sponsorSecrets[0])
 	require.NoError(t, err)
-	msig2, err := crypto.MultisigSign(tx, crypto.Digest(sponsor), 1, 2, sponsorPKs, *sponsorSecrets[1])
+	msig2, err := crypto.MultisigSign(st, crypto.Digest(sponsor), 1, 2, sponsorPKs, *sponsorSecrets[1])
 	require.NoError(t, err)
 	combinedMsig, err := crypto.MultisigAssemble([]crypto.MultisigSig{msig1, msig2})
 	require.NoError(t, err)
@@ -345,10 +353,10 @@ func TestFeeSponsoredBatchSigCountMultiSig(t *testing.T) {
 	require.Equal(t, uint64(3), count, "Expected 3 batchable signatures (1 sender + 2 sponsor multisig)")
 }
 
-// TestFeeSponsoredSignatureVulnerability demonstrates a vulnerability where a sponsorship signature
-// can be misused by replacing the sponsor address with another address that has been rekeyed
-// to the sponsor's address. Because the signature only covers the transaction and not the
-// sponsor address itself, the signature remains valid for any account rekeyed to the signer.
+// TestFeeSponsoredSignatureVulnerability verifies that the vulnerability where a sponsorship
+// signature could be replayed by swapping the sponsor address is now FIXED.
+// With the "FS" domain-separated HashID, the signature commits to the sponsor address,
+// so changing the sponsor address invalidates the signature.
 func TestFeeSponsoredSignatureVulnerability(t *testing.T) {
 	partitiontest.PartitionTest(t)
 
@@ -367,27 +375,25 @@ func TestFeeSponsoredSignatureVulnerability(t *testing.T) {
 	// Sign transaction as sender
 	stxn := tx.Sign(senderSecrets[0])
 
-	// Sponsor S signs the transaction
+	// Sponsor S signs the transaction with domain-separated signature (commits to S)
 	stxn.Ssig.Sponsor = S
-	stxn.Ssig.Sig = sponsorSecrets[0].Sign(tx)
+	stxn.Ssig.Sig = signAsSponsor(sponsorSecrets[0], tx, S)
 
 	// Now an attacker modifies the transaction to make X pay instead of S.
 	// Assume X is rekeyed to S (this check happens at apply time, but we're testing the signature binding here).
 	stxn.Ssig.Sponsor = X
 	stxn.Ssig.AuthAddr = S
-	// The signature stxn.Ssig.Sig remains the SAME.
+	// The signature stxn.Ssig.Sig remains the SAME — but it was signed for sponsor=S, not sponsor=X.
 
-	// In a secure implementation, this should FAIL because the signature was for S, not X.
-	// But currently, it will SUCCEED because the signature is only over the transaction tx,
-	// and S is a valid authorizer for X (assuming rekeying).
+	// With the "FS" domain-separated signature, the signature is bound to sponsor=S.
+	// Verification will check the signature against SponsoredTransaction{Txn: tx, Sponsor: X},
+	// which won't match the signature that was created for SponsoredTransaction{Txn: tx, Sponsor: S}.
 	blkHdr := createFeeSponsoredBlockHeader()
 	groupCtx, err := PrepareGroupContext([]transactions.SignedTxn{stxn}, blkHdr, nil, nil)
 	require.NoError(t, err)
 
 	err = verifyTxn(0, groupCtx)
-	// IF SECURE: require.Error(t, err)
-	// CURRENTLY VULNERABLE:
-	require.NoError(t, err, "VULNERABILITY: Signature is valid even if sponsor address is changed to another address rekeyed to the same signer")
+	require.Error(t, err, "Signature should be invalid because it was signed for sponsor S but sponsor was changed to X")
 }
 
 func TestFeeSponsoredFlagWithoutSponsorSig(t *testing.T) {

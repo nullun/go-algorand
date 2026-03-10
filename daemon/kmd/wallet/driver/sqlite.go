@@ -33,6 +33,7 @@ import (
 	"github.com/algorand/go-algorand/crypto"
 	"github.com/algorand/go-algorand/daemon/kmd/config"
 	"github.com/algorand/go-algorand/daemon/kmd/wallet"
+	"github.com/algorand/go-algorand/data/basics"
 	"github.com/algorand/go-algorand/data/transactions"
 	"github.com/algorand/go-algorand/data/transactions/logic"
 	"github.com/algorand/go-algorand/logging"
@@ -1167,6 +1168,119 @@ func (sw *SQLiteWallet) SignProgram(data []byte, src crypto.Digest, pw []byte) (
 	// Sign the transaction
 	sig := secrets.Sign(&progb)
 	stx = sig[:]
+	return
+}
+
+// SponsorSignTransaction signs a transaction as a fee sponsor using the FeeSponsor domain separator.
+// The signature commits to both the transaction and the sponsor address.
+func (sw *SQLiteWallet) SponsorSignTransaction(tx transactions.Transaction, sponsor basics.Address, pk crypto.PublicKey, pw []byte) (stx []byte, err error) {
+	// Check the password
+	err = sw.CheckPassword(pw)
+	if err != nil {
+		return
+	}
+
+	// Fetch the required key
+	var sk crypto.PrivateKey
+	if (pk == crypto.PublicKey{}) {
+		sk, err = sw.fetchSecretKey(crypto.Digest(sponsor))
+	} else {
+		sk, err = sw.fetchSecretKey(crypto.Digest(pk))
+	}
+	if err != nil {
+		return
+	}
+
+	// Generate the signature secrets
+	secrets, err := crypto.SecretKeyToSignatureSecrets(sk)
+	if err != nil {
+		err = errSKToPK
+		return
+	}
+
+	// Sign the sponsored transaction (domain-separated with "FS" HashID)
+	st := transactions.SponsoredTransaction{Txn: tx, Sponsor: sponsor}
+	sig := secrets.Sign(st)
+	stx = sig[:]
+	return
+}
+
+// MultisigSponsorSignTransaction starts or adds to a multisig sponsor signature
+// using the FeeSponsor domain separator.
+func (sw *SQLiteWallet) MultisigSponsorSignTransaction(tx transactions.Transaction, sponsor basics.Address, pk crypto.PublicKey, partial crypto.MultisigSig, pw []byte, signer crypto.Digest) (sig crypto.MultisigSig, err error) {
+	// Check the password
+	err = sw.CheckPassword(pw)
+	if err != nil {
+		return
+	}
+
+	st := transactions.SponsoredTransaction{Txn: tx, Sponsor: sponsor}
+
+	if partial.Version == 0 && partial.Threshold == 0 && len(partial.Subsigs) == 0 {
+		// No partial multisig provided, create a new one
+		var pks []crypto.PublicKey
+		var version, threshold uint8
+		version, threshold, pks, err = sw.LookupMultisigPreimage(crypto.Digest(sponsor))
+		if err != nil {
+			return
+		}
+
+		var sk crypto.PrivateKey
+		sk, err = sw.fetchSecretKey(publicKeyToAddress(pk))
+		if err != nil {
+			return
+		}
+
+		var secrets *crypto.SignatureSecrets
+		secrets, err = crypto.SecretKeyToSignatureSecrets(sk)
+		if err != nil {
+			err = errSKToPK
+			return
+		}
+
+		sig, err = crypto.MultisigSign(st, crypto.Digest(sponsor), version, threshold, pks, *secrets)
+		return
+	}
+
+	// Add to existing partial multisig
+	var addr crypto.Digest
+	addr, err = crypto.MultisigAddrGenWithSubsigs(partial.Version, partial.Threshold, partial.Subsigs)
+	if err != nil {
+		return
+	}
+
+	if addr != crypto.Digest(sponsor) && addr != signer {
+		err = errMsigWrongAddr
+		return
+	}
+
+	err = errMsigWrongKey
+	for _, subsig := range partial.Subsigs {
+		if pk == subsig.Key {
+			err = nil
+			break
+		}
+	}
+	if err != nil {
+		return
+	}
+
+	sk, err := sw.fetchSecretKey(publicKeyToAddress(pk))
+	if err != nil {
+		return
+	}
+
+	secrets, err := crypto.SecretKeyToSignatureSecrets(sk)
+	if err != nil {
+		return
+	}
+
+	version, threshold, pks := partial.Preimage()
+	msig2, err := crypto.MultisigSign(st, addr, version, threshold, pks, *secrets)
+	if err != nil {
+		return
+	}
+	sig, err = crypto.MultisigMerge(partial, msig2)
 	return
 }
 

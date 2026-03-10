@@ -360,7 +360,8 @@ func stxnCoreChecks(gi int, groupCtx *GroupContext, batchVerifier crypto.BatchVe
 			return &TxGroupError{err: errTxnSigHasIncompleteOrMissingSponsorSig, GroupIndex: gi, Reason: TxGroupErrorReasonHasNoSig}
 		}
 
-		return enqueueAuthSigVerify(stxn.SponsorAuthorizer(), &stxn.Ssig.SignatureFields, &stxn.Txn, gi, groupCtx, sponsorSigType, batchVerifier)
+		st := transactions.SponsoredTransaction{Txn: stxn.Txn, Sponsor: stxn.Ssig.Sponsor}
+		return enqueueSponsorSigVerify(stxn.SponsorAuthorizer(), &stxn.Ssig.SignatureFields, st, gi, groupCtx, sponsorSigType, batchVerifier)
 	}
 
 	return nil
@@ -393,6 +394,35 @@ func enqueueAuthSigVerify(auth basics.Address, s *transactions.SignatureFields, 
 		return nil
 
 	case logicSig:
+		if err := logicSigVerify(gi, groupCtx); err != nil {
+			return &TxGroupError{err: err, GroupIndex: gi, Reason: TxGroupErrorReasonLogicSigFailed}
+		}
+		return nil
+
+	default:
+		return &TxGroupError{err: errUnknownSignature, GroupIndex: gi, Reason: TxGroupErrorReasonGeneric}
+	}
+}
+
+// enqueueSponsorSigVerify is like enqueueAuthSigVerify but uses SponsoredTransaction
+// as the message to verify against, providing domain separation for sponsor signatures.
+func enqueueSponsorSigVerify(auth basics.Address, s *transactions.SignatureFields, st transactions.SponsoredTransaction, gi int, groupCtx *GroupContext, sigType_ sigType, batchVerifier crypto.BatchVerifier) *TxGroupError {
+	switch sigType_ {
+	case missingSig:
+		return &TxGroupError{err: errTxnSigHasNoSig, GroupIndex: gi, Reason: TxGroupErrorReasonGeneric}
+
+	case singleSig:
+		batchVerifier.EnqueueSignature(crypto.SignatureVerifier(auth), st, s.Sig)
+		return nil
+
+	case multiSig:
+		if err := crypto.MultisigBatchPrep(st, crypto.Digest(auth), s.Msig, batchVerifier); err != nil {
+			return &TxGroupError{err: fmt.Errorf("sponsor multisig validation failed: %w", err), GroupIndex: gi, Reason: TxGroupErrorReasonMsigNotWellFormed}
+		}
+		return nil
+
+	case logicSig:
+		// Logic signatures for sponsors use the same logic sig verification path
 		if err := logicSigVerify(gi, groupCtx); err != nil {
 			return &TxGroupError{err: err, GroupIndex: gi, Reason: TxGroupErrorReasonLogicSigFailed}
 		}

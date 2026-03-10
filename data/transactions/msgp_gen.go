@@ -238,6 +238,16 @@ import (
 //      |-----> (*) MsgIsZero
 //      |-----> SponsorSigMaxSize()
 //
+// SponsoredTransaction
+//           |-----> (*) MarshalMsg
+//           |-----> (*) CanMarshalMsg
+//           |-----> (*) UnmarshalMsg
+//           |-----> (*) UnmarshalMsgWithState
+//           |-----> (*) CanUnmarshalMsg
+//           |-----> (*) Msgsize
+//           |-----> (*) MsgIsZero
+//           |-----> SponsoredTransactionMaxSize()
+//
 // StateProofTxnFields
 //          |-----> (*) MarshalMsg
 //          |-----> (*) CanMarshalMsg
@@ -6780,6 +6790,149 @@ func (z *SponsorSig) MsgIsZero() bool {
 // SponsorSigMaxSize returns a maximum valid message size for this message type
 func SponsorSigMaxSize() (s int) {
 	s = 1 + 5 + basics.AddressMaxSize() + 4 + crypto.SignatureMaxSize() + 5 + crypto.MultisigSigMaxSize() + 5 + LogicSigMaxSize() + 5 + basics.AddressMaxSize()
+	return
+}
+
+// MarshalMsg implements msgp.Marshaler
+func (z *SponsoredTransaction) MarshalMsg(b []byte) (o []byte) {
+	o = msgp.Require(b, z.Msgsize())
+	// omitempty: check for empty values
+	zb0001Len := uint32(2)
+	var zb0001Mask uint8 /* 3 bits */
+	if (*z).Sponsor.MsgIsZero() {
+		zb0001Len--
+		zb0001Mask |= 0x2
+	}
+	if (*z).Txn.MsgIsZero() {
+		zb0001Len--
+		zb0001Mask |= 0x4
+	}
+	// variable map header, size zb0001Len
+	o = append(o, 0x80|uint8(zb0001Len))
+	if zb0001Len != 0 {
+		if (zb0001Mask & 0x2) == 0 { // if not empty
+			// string "sponsor"
+			o = append(o, 0xa7, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x6f, 0x72)
+			o = (*z).Sponsor.MarshalMsg(o)
+		}
+		if (zb0001Mask & 0x4) == 0 { // if not empty
+			// string "txn"
+			o = append(o, 0xa3, 0x74, 0x78, 0x6e)
+			o = (*z).Txn.MarshalMsg(o)
+		}
+	}
+	return
+}
+
+func (_ *SponsoredTransaction) CanMarshalMsg(z interface{}) bool {
+	_, ok := (z).(*SponsoredTransaction)
+	return ok
+}
+
+// UnmarshalMsg implements msgp.Unmarshaler
+func (z *SponsoredTransaction) UnmarshalMsgWithState(bts []byte, st msgp.UnmarshalState) (o []byte, err error) {
+	if st.AllowableDepth == 0 {
+		err = msgp.ErrMaxDepthExceeded{}
+		return
+	}
+	st.AllowableDepth--
+	var field []byte
+	_ = field
+	var zb0001 int
+	var zb0002 bool
+	zb0001, zb0002, bts, err = msgp.ReadMapHeaderBytes(bts)
+	if _, ok := err.(msgp.TypeError); ok {
+		zb0001, zb0002, bts, err = msgp.ReadArrayHeaderBytes(bts)
+		if err != nil {
+			err = msgp.WrapError(err)
+			return
+		}
+		if zb0001 > 0 {
+			zb0001--
+			bts, err = (*z).Txn.UnmarshalMsgWithState(bts, st)
+			if err != nil {
+				err = msgp.WrapError(err, "struct-from-array", "Txn")
+				return
+			}
+		}
+		if zb0001 > 0 {
+			zb0001--
+			bts, err = (*z).Sponsor.UnmarshalMsgWithState(bts, st)
+			if err != nil {
+				err = msgp.WrapError(err, "struct-from-array", "Sponsor")
+				return
+			}
+		}
+		if zb0001 > 0 {
+			err = msgp.ErrTooManyArrayFields(zb0001)
+			if err != nil {
+				err = msgp.WrapError(err, "struct-from-array")
+				return
+			}
+		}
+	} else {
+		if err != nil {
+			err = msgp.WrapError(err)
+			return
+		}
+		if zb0002 {
+			(*z) = SponsoredTransaction{}
+		}
+		for zb0001 > 0 {
+			zb0001--
+			field, bts, err = msgp.ReadMapKeyZC(bts)
+			if err != nil {
+				err = msgp.WrapError(err)
+				return
+			}
+			switch string(field) {
+			case "txn":
+				bts, err = (*z).Txn.UnmarshalMsgWithState(bts, st)
+				if err != nil {
+					err = msgp.WrapError(err, "Txn")
+					return
+				}
+			case "sponsor":
+				bts, err = (*z).Sponsor.UnmarshalMsgWithState(bts, st)
+				if err != nil {
+					err = msgp.WrapError(err, "Sponsor")
+					return
+				}
+			default:
+				err = msgp.ErrNoField(string(field))
+				if err != nil {
+					err = msgp.WrapError(err)
+					return
+				}
+			}
+		}
+	}
+	o = bts
+	return
+}
+
+func (z *SponsoredTransaction) UnmarshalMsg(bts []byte) (o []byte, err error) {
+	return z.UnmarshalMsgWithState(bts, msgp.DefaultUnmarshalState)
+}
+func (_ *SponsoredTransaction) CanUnmarshalMsg(z interface{}) bool {
+	_, ok := (z).(*SponsoredTransaction)
+	return ok
+}
+
+// Msgsize returns an upper bound estimate of the number of bytes occupied by the serialized message
+func (z *SponsoredTransaction) Msgsize() (s int) {
+	s = 1 + 4 + (*z).Txn.Msgsize() + 8 + (*z).Sponsor.Msgsize()
+	return
+}
+
+// MsgIsZero returns whether this is a zero value
+func (z *SponsoredTransaction) MsgIsZero() bool {
+	return ((*z).Txn.MsgIsZero()) && ((*z).Sponsor.MsgIsZero())
+}
+
+// SponsoredTransactionMaxSize returns a maximum valid message size for this message type
+func SponsoredTransactionMaxSize() (s int) {
+	s = 1 + 4 + TransactionMaxSize() + 8 + basics.AddressMaxSize()
 	return
 }
 

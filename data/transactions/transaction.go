@@ -286,26 +286,6 @@ func (tx Transaction) Sign(secrets *crypto.SignatureSecrets) SignedTxn {
 	return s
 }
 
-// SignAsSponsor signs a transaction as a sponsor using a given Account's secrets.
-func (tx Transaction) SignAsSponsor(secrets *crypto.SignatureSecrets) SignedTxn {
-	ssig := secrets.Sign(tx)
-
-	s := SignedTxn{
-		Txn: tx,
-		Ssig: SponsorSig{
-			Sponsor: basics.Address(secrets.SignatureVerifier),
-			SignatureFields: SignatureFields{
-				Sig: ssig,
-			},
-		},
-	}
-	// // Set the Sponsor AuthAddr if the signing key doesn't match the transaction sponsor
-	// if basics.Address(secrets.SignatureVerifier) != tx.Sponsor.Address {
-	// 	s.Sponsor.AuthAddr = basics.Address(secrets.SignatureVerifier)
-	// }
-	return s
-}
-
 // Src returns the address that posted the transaction.
 // This is the account that pays the associated Fee.
 func (tx Header) Src() basics.Address {

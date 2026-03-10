@@ -347,6 +347,38 @@ type signMultisigResponse struct {
 	Body *APIV1POSTMultisigTransactionSignResponse
 }
 
+// APIV1POSTSponsorSignResponse is the response to `POST /v1/sponsor/sign`
+// friendly:SponsorSignResponse
+type APIV1POSTSponsorSignResponse struct {
+	APIV1ResponseEnvelope
+
+	// swagger:strfmt byte
+	Signature []byte `json:"sig"`
+}
+
+// Response to `POST /v1/sponsor/sign`
+// swagger:response SponsorSignResponse
+type sponsorSignResponse struct {
+	//	in:body
+	Body *APIV1POSTSponsorSignResponse
+}
+
+// APIV1POSTMultisigSponsorSignResponse is the response to `POST /v1/multisig/signsponsor`
+// friendly:MultisigSponsorSignResponse
+type APIV1POSTMultisigSponsorSignResponse struct {
+	APIV1ResponseEnvelope
+
+	// swagger:strfmt byte
+	Multisig []byte `json:"multisig"`
+}
+
+// Response to `POST /v1/multisig/signsponsor`
+// swagger:response MultisigSponsorSignResponse
+type multisigSponsorSignResponse struct {
+	//	in:body
+	Body *APIV1POSTMultisigSponsorSignResponse
+}
+
 // APIV1POSTMultisigProgramSignResponse is the response to `POST /v1/multisig/signdata`
 // friendly:SignProgramMultisigResponse
 type APIV1POSTMultisigProgramSignResponse struct {

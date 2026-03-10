@@ -21,6 +21,7 @@ import (
 	"fmt"
 
 	"github.com/algorand/go-algorand/crypto"
+	"github.com/algorand/go-algorand/data/basics"
 	"github.com/algorand/go-algorand/data/transactions"
 	"github.com/algorand/go-algorand/protocol"
 )
@@ -54,6 +55,9 @@ type Wallet interface {
 	SignTransaction(tx transactions.Transaction, pk crypto.PublicKey, pw []byte) ([]byte, error)
 
 	MultisigSignTransaction(tx transactions.Transaction, pk crypto.PublicKey, partial crypto.MultisigSig, pw []byte, signer crypto.Digest) (crypto.MultisigSig, error)
+
+	SponsorSignTransaction(tx transactions.Transaction, sponsor basics.Address, pk crypto.PublicKey, pw []byte) ([]byte, error)
+	MultisigSponsorSignTransaction(tx transactions.Transaction, sponsor basics.Address, pk crypto.PublicKey, partial crypto.MultisigSig, pw []byte, signer crypto.Digest) (crypto.MultisigSig, error)
 
 	SignProgram(program []byte, src crypto.Digest, pw []byte) ([]byte, error)
 	MultisigSignProgram(program []byte, src crypto.Digest, pk crypto.PublicKey, partial crypto.MultisigSig, pw []byte, useLegacyMsig bool) (crypto.MultisigSig, error)

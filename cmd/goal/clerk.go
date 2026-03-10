@@ -996,11 +996,6 @@ Example workflow:
 				reportErrorf(txDecodeError, txFilename, err)
 			}
 
-			// Validate that the transaction is fee-sponsored
-			if !stxn.Txn.FeeSponsored {
-				reportErrorln(errorTxNotFeeSponsored)
-			}
-
 			// Validate sponsor is not the sender
 			if sponsor == stxn.Txn.Sender {
 				reportErrorln(errorSponsorSameAsSender)
@@ -1033,12 +1028,23 @@ Example workflow:
 					stxn.Ssig.AuthAddr = authAddr
 				}
 			} else {
-				// Sign with kmd
-				// Determine which address to use for signing
-				signingAddr := sponsorAddress
-				if signerAddress != "" {
-					signingAddr = signerAddress
-					// Set AuthAddr if sponsor is rekeyed
+				// Sign with kmd using domain-separated sponsor signature
+
+				// Check if this is a multisig sponsor
+				var msigInfo libgoal.MultisigInfo
+				msigInfo, err = client.LookupMultisigAccount(wh, sponsorAddress)
+				if err == nil && len(msigInfo.PKs) > 0 {
+					// Multisig sponsor
+					signingAddr := sponsorAddress
+					if signerAddress != "" {
+						signingAddr = signerAddress
+					}
+					stxn, err = client.MultisigSignTransactionAsSponsor(wh, pw, sponsorAddress, signingAddr, stxn, stxn.Ssig.Msig)
+					if err != nil {
+						reportErrorf(errorSponsorSigningTX, err)
+					}
+				} else if signerAddress != "" {
+					// Single signature sponsor with rekeyed account
 					var authAddr basics.Address
 					authAddr, err = basics.UnmarshalChecksumAddress(signerAddress)
 					if err != nil {
@@ -1047,28 +1053,16 @@ Example workflow:
 					if authAddr == sponsor {
 						reportErrorf("Sponsor signer cannot be the same as the sponsor address when using --signer")
 					}
-					stxn.Ssig.AuthAddr = authAddr
-				}
-
-				// Check if this is a multisig sponsor
-				var msigInfo libgoal.MultisigInfo
-				msigInfo, err = client.LookupMultisigAccount(wh, sponsorAddress)
-				if err == nil && len(msigInfo.PKs) > 0 {
-					// Multisig sponsor - add signature to the multisig
-					var msig crypto.MultisigSig
-					msig, err = client.MultisigSignTransactionWithWallet(wh, pw, stxn.Txn, signingAddr, stxn.Ssig.Msig)
+					stxn, err = client.SignTransactionWithWalletAsSponsorAndSigner(wh, pw, sponsorAddress, signerAddress, stxn)
 					if err != nil {
 						reportErrorf(errorSponsorSigningTX, err)
 					}
-					stxn.Ssig.Msig = msig
 				} else {
 					// Single signature sponsor
-					var sig transactions.SignedTxn
-					sig, err = client.SignTransactionWithWallet(wh, pw, stxn.Txn)
+					stxn, err = client.SignTransactionWithWalletAsSponsor(wh, pw, sponsorAddress, stxn)
 					if err != nil {
 						reportErrorf(errorSponsorSigningTX, err)
 					}
-					stxn.Ssig.Sig = sig.Sig
 				}
 			}
 

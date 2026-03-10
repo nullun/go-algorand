@@ -136,7 +136,6 @@ const (
 
 	// Fee Sponsorship
 	errorSponsorSameAsSender = "Sponsor address cannot be the same as the transaction sender"
-	errorTxNotFeeSponsored   = "Transaction is not marked as fee-sponsored. Use --fee-sponsored flag when creating the transaction"
 	errorSponsorSigPresent   = "Transaction already has a sponsor signature"
 	errorSponsorSigningTX    = "Couldn't sign transaction as sponsor: %s"
 	infoSponsorSigAdded      = "Added sponsor signature from %s to transaction %s"

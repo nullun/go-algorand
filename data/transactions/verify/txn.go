@@ -424,7 +424,8 @@ func stxnCoreChecks(gi int, groupCtx *GroupContext, batch crypto.BatchEnqueuer) 
 			return &TxGroupError{err: errTxnSigHasIncompleteOrMissingSponsorSig, GroupIndex: gi, Reason: TxGroupErrorReasonHasNoSig}
 		}
 
-		return enqueueAuthSigVerify(stxn.SponsorAuthorizer(), &stxn.Ssig.SignatureFields, &stxn.Txn, gi, groupCtx, sponsorSigType, batch)
+		st := transactions.SponsoredTransaction{Txn: stxn.Txn, Sponsor: stxn.Ssig.Sponsor}
+		return enqueueSponsorSigVerify(stxn.SponsorAuthorizer(), &stxn.Ssig.SignatureFields, st, gi, groupCtx, sponsorSigType, batch)
 	}
 
 	return nil
@@ -463,6 +464,42 @@ func enqueueAuthSigVerify(auth basics.Address, s *transactions.SignatureFields, 
 	case pqSig:
 		if err := s.PQsig.Verify(groupCtx.consensusParams, t, auth); err != nil {
 			return &TxGroupError{err: fmt.Errorf("pq signature validation failed: %w", err), GroupIndex: gi, Reason: TxGroupErrorReasonSigNotWellFormed}
+		}
+		return nil
+
+	default:
+		return &TxGroupError{err: errUnknownSignature, GroupIndex: gi, Reason: TxGroupErrorReasonGeneric}
+	}
+}
+
+// enqueueSponsorSigVerify is like enqueueAuthSigVerify but uses SponsoredTransaction
+// as the message to verify against, providing domain separation for sponsor signatures.
+func enqueueSponsorSigVerify(auth basics.Address, s *transactions.SignatureFields, st transactions.SponsoredTransaction, gi int, groupCtx *GroupContext, sigType_ sigType, batch crypto.BatchEnqueuer) *TxGroupError {
+	switch sigType_ {
+	case missingSig:
+		return &TxGroupError{err: errTxnSigHasNoSig, GroupIndex: gi, Reason: TxGroupErrorReasonGeneric}
+
+	case singleSig:
+		batch.EnqueueSignature(crypto.SignatureVerifier(auth), st, s.Sig)
+		return nil
+
+	case multiSig:
+		if err := crypto.MultisigBatchPrep(st, crypto.Digest(auth), s.Msig, batch); err != nil {
+			return &TxGroupError{err: fmt.Errorf("sponsor multisig validation failed: %w", err), GroupIndex: gi, Reason: TxGroupErrorReasonMsigNotWellFormed}
+		}
+		return nil
+
+	case logicSig:
+		// Logic signatures for sponsors use the same logic sig verification path
+		if err := logicSigVerify(gi, groupCtx); err != nil {
+			return &TxGroupError{err: err, GroupIndex: gi, Reason: TxGroupErrorReasonLogicSigFailed}
+		}
+		return nil
+
+	case pqSig:
+		// The sponsor's PQ signature also commits to the sponsor address.
+		if err := s.PQsig.Verify(groupCtx.consensusParams, st, auth); err != nil {
+			return &TxGroupError{err: fmt.Errorf("sponsor pq signature validation failed: %w", err), GroupIndex: gi, Reason: TxGroupErrorReasonSigNotWellFormed}
 		}
 		return nil
 

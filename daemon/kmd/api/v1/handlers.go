@@ -1080,6 +1080,117 @@ func postMultisigExportHandler(ctx reqContext, w http.ResponseWriter, r *http.Re
 	successResponse(w, resp)
 }
 
+// postSponsorSignHandler handles `POST /v1/sponsor/sign`
+func postSponsorSignHandler(ctx reqContext, w http.ResponseWriter, r *http.Request) {
+	var req kmdapi.APIV1POSTSponsorSignRequest
+
+	// Decode the request
+	decoder := protocol.NewJSONDecoder(r.Body)
+	err := decoder.Decode(&req)
+	if err != nil {
+		errorResponse(w, http.StatusBadRequest, errCouldNotDecode)
+		return
+	}
+
+	// Fetch the wallet from the WalletHandleToken
+	wallet, _, err := ctx.sm.AuthWithWalletHandleToken([]byte(req.WalletHandleToken))
+	if err != nil {
+		errorResponse(w, http.StatusUnauthorized, err)
+		return
+	}
+
+	// Decode the transaction
+	var tx transactions.Transaction
+	err = protocol.Decode(req.Transaction, &tx)
+	if err != nil {
+		errorResponse(w, http.StatusBadRequest, errCouldNotDecodeTx)
+		return
+	}
+
+	// Decode the sponsor address
+	sponsorAddr, err := basics.UnmarshalChecksumAddress(req.SponsorAddress)
+	if err != nil {
+		errorResponse(w, http.StatusBadRequest, errCouldNotDecodeAddress)
+		return
+	}
+
+	// Sign as sponsor
+	sig, err := wallet.SponsorSignTransaction(tx, sponsorAddr, req.PublicKey, []byte(req.WalletPassword))
+	if err != nil {
+		errorResponse(w, http.StatusBadRequest, err)
+		return
+	}
+
+	// Build the response
+	resp := kmdapi.APIV1POSTSponsorSignResponse{
+		Signature: sig,
+	}
+
+	// Return and encode the response
+	successResponse(w, resp)
+}
+
+// postMultisigSponsorSignHandler handles `POST /v1/multisig/signsponsor`
+func postMultisigSponsorSignHandler(ctx reqContext, w http.ResponseWriter, r *http.Request) {
+	var req kmdapi.APIV1POSTMultisigSponsorSignRequest
+
+	// Decode the request
+	decoder := protocol.NewJSONDecoder(r.Body)
+	err := decoder.Decode(&req)
+	if err != nil {
+		errorResponse(w, http.StatusBadRequest, errCouldNotDecode)
+		return
+	}
+
+	// Fetch the wallet from the WalletHandleToken
+	wallet, _, err := ctx.sm.AuthWithWalletHandleToken([]byte(req.WalletHandleToken))
+	if err != nil {
+		errorResponse(w, http.StatusUnauthorized, err)
+		return
+	}
+
+	// Decode the transaction
+	var tx transactions.Transaction
+	err = protocol.Decode(req.Transaction, &tx)
+	if err != nil {
+		errorResponse(w, http.StatusBadRequest, errCouldNotDecodeTx)
+		return
+	}
+
+	// Decode the sponsor address
+	sponsorAddr, err := basics.UnmarshalChecksumAddress(req.SponsorAddress)
+	if err != nil {
+		errorResponse(w, http.StatusBadRequest, errCouldNotDecodeAddress)
+		return
+	}
+
+	// Decode the signer address if provided
+	var signerDigest crypto.Digest
+	if req.Signer != "" {
+		signerAddr, err2 := basics.UnmarshalChecksumAddress(req.Signer)
+		if err2 != nil {
+			errorResponse(w, http.StatusBadRequest, errCouldNotDecodeAddress)
+			return
+		}
+		signerDigest = crypto.Digest(signerAddr)
+	}
+
+	// Sign as multisig sponsor
+	msig, err := wallet.MultisigSponsorSignTransaction(tx, sponsorAddr, req.PublicKey, req.PartialMsig, []byte(req.WalletPassword), signerDigest)
+	if err != nil {
+		errorResponse(w, http.StatusBadRequest, err)
+		return
+	}
+
+	// Build the response
+	resp := kmdapi.APIV1POSTMultisigSponsorSignResponse{
+		Multisig: protocol.Encode(&msig),
+	}
+
+	// Return and encode the response
+	successResponse(w, resp)
+}
+
 // postMultisigTransactionSignHandler handles `POST /v1/multisig/sign`
 func postMultisigTransactionSignHandler(ctx reqContext, w http.ResponseWriter, r *http.Request) {
 	// swagger:operation POST /v1/multisig/sign SignMultisigTransaction
@@ -1310,10 +1421,12 @@ func RegisterHandlers(router *mux.Router, sm *session.Manager, log logging.Logge
 	router.HandleFunc("/multisig/list", wrapCtx(ctx, postMultisigListHandler)).Methods("POST")
 	router.HandleFunc("/multisig/sign", wrapCtx(ctx, postMultisigTransactionSignHandler)).Methods("POST")
 	router.HandleFunc("/multisig/signprogram", wrapCtx(ctx, postMultisigProgramSignHandler)).Methods("POST")
+	router.HandleFunc("/multisig/signsponsor", wrapCtx(ctx, postMultisigSponsorSignHandler)).Methods("POST")
 	router.HandleFunc("/multisig/import", wrapCtx(ctx, postMultisigImportHandler)).Methods("POST")
 	router.HandleFunc("/multisig/export", wrapCtx(ctx, postMultisigExportHandler)).Methods("POST")
 	router.HandleFunc("/multisig", wrapCtx(ctx, deleteMultisigHandler)).Methods("DELETE")
 
 	router.HandleFunc("/transaction/sign", wrapCtx(ctx, postTransactionSignHandler)).Methods("POST")
 	router.HandleFunc("/program/sign", wrapCtx(ctx, postProgramSignHandler)).Methods("POST")
+	router.HandleFunc("/sponsor/sign", wrapCtx(ctx, postSponsorSignHandler)).Methods("POST")
 }

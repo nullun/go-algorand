@@ -369,6 +369,18 @@ func (lw *LedgerWallet) SignProgram(data []byte, src crypto.Digest, pw []byte) (
 	return sig[:], nil
 }
 
+// SponsorSignTransaction implements the Wallet interface.
+// Ledger wallets do not yet support sponsor signing.
+func (lw *LedgerWallet) SponsorSignTransaction(tx transactions.Transaction, sponsor basics.Address, pk crypto.PublicKey, pw []byte) ([]byte, error) {
+	return nil, errNotSupported
+}
+
+// MultisigSponsorSignTransaction implements the Wallet interface.
+// Ledger wallets do not yet support multisig sponsor signing.
+func (lw *LedgerWallet) MultisigSponsorSignTransaction(tx transactions.Transaction, sponsor basics.Address, pk crypto.PublicKey, partial crypto.MultisigSig, pw []byte, signer crypto.Digest) (crypto.MultisigSig, error) {
+	return crypto.MultisigSig{}, errNotSupported
+}
+
 // MultisigSignTransaction implements the Wallet interface.
 func (lw *LedgerWallet) MultisigSignTransaction(tx transactions.Transaction, pk crypto.PublicKey, partial crypto.MultisigSig, pw []byte, signer crypto.Digest) (crypto.MultisigSig, error) {
 	isValidKey := false

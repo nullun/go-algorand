@@ -222,6 +222,36 @@ func (kcl KMDClient) SignTransaction(walletHandle, pw []byte, pk crypto.PublicKe
 	return
 }
 
+// SponsorSignTransaction wraps kmdapi.APIV1POSTSponsorSignRequest
+func (kcl KMDClient) SponsorSignTransaction(walletHandle, pw []byte, pk crypto.PublicKey, sponsorAddr string, tx transactions.Transaction) (resp kmdapi.APIV1POSTSponsorSignResponse, err error) {
+	txBytes := protocol.Encode(&tx)
+	req := kmdapi.APIV1POSTSponsorSignRequest{
+		WalletHandleToken: string(walletHandle),
+		WalletPassword:    string(pw),
+		PublicKey:         pk,
+		SponsorAddress:    sponsorAddr,
+		Transaction:       txBytes,
+	}
+	err = kcl.DoV1Request(req, &resp)
+	return
+}
+
+// MultisigSponsorSignTransaction wraps kmdapi.APIV1POSTMultisigSponsorSignRequest
+func (kcl KMDClient) MultisigSponsorSignTransaction(walletHandle, pw []byte, sponsorAddr string, signerAddr string, tx transactions.Transaction, pk crypto.PublicKey, partial crypto.MultisigSig) (resp kmdapi.APIV1POSTMultisigSponsorSignResponse, err error) {
+	txBytes := protocol.Encode(&tx)
+	req := kmdapi.APIV1POSTMultisigSponsorSignRequest{
+		WalletHandleToken: string(walletHandle),
+		WalletPassword:    string(pw),
+		SponsorAddress:    sponsorAddr,
+		Signer:            signerAddr,
+		Transaction:       txBytes,
+		PublicKey:         pk,
+		PartialMsig:       partial,
+	}
+	err = kcl.DoV1Request(req, &resp)
+	return
+}
+
 // SignProgram wraps kmdapi.APIV1POSTProgramSignRequest
 func (kcl KMDClient) SignProgram(walletHandle, pw []byte, addr string, data []byte) (resp kmdapi.APIV1POSTProgramSignResponse, err error) {
 	req := kmdapi.APIV1POSTProgramSignRequest{

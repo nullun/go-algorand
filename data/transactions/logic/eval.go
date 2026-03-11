@@ -1226,6 +1226,20 @@ func EvalApp(program []byte, gi int, aid basics.AppIndex, params *EvalParams) (b
 // A program passes successfully if it finishes with one int element on the stack that is non-zero.
 // It returns EvalContext suitable for obtaining additional info about the execution.
 func EvalSignatureFull(gi int, params *EvalParams) (bool, *EvalContext, error) {
+	return EvalLogicSigFull(gi, params, &params.TxnGroup[gi].Lsig)
+}
+
+// EvalSignature evaluates the logicsig of the ith transaction in params.
+// A program passes successfully if it finishes with one int element on the stack that is non-zero.
+func EvalSignature(gi int, params *EvalParams) (bool, error) {
+	pass, _, err := EvalSignatureFull(gi, params)
+	return pass, err
+}
+
+// EvalLogicSigFull evaluates the provided logicsig in the context of the ith transaction in params.
+// A program passes successfully if it finishes with one int element on the stack that is non-zero.
+// It returns EvalContext suitable for obtaining additional info about the execution.
+func EvalLogicSigFull(gi int, params *EvalParams, lsig *transactions.LogicSig) (bool, *EvalContext, error) {
 	if params.SigLedger == nil {
 		return false, nil, errors.New("no sig ledger in signature eval")
 	}
@@ -1243,7 +1257,7 @@ func EvalSignatureFull(gi int, params *EvalParams) (bool, *EvalContext, error) {
 	// values). But error returns and potentially debug code might like to
 	// return them.
 	cx.pastScratch[cx.groupIndex] = &cx.Scratch
-	pass, err := eval(cx.txn.Lsig.Logic, &cx)
+	pass, err := eval(lsig.Logic, &cx)
 
 	if err != nil {
 		err = cx.evalError(err)
@@ -1252,10 +1266,10 @@ func EvalSignatureFull(gi int, params *EvalParams) (bool, *EvalContext, error) {
 	return pass, &cx, err
 }
 
-// EvalSignature evaluates the logicsig of the ith transaction in params.
+// EvalLogicSig evaluates the provided logicsig in the context of the ith transaction in params.
 // A program passes successfully if it finishes with one int element on the stack that is non-zero.
-func EvalSignature(gi int, params *EvalParams) (bool, error) {
-	pass, _, err := EvalSignatureFull(gi, params)
+func EvalLogicSig(gi int, params *EvalParams, lsig *transactions.LogicSig) (bool, error) {
+	pass, _, err := EvalLogicSigFull(gi, params, lsig)
 	return pass, err
 }
 

@@ -90,6 +90,7 @@ var (
 	errAuthAddrEqualsSender                   = errors.New("AuthAddr must be different from Sender")
 	errFeeSponsoredNotSupported               = errors.New("nonempty SponsorSig but sponsoring is not supported")
 	errTxnSigHasIncompleteOrMissingSponsorSig = errors.New("signedtxn has incomplete or missing sponsor sig")
+	errSponsorLogicSigVersionTooLow           = errors.New("sponsor LogicSig version too low")
 	errUnknownSignature                       = errors.New("has one mystery sig. WAT?")
 )
 
@@ -394,7 +395,7 @@ func enqueueAuthSigVerify(auth basics.Address, s *transactions.SignatureFields, 
 		return nil
 
 	case logicSig:
-		if err := logicSigVerify(gi, groupCtx); err != nil {
+		if err := logicSigVerify(gi, groupCtx, false); err != nil {
 			return &TxGroupError{err: err, GroupIndex: gi, Reason: TxGroupErrorReasonLogicSigFailed}
 		}
 		return nil
@@ -423,7 +424,7 @@ func enqueueSponsorSigVerify(auth basics.Address, s *transactions.SignatureField
 
 	case logicSig:
 		// Logic signatures for sponsors use the same logic sig verification path
-		if err := logicSigVerify(gi, groupCtx); err != nil {
+		if err := logicSigVerify(gi, groupCtx, true); err != nil {
 			return &TxGroupError{err: err, GroupIndex: gi, Reason: TxGroupErrorReasonLogicSigFailed}
 		}
 		return nil
@@ -433,12 +434,13 @@ func enqueueSponsorSigVerify(auth basics.Address, s *transactions.SignatureField
 	}
 }
 
-// LogicSigSanityCheck checks that the signature is valid and that the program is basically well formed.
-// It does not evaluate the logic.
-func LogicSigSanityCheck(gi int, groupCtx *GroupContext) error {
+// LogicSigSanityCheck performs stateless validation of a LogicSig, ensuring it
+// is well-formed, its version is supported by the current protocol, and
+// it meets minimum version requirements if used as a fee sponsor.
+func LogicSigSanityCheck(gi int, groupCtx *GroupContext, isSponsor bool) error {
 	batchVerifier := crypto.MakeBatchVerifier()
 
-	if err := logicSigSanityCheckBatchPrep(gi, groupCtx, batchVerifier); err != nil {
+	if err := logicSigSanityCheckBatchPrep(gi, groupCtx, batchVerifier, isSponsor); err != nil {
 		return err
 	}
 	return batchVerifier.Verify()
@@ -447,7 +449,7 @@ func LogicSigSanityCheck(gi int, groupCtx *GroupContext) error {
 // logicSigSanityCheckBatchPrep checks that the signature is valid and that the program is basically well formed.
 // It does not evaluate the logic.
 // it is the caller responsibility to call batchVerifier.Verify()
-func logicSigSanityCheckBatchPrep(gi int, groupCtx *GroupContext, batchVerifier crypto.BatchVerifier) error {
+func logicSigSanityCheckBatchPrep(gi int, groupCtx *GroupContext, batchVerifier crypto.BatchVerifier, isSponsor bool) error {
 	if groupCtx.consensusParams.LogicSigVersion == 0 {
 		return errors.New("LogicSig not enabled")
 	}
@@ -456,7 +458,13 @@ func logicSigSanityCheckBatchPrep(gi int, groupCtx *GroupContext, batchVerifier 
 		return errors.New("negative group index")
 	}
 	txn := &groupCtx.signedGroupTxns[gi]
-	lsig := txn.Lsig
+
+	var lsig *transactions.LogicSig
+	if isSponsor {
+		lsig = &txn.Ssig.Lsig
+	} else {
+		lsig = &txn.Lsig
+	}
 
 	if len(lsig.Logic) == 0 {
 		return errors.New("LogicSig.Logic empty")
@@ -468,13 +476,21 @@ func logicSigSanityCheckBatchPrep(gi int, groupCtx *GroupContext, batchVerifier 
 	if version > groupCtx.consensusParams.LogicSigVersion {
 		return errors.New("LogicSig.Logic version too new")
 	}
+
+	if isSponsor && version < groupCtx.consensusParams.MinSponsorLogicSigVersion {
+		return errSponsorLogicSigVersionTooLow
+	}
+
 	if !groupCtx.consensusParams.EnableLogicSigSizePooling && uint64(lsig.Len()) > groupCtx.consensusParams.LogicSigMaxSize {
 		return errors.New("LogicSig too long")
 	}
 
-	err := logic.CheckSignature(gi, groupCtx.evalParams)
-	if err != nil {
-		return err
+	// NOTE: If it's a sponsor, we use the authorizer from the Ssig.
+	var authorizer basics.Address
+	if isSponsor {
+		authorizer = txn.SponsorAuthorizer()
+	} else {
+		authorizer = txn.Authorizer()
 	}
 
 	hasMsig := false
@@ -492,10 +508,10 @@ func logicSigSanityCheckBatchPrep(gi int, groupCtx *GroupContext, batchVerifier 
 		numSigs++
 	}
 	if numSigs == 0 {
-		// if the txn.Authorizer() == hash(Logic) then this is a (potentially) valid operation on a contract-only account
+		// if the authorizer == hash(Logic) then this is a (potentially) valid operation on a contract-only account
 		program := logic.Program(lsig.Logic)
 		lhash := crypto.HashObj(&program)
-		if crypto.Digest(txn.Authorizer()) == lhash {
+		if crypto.Digest(authorizer) == lhash {
 			return nil
 		}
 		return errors.New("LogicNot signed and not a Logic-only account")
@@ -504,26 +520,31 @@ func logicSigSanityCheckBatchPrep(gi int, groupCtx *GroupContext, batchVerifier 
 		return errors.New("LogicSig should only have one of Sig, Msig, or LMsig but has more than one")
 	}
 
-	if !hasMsig && !hasLMsig {
-		program := logic.Program(lsig.Logic)
-		batchVerifier.EnqueueSignature(crypto.PublicKey(txn.Authorizer()), &program, lsig.Sig)
+	var msg crypto.Hashable
+	if isSponsor {
+		msg = transactions.SponsoredTransaction{Txn: txn.Txn, Sponsor: txn.Ssig.Sponsor}
+	} else if hasLMsig {
+		if !groupCtx.consensusParams.LogicSigLMsig {
+			return errors.New("LogicSig LMsig field not supported in this consensus version")
+		}
+		msg = logic.MultisigProgram{Addr: crypto.Digest(authorizer), Program: lsig.Logic}
 	} else {
-		var program crypto.Hashable
+		msg = logic.Program(lsig.Logic)
+	}
+
+	if !hasMsig && !hasLMsig {
+		batchVerifier.EnqueueSignature(crypto.PublicKey(authorizer), msg, lsig.Sig)
+	} else {
 		var msig crypto.MultisigSig
 		if hasLMsig {
-			if !groupCtx.consensusParams.LogicSigLMsig {
-				return errors.New("LogicSig LMsig field not supported in this consensus version")
-			}
-			program = logic.MultisigProgram{Addr: crypto.Digest(txn.Authorizer()), Program: lsig.Logic}
 			msig = crypto.MultisigSig(lsig.LMsig)
 		} else {
 			if !groupCtx.consensusParams.LogicSigMsig {
 				return errors.New("LogicSig Msig field not supported in this consensus version")
 			}
-			program = logic.Program(lsig.Logic)
 			msig = lsig.Msig
 		}
-		if err := crypto.MultisigBatchPrep(program, crypto.Digest(txn.Authorizer()), msig, batchVerifier); err != nil {
+		if err := crypto.MultisigBatchPrep(msg, crypto.Digest(authorizer), msig, batchVerifier); err != nil {
 			return fmt.Errorf("logic multisig validation failed: %w", err)
 		}
 
@@ -540,13 +561,21 @@ func logicSigSanityCheckBatchPrep(gi int, groupCtx *GroupContext, batchVerifier 
 }
 
 // logicSigVerify checks that the signature is valid, executing the program.
-func logicSigVerify(gi int, groupCtx *GroupContext) error {
-	err := LogicSigSanityCheck(gi, groupCtx)
+func logicSigVerify(gi int, groupCtx *GroupContext, isSponsor bool) error {
+	err := LogicSigSanityCheck(gi, groupCtx, isSponsor)
 	if err != nil {
 		return err
 	}
 
-	pass, cx, err := logic.EvalSignatureFull(gi, groupCtx.evalParams)
+	txn := &groupCtx.signedGroupTxns[gi]
+	var lsig *transactions.LogicSig
+	if isSponsor {
+		lsig = &txn.Ssig.Lsig
+	} else {
+		lsig = &txn.Lsig
+	}
+
+	pass, cx, err := logic.EvalLogicSigFull(gi, groupCtx.evalParams, lsig)
 	if err != nil {
 		logicErrTotal.Inc(nil)
 		return fmt.Errorf("transaction %v: %w", groupCtx.signedGroupTxns[gi].ID(), err)
@@ -558,7 +587,6 @@ func logicSigVerify(gi int, groupCtx *GroupContext) error {
 	logicGoodTotal.Inc(nil)
 	logicCostTotal.AddUint64(uint64(cx.Cost()), nil)
 	return nil
-
 }
 
 // PaysetGroups verifies that the payset have a good signature and that the underlying

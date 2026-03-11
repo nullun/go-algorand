@@ -83,6 +83,9 @@ const mimcVersion = 11
 // their version, and fixup TestAssemble() in assembler_test.go.
 const sumhashVersion = 13
 
+// assetDelegationVersion is the first version that supports asset delegation.
+const assetDelegationVersion = 13
+
 // Unlimited Global Storage opcodes
 const boxVersion = 8 // box_*
 

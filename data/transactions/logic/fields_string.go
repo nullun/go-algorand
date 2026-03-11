@@ -77,12 +77,14 @@ func _() {
 	_ = x[ClearStateProgramPages-66]
 	_ = x[NumClearStateProgramPages-67]
 	_ = x[RejectVersion-68]
-	_ = x[invalidTxnField-69]
+	_ = x[AssetDelegation-69]
+	_ = x[AccountBootstrap-70]
+	_ = x[invalidTxnField-71]
 }
 
-const _TxnField_name = "SenderFeeFirstValidFirstValidTimeLastValidNoteLeaseReceiverAmountCloseRemainderToVotePKSelectionPKVoteFirstVoteLastVoteKeyDilutionTypeTypeEnumXferAssetAssetAmountAssetSenderAssetReceiverAssetCloseToGroupIndexTxIDApplicationIDOnCompletionApplicationArgsNumAppArgsAccountsNumAccountsApprovalProgramClearStateProgramRekeyToConfigAssetConfigAssetTotalConfigAssetDecimalsConfigAssetDefaultFrozenConfigAssetUnitNameConfigAssetNameConfigAssetURLConfigAssetMetadataHashConfigAssetManagerConfigAssetReserveConfigAssetFreezeConfigAssetClawbackFreezeAssetFreezeAssetAccountFreezeAssetFrozenAssetsNumAssetsApplicationsNumApplicationsGlobalNumUintGlobalNumByteSliceLocalNumUintLocalNumByteSliceExtraProgramPagesNonparticipationLogsNumLogsCreatedAssetIDCreatedApplicationIDLastLogStateProofPKApprovalProgramPagesNumApprovalProgramPagesClearStateProgramPagesNumClearStateProgramPagesRejectVersioninvalidTxnField"
+const _TxnField_name = "SenderFeeFirstValidFirstValidTimeLastValidNoteLeaseReceiverAmountCloseRemainderToVotePKSelectionPKVoteFirstVoteLastVoteKeyDilutionTypeTypeEnumXferAssetAssetAmountAssetSenderAssetReceiverAssetCloseToGroupIndexTxIDApplicationIDOnCompletionApplicationArgsNumAppArgsAccountsNumAccountsApprovalProgramClearStateProgramRekeyToConfigAssetConfigAssetTotalConfigAssetDecimalsConfigAssetDefaultFrozenConfigAssetUnitNameConfigAssetNameConfigAssetURLConfigAssetMetadataHashConfigAssetManagerConfigAssetReserveConfigAssetFreezeConfigAssetClawbackFreezeAssetFreezeAssetAccountFreezeAssetFrozenAssetsNumAssetsApplicationsNumApplicationsGlobalNumUintGlobalNumByteSliceLocalNumUintLocalNumByteSliceExtraProgramPagesNonparticipationLogsNumLogsCreatedAssetIDCreatedApplicationIDLastLogStateProofPKApprovalProgramPagesNumApprovalProgramPagesClearStateProgramPagesNumClearStateProgramPagesRejectVersionAssetDelegationAccountBootstrapinvalidTxnField"
 
-var _TxnField_index = [...]uint16{0, 6, 9, 19, 33, 42, 46, 51, 59, 65, 81, 87, 98, 107, 115, 130, 134, 142, 151, 162, 173, 186, 198, 208, 212, 225, 237, 252, 262, 270, 281, 296, 313, 320, 331, 347, 366, 390, 409, 424, 438, 461, 479, 497, 514, 533, 544, 562, 579, 585, 594, 606, 621, 634, 652, 664, 681, 698, 714, 718, 725, 739, 759, 766, 778, 798, 821, 843, 868, 881, 896}
+var _TxnField_index = [...]uint16{0, 6, 9, 19, 33, 42, 46, 51, 59, 65, 81, 87, 98, 107, 115, 130, 134, 142, 151, 162, 173, 186, 198, 208, 212, 225, 237, 252, 262, 270, 281, 296, 313, 320, 331, 347, 366, 390, 409, 424, 438, 461, 479, 497, 514, 533, 544, 562, 579, 585, 594, 606, 621, 634, 652, 664, 681, 698, 714, 718, 725, 739, 759, 766, 778, 798, 821, 843, 868, 881, 896, 912, 927}
 
 func (i TxnField) String() string {
 	idx := int(i) - 0
@@ -210,12 +212,16 @@ func _() {
 	_ = x[AcctIncentiveEligible-12]
 	_ = x[AcctLastProposed-13]
 	_ = x[AcctLastHeartbeat-14]
-	_ = x[invalidAcctParamsField-15]
+	_ = x[AcctTotalAssetsDelegated-15]
+	_ = x[AcctTotalAssetsDelegating-16]
+	_ = x[AcctTotalAccountsBootstrapping-17]
+	_ = x[AcctBootstrapper-18]
+	_ = x[invalidAcctParamsField-19]
 }
 
-const _AcctParamsField_name = "AcctBalanceAcctMinBalanceAcctAuthAddrAcctTotalNumUintAcctTotalNumByteSliceAcctTotalExtraAppPagesAcctTotalAppsCreatedAcctTotalAppsOptedInAcctTotalAssetsCreatedAcctTotalAssetsAcctTotalBoxesAcctTotalBoxBytesAcctIncentiveEligibleAcctLastProposedAcctLastHeartbeatinvalidAcctParamsField"
+const _AcctParamsField_name = "AcctBalanceAcctMinBalanceAcctAuthAddrAcctTotalNumUintAcctTotalNumByteSliceAcctTotalExtraAppPagesAcctTotalAppsCreatedAcctTotalAppsOptedInAcctTotalAssetsCreatedAcctTotalAssetsAcctTotalBoxesAcctTotalBoxBytesAcctIncentiveEligibleAcctLastProposedAcctLastHeartbeatAcctTotalAssetsDelegatedAcctTotalAssetsDelegatingAcctTotalAccountsBootstrappingAcctBootstrapperinvalidAcctParamsField"
 
-var _AcctParamsField_index = [...]uint16{0, 11, 25, 37, 53, 74, 96, 116, 136, 158, 173, 187, 204, 225, 241, 258, 280}
+var _AcctParamsField_index = [...]uint16{0, 11, 25, 37, 53, 74, 96, 116, 136, 158, 173, 187, 204, 225, 241, 258, 282, 307, 337, 353, 375}
 
 func (i AcctParamsField) String() string {
 	idx := int(i) - 0
@@ -230,12 +236,13 @@ func _() {
 	var x [1]struct{}
 	_ = x[AssetBalance-0]
 	_ = x[AssetFrozen-1]
-	_ = x[invalidAssetHoldingField-2]
+	_ = x[AssetDelegator-2]
+	_ = x[invalidAssetHoldingField-3]
 }
 
-const _AssetHoldingField_name = "AssetBalanceAssetFrozeninvalidAssetHoldingField"
+const _AssetHoldingField_name = "AssetBalanceAssetFrozenAssetDelegatorinvalidAssetHoldingField"
 
-var _AssetHoldingField_index = [...]uint8{0, 12, 23, 47}
+var _AssetHoldingField_index = [...]uint8{0, 12, 23, 37, 61}
 
 func (i AssetHoldingField) String() string {
 	idx := int(i) - 0

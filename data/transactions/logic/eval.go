@@ -2903,6 +2903,8 @@ func (cx *EvalContext) assetHoldingToValue(holding *basics.AssetHolding, fs asse
 		sv.Uint = holding.Amount
 	case AssetFrozen:
 		sv.Uint = boolToUint(holding.Frozen)
+	case AssetDelegator:
+		sv.Bytes = holding.Delegator[:]
 	default:
 		return sv, fmt.Errorf("invalid asset_holding_get field %d", fs.field)
 	}
@@ -3280,6 +3282,11 @@ func (cx *EvalContext) txnFieldToStack(stxn *transactions.SignedTxnWithAD, fs *t
 		sv.Uint = boolToUint(txn.AssetFrozen)
 	case ExtraProgramPages:
 		sv.Uint = uint64(txn.ExtraProgramPages)
+
+	case AssetDelegation:
+		sv.Uint = uint64(txn.AssetDelegation)
+	case AccountBootstrap:
+		sv.Uint = uint64(txn.AccountBootstrap)
 
 	case Logs:
 		if arrayFieldIdx >= uint64(len(stxn.EvalDelta.Logs)) {
@@ -4372,7 +4379,24 @@ func opMinBalance(cx *EvalContext) error {
 	}
 
 	cx.Stack[last].Bytes = nil
-	cx.Stack[last].Uint = account.MinBalance(cx.Proto).Raw
+	if cx.version < assetDelegationVersion {
+		// Programs with version below assetDelegationVersion should not see delegated assets
+		// or account bootstrapping.
+		cx.Stack[last].Uint = basics.MinBalance(
+			cx.Proto.BalanceRequirements(),
+			false, // Bootstrapper
+			0,     // TotalAccountsBootstrapping
+			account.TotalAssets - account.TotalAssetsDelegated,
+			account.TotalAppSchema,
+			account.TotalAppParams, account.TotalAppLocalStates,
+			uint64(account.TotalExtraAppPages),
+			account.TotalBoxes, account.TotalBoxBytes,
+			0, // TotalAssetsDelegated
+			0, // TotalAssetsDelegating
+		).Raw
+	} else {
+		cx.Stack[last].Uint = account.MinBalance(cx.Proto).Raw
+	}
 	return nil
 }
 
@@ -4929,11 +4953,15 @@ func opAssetHoldingGet(cx *EvalContext) error {
 	var exist uint64 = 0
 	var value stackValue
 	if holding, err := cx.Ledger.AssetHolding(addr, asset); err == nil {
-		// the holding exists, read the value
-		exist = 1
-		value, err = cx.assetHoldingToValue(&holding, fs)
-		if err != nil {
-			return err
+		if cx.version < assetDelegationVersion && !holding.Delegator.IsZero() {
+			// Programs with version below assetDelegationVersion should not see delegated assets
+		} else {
+			// the holding exists, read the value
+			exist = 1
+			value, err = cx.assetHoldingToValue(&holding, fs)
+			if err != nil {
+				return err
+			}
 		}
 	}
 
@@ -5036,7 +5064,24 @@ func opAcctParamsGet(cx *EvalContext) error {
 	case AcctBalance:
 		value.Uint = account.MicroAlgos.Raw
 	case AcctMinBalance:
-		value.Uint = account.MinBalance(cx.Proto).Raw
+		if cx.version < assetDelegationVersion {
+			// Programs with version below assetDelegationVersion should not see delegated assets
+			// or account bootstrapping.
+			value.Uint = basics.MinBalance(
+				cx.Proto.BalanceRequirements(),
+				false, // Bootstrapper
+				0,     // TotalAccountsBootstrapping
+				account.TotalAssets - account.TotalAssetsDelegated,
+				account.TotalAppSchema,
+				account.TotalAppParams, account.TotalAppLocalStates,
+				uint64(account.TotalExtraAppPages),
+				account.TotalBoxes, account.TotalBoxBytes,
+				0, // TotalAssetsDelegated
+				0, // TotalAssetsDelegating
+			).Raw
+		} else {
+			value.Uint = account.MinBalance(cx.Proto).Raw
+		}
 	case AcctAuthAddr:
 		value.Bytes = account.AuthAddr[:]
 
@@ -5054,7 +5099,12 @@ func opAcctParamsGet(cx *EvalContext) error {
 	case AcctTotalAssetsCreated:
 		value.Uint = account.TotalAssetParams
 	case AcctTotalAssets:
-		value.Uint = account.TotalAssets
+		if cx.version < assetDelegationVersion {
+			// Programs with version below assetDelegationVersion should not see delegated assets.
+			value.Uint = account.TotalAssets - account.TotalAssetsDelegated
+		} else {
+			value.Uint = account.TotalAssets
+		}
 	case AcctTotalBoxes:
 		value.Uint = account.TotalBoxes
 	case AcctTotalBoxBytes:
@@ -5065,6 +5115,14 @@ func opAcctParamsGet(cx *EvalContext) error {
 		value.Uint = uint64(account.LastHeartbeat)
 	case AcctLastProposed:
 		value.Uint = uint64(account.LastProposed)
+	case AcctTotalAssetsDelegated:
+		value.Uint = account.TotalAssetsDelegated
+	case AcctTotalAssetsDelegating:
+		value.Uint = account.TotalAssetsDelegating
+	case AcctTotalAccountsBootstrapping:
+		value.Uint = account.TotalAccountsBootstrapping
+	case AcctBootstrapper:
+		value.Bytes = account.Bootstrapper[:]
 	default:
 		return fmt.Errorf("invalid account field %s", fs.field)
 	}

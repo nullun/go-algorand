@@ -227,6 +227,12 @@ const (
 	// RejectVersion uint64
 	RejectVersion
 
+	// AssetDelegation AssetTransferTxnFields.AssetDelegation
+	AssetDelegation
+
+	// AccountBootstrap PaymentTxnFields.AccountBootstrap
+	AccountBootstrap
+
 	invalidTxnField // compile-time constant for number of fields
 )
 
@@ -368,6 +374,9 @@ var txnFieldSpecs = [...]txnFieldSpec{
 	{NumClearStateProgramPages, StackUint64, false, 7, 0, false, "Number of ClearState Program pages"},
 
 	{RejectVersion, StackUint64, false, 12, 12, false, "Application version for which the txn must reject"},
+
+	{AssetDelegation, StackUint64, false, 13, 13, false, "The type of asset delegation operation (1: Approve, 2: Revoke)"},
+	{AccountBootstrap, StackUint64, false, 13, 13, false, "The type of account bootstrap operation (1: Bootstrap, 2: Rescind)"},
 }
 
 // TxnFields contains info on the arguments to the txn* family of opcodes
@@ -1195,6 +1204,8 @@ const (
 	AssetBalance AssetHoldingField = iota
 	// AssetFrozen AssetHolding.Frozen
 	AssetFrozen
+	// AssetDelegator AssetHolding.Delegator
+	AssetDelegator
 	invalidAssetHoldingField // compile-time constant for number of fields
 )
 
@@ -1226,6 +1237,7 @@ func (fs assetHoldingFieldSpec) Note() string {
 var assetHoldingFieldSpecs = [...]assetHoldingFieldSpec{
 	{AssetBalance, StackUint64, 2, "Amount of the asset unit held by this account"},
 	{AssetFrozen, StackBoolean, 2, "Is the asset frozen or not"},
+	{AssetDelegator, StackAddress, 13, "Address of the account sponsoring the MBR for this asset holding"},
 }
 
 func assetHoldingFieldSpecByField(f AssetHoldingField) (assetHoldingFieldSpec, bool) {
@@ -1486,6 +1498,15 @@ const (
 
 	// AcctTotalAppSchema - consider how to expose
 
+	// AcctTotalAssetsDelegated is the number of asset holdings delegated to this account
+	AcctTotalAssetsDelegated
+	// AcctTotalAssetsDelegating is the number of asset holdings this account is delegating for others
+	AcctTotalAssetsDelegating
+	// AcctTotalAccountsBootstrapping is the number of accounts this account is bootstrapping
+	AcctTotalAccountsBootstrapping
+	// AcctBootstrapper is the address of the account bootstrapping this account
+	AcctBootstrapper
+
 	invalidAcctParamsField // compile-time constant for number of fields
 )
 
@@ -1532,6 +1553,11 @@ var acctParamsFieldSpecs = [...]acctParamsFieldSpec{
 	{AcctIncentiveEligible, StackBoolean, incentiveVersion, "Has this account opted into block payouts"},
 	{AcctLastProposed, StackUint64, incentiveVersion, "The round number of the last block this account proposed."},
 	{AcctLastHeartbeat, StackUint64, incentiveVersion, "The round number of the last block this account sent a heartbeat."},
+
+	{AcctTotalAssetsDelegated, StackUint64, 13, "The number of asset holdings other accounts are sponsoring for this account"},
+	{AcctTotalAssetsDelegating, StackUint64, 13, "The number of asset holdings this account is sponsoring for other accounts"},
+	{AcctTotalAccountsBootstrapping, StackUint64, 13, "The number of accounts this account is bootstrapping"},
+	{AcctBootstrapper, StackAddress, 13, "Address of the account bootstrapping this account"},
 }
 
 func acctParamsFieldSpecByField(f AcctParamsField) (acctParamsFieldSpec, bool) {

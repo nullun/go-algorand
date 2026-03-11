@@ -614,6 +614,10 @@ type ConsensusParams struct {
 	// SupportFeeSponsored indicates support for a transaction's fee to
 	// be paid by another account.
 	SupportFeeSponsored bool
+
+	// MinSponsorLogicSigVersion specifies the minimum LogicSig version
+	// allowed for a sponsor.
+	MinSponsorLogicSigVersion uint64
 }
 
 // ProposerPayoutRules puts several related consensus parameters in one place. The same
@@ -1566,6 +1570,7 @@ func initConsensusProtocols() {
 	vFuture.LogicSigVersion = 14 // When moving this to a release, put a new higher LogicSigVersion here
 
 	vFuture.SupportFeeSponsored = true
+	vFuture.MinSponsorLogicSigVersion = vFuture.LogicSigVersion
 
 	Consensus[protocol.ConsensusFuture] = vFuture
 

@@ -2082,7 +2082,7 @@ func testLogicSigMultisigValidation(t *testing.T, consensusVer protocol.Consensu
 		dummyLedger := DummyLedgerForSignature{}
 		groupCtx, err := PrepareGroupContext([]transactions.SignedTxn{stxn}, &blkHdr, &dummyLedger, nil)
 		require.NoError(t, err)
-		return logicSigVerify(0, groupCtx)
+		return logicSigVerify(0, groupCtx, false)
 	}
 
 	t.Run("MultisigToSingleSig", func(t *testing.T) {
@@ -2279,7 +2279,7 @@ func TestLogicSigMsigBothFlags(t *testing.T) {
 		dummyLedger := DummyLedgerForSignature{}
 		groupCtx, err := PrepareGroupContext([]transactions.SignedTxn{stxn}, &blkHdr, &dummyLedger, nil)
 		require.NoError(t, err)
-		return logicSigVerify(0, groupCtx)
+		return logicSigVerify(0, groupCtx, false)
 	}
 
 	// Test with Msig field only - should work

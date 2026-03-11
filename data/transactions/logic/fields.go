@@ -227,6 +227,12 @@ const (
 	// RejectVersion uint64
 	RejectVersion
 
+	// FeeSponsored Transaction.FeeSponsored
+	FeeSponsored
+
+	// Sponsor SignedTxn.Ssig.Sponsor
+	Sponsor
+
 	invalidTxnField // compile-time constant for number of fields
 )
 
@@ -368,6 +374,9 @@ var txnFieldSpecs = [...]txnFieldSpec{
 	{NumClearStateProgramPages, StackUint64, false, 7, 0, false, "Number of ClearState Program pages"},
 
 	{RejectVersion, StackUint64, false, 12, 12, false, "Application version for which the txn must reject"},
+
+	{FeeSponsored, StackBoolean, false, 14, 0, false, "Whether the transaction fee is paid by a sponsor"},
+	{Sponsor, StackAddress, false, 14, 0, false, "32 byte address of the sponsor. ZeroAddress if not sponsored."},
 }
 
 // TxnFields contains info on the arguments to the txn* family of opcodes

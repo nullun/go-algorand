@@ -99,6 +99,44 @@ func TestCurrentInnerTypes(t *testing.T) {
 	TestApp(t, "itxn_begin; int afrz; itxn_field TypeEnum; int 1;", ep)
 }
 
+func TestSponsorshipTxnFields(t *testing.T) {
+	partitiontest.PartitionTest(t)
+	t.Parallel()
+
+	ep, tx, _ := MakeSampleEnv()
+
+	// Not sponsored by default
+	tx.FeeSponsored = false
+	TestApp(t, "txn FeeSponsored; int 0; ==", ep)
+	TestApp(t, "txn Sponsor; global ZeroAddress; ==", ep)
+
+	// Sponsored
+	tx.FeeSponsored = true
+	sponsorAddr := basics.Address{1, 2, 3, 4}
+	ep.TxnGroup[0].SignedTxn.Ssig.Sponsor = sponsorAddr
+	TestApp(t, "txn FeeSponsored; int 1; ==", ep)
+	TestApp(t, fmt.Sprintf("txn Sponsor; byte 0x%x; ==", sponsorAddr[:]), ep)
+
+	// Still accessible if we use an older version for the program (as long as it's not looking at the field)
+	v12, _, _ := MakeSampleEnvWithVersion(12)
+	v12.TxnGroup[0].Txn.FeeSponsored = true
+	v12.TxnGroup[0].SignedTxn.Ssig.Sponsor = sponsorAddr
+	// The program itself must be v13 to use the opcode, but the group can have sponsored txns
+	// without forcing the program to be v13.
+	// Actually, if the program is v12, it CANNOT use 'txn FeeSponsored' because it's introduced in 13.
+	// So we test that a v12 program can still run in a group where a txn is sponsored.
+	TestApp(t, "int 1", v12)
+
+	// Not settable in inner transactions
+	ops, _ := AssembleStringWithVersion("itxn_begin; int 1; itxn_field FeeSponsored;", ep.Proto.LogicSigVersion)
+	require.NotEmpty(t, ops.Errors)
+	require.Contains(t, ops.Errors[0].Error(), "itxn_field \"FeeSponsored\" is not allowed")
+
+	ops, _ = AssembleStringWithVersion("itxn_begin; global ZeroAddress; itxn_field Sponsor;", ep.Proto.LogicSigVersion)
+	require.NotEmpty(t, ops.Errors)
+	require.Contains(t, ops.Errors[0].Error(), "itxn_field \"Sponsor\" is not allowed")
+}
+
 func TestFieldTypes(t *testing.T) {
 	partitiontest.PartitionTest(t)
 	t.Parallel()

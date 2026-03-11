@@ -3428,6 +3428,10 @@ func (cx *EvalContext) txnFieldToStack(stxn *transactions.SignedTxnWithAD, fs *t
 		sv.Bytes = []byte(txn.Type)
 	case TypeEnum:
 		sv.Uint = txnTypeMap[string(txn.Type)]
+	case FeeSponsored:
+		sv.Uint = boolToUint(txn.FeeSponsored)
+	case Sponsor:
+		sv.Bytes = stxn.SignedTxn.Ssig.Sponsor[:]
 	case XferAsset:
 		sv.Uint = uint64(txn.XferAsset)
 	case AssetAmount:

@@ -91,6 +91,9 @@ const sumhashVersion = 14
 // assembled by this package are expected to hash to an off-curve address.
 const LogicSigOffCurveVersion = 13
 
+// assetDelegationVersion is the first version that supports asset delegation.
+const assetDelegationVersion = 13
+
 // Unlimited Global Storage opcodes
 const boxVersion = 8 // box_*
 

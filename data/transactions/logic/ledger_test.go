@@ -54,9 +54,13 @@ type balanceRecord struct {
 	proposed  basics.Round // The last round that this account proposed the accepted block
 	heartbeat basics.Round // The last round that this account sent a heartbeat to show it was online.
 
-	locals   map[basics.AppIndex]basics.TealKeyValue
-	holdings map[basics.AssetIndex]basics.AssetHolding
-	mods     map[basics.AppIndex]map[string]basics.ValueDelta
+	locals     map[basics.AppIndex]basics.TealKeyValue
+	holdings   map[basics.AssetIndex]basics.AssetHolding
+	delegated  uint64
+	delegating uint64
+	bootstrapping uint64
+	bootstrapper basics.Address
+	mods       map[basics.AppIndex]map[string]basics.ValueDelta
 }
 
 func newBalanceRecord(addr basics.Address, balance uint64) balanceRecord {
@@ -350,6 +354,12 @@ func (l *Ledger) AccountData(addr basics.Address) (ledgercore.AccountData, error
 
 			LastProposed:  br.proposed,
 			LastHeartbeat: br.heartbeat,
+
+			TotalAssetsDelegated:  br.delegated,
+			TotalAssetsDelegating: br.delegating,
+
+			TotalAccountsBootstrapping: br.bootstrapping,
+			Bootstrapper:               br.bootstrapper,
 		},
 		VotingData: br.voting,
 	}, nil

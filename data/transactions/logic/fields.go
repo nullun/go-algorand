@@ -108,6 +108,10 @@ const (
 	Type
 	// TypeEnum int(Transaction.Type)
 	TypeEnum
+	// FeeSponsored Transaction.FeeSponsored
+	FeeSponsored
+	// Sponsor SignedTxn.Ssig.Sponsor
+	Sponsor
 	// XferAsset Transaction.XferAsset
 	XferAsset
 	// AssetAmount Transaction.AssetAmount
@@ -298,6 +302,8 @@ var txnFieldSpecs = [...]txnFieldSpec{
 	{VoteKeyDilution, StackUint64, false, 0, 6, false, "Dilution for the 2-level participation key"},
 	{Type, StackBytes, false, 0, 5, false, "Transaction type as bytes"},
 	{TypeEnum, StackUint64, false, 0, 5, false, "Transaction type as integer"},
+	{FeeSponsored, StackBoolean, false, 13, 0, false, "Whether the transaction fee is paid by a sponsor"},
+	{Sponsor, StackAddress, false, 13, 0, false, "32 byte address of the sponsor. ZeroAddress if not sponsored."},
 	{XferAsset, StackUint64, false, 0, 5, false, "Asset ID"},
 	{AssetAmount, StackUint64, false, 0, 5, false, "value in Asset's units"},
 	{AssetSender, StackAddress, false, 0, 5, false,

@@ -503,7 +503,7 @@ var sendCmd = &cobra.Command{
 			}
 			groupCtx, err1 := verify.PrepareGroupContext([]transactions.SignedTxn{uncheckedTxn}, &blockHeader, nil, nil)
 			if err1 == nil {
-				err1 = verify.LogicSigSanityCheck(0, groupCtx)
+				err1 = verify.LogicSigSanityCheck(0, groupCtx, false)
 			}
 			if err1 != nil {
 				reportErrorf("%s: txn error %s", outFilename, err1)
@@ -916,7 +916,7 @@ var signCmd = &cobra.Command{
 			for i := range txnGroup {
 				var signedTxn transactions.SignedTxn
 				if lsig.Logic != nil {
-					err = verify.LogicSigSanityCheck(i, groupCtx)
+					err = verify.LogicSigSanityCheck(i, groupCtx, false)
 					if err != nil {
 						reportErrorf("%s: txn[%d] error %s", txFilename, txnIndex[txnGroups[group][i]], err)
 					}

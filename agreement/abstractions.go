@@ -46,6 +46,13 @@ type BlockValidator interface {
 	// liveness. Validate should therefore be conservative in which Entries
 	// it accepts.
 	//
+	// Validate must not mutate the input Block -- not even in place through
+	// the payset's shared backing arrays -- and the returned ValidatedBlock
+	// must carry content identical to that input. The agreement code relies
+	// on this when it memoizes a proposal's encoding digest at validation
+	// time and when it matches verified payloads against proposal-values
+	// derived from votes.
+	//
 	// TODO There should probably be a second Round argument here.
 	Validate(context.Context, bookkeeping.Block) (ValidatedBlock, error)
 }

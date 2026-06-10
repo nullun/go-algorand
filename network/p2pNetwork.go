@@ -1199,9 +1199,13 @@ func (p *gsPeer) RoutingAddr() []byte {
 	return []byte(p.peerID)
 }
 
+func (p *gsPeer) RoutingAddrString() string {
+	return string(p.peerID)
+}
+
 // txTopicValidator calls txHandler to validate and process incoming transactions.
 func (n *P2PNetwork) txTopicValidator(ctx context.Context, peerID peer.ID, msg *pubsub.Message) pubsub.ValidationResult {
-	n.wsPeersLock.Lock()
+	n.wsPeersLock.RLock()
 	var sender DisconnectableAddressablePeer
 	if wsp, ok := n.wsPeers[peerID]; ok {
 		sender = wsp
@@ -1211,7 +1215,7 @@ func (n *P2PNetwork) txTopicValidator(ctx context.Context, peerID peer.ID, msg *
 		// create a fake peer that is good enough for tx handler to work with.
 		sender = &gsPeer{peerID: peerID, net: n}
 	}
-	n.wsPeersLock.Unlock()
+	n.wsPeersLock.RUnlock()
 
 	inmsg := IncomingMessage{
 		Sender:   sender,

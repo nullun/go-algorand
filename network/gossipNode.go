@@ -42,6 +42,9 @@ type DisconnectableAddressablePeer interface {
 // IPAddressable is addressable with either IPv4 or IPv6 address
 type IPAddressable interface {
 	RoutingAddr() []byte
+	// RoutingAddrString returns the routing address as a string, computed once
+	// and cached for the connection's lifetime (used as a stable map key).
+	RoutingAddrString() string
 }
 
 // PeerOption allows users to specify a subset of peers to query

@@ -85,6 +85,10 @@ func (p *facadePeer) RoutingAddr() []byte {
 	return buf
 }
 
+func (p *facadePeer) RoutingAddrString() string {
+	return string(p.RoutingAddr())
+}
+
 // MakeNetworkFacade creates a facade with a given nodeID.
 func MakeNetworkFacade(fuzzer *Fuzzer, nodeID int) *NetworkFacade {
 	n := &NetworkFacade{

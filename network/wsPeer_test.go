@@ -354,3 +354,23 @@ func TestWsPeerIPAddr(t *testing.T) {
 	require.Equal(t, []byte{127, 0, 0, 1}, peer.ipAddr())
 	require.Equal(t, []byte{127, 0, 0, 2}, peer.RoutingAddr())
 }
+
+func TestWsPeerRoutingAddrString(t *testing.T) {
+	partitiontest.PartitionTest(t)
+	t.Parallel()
+
+	conn := &tcpipMockConn{}
+	conn.addr.IP = []byte{127, 0, 0, 1}
+	peer := wsPeer{
+		conn: conn,
+	}
+	// matches string(RoutingAddr()) and is stable across repeated calls
+	require.Equal(t, string(peer.RoutingAddr()), peer.RoutingAddrString())
+	require.Equal(t, peer.RoutingAddrString(), peer.RoutingAddrString())
+
+	// the cached value is computed once per connection: it does not track
+	// later address changes (the remote address is fixed for a real peer)
+	cached := peer.RoutingAddrString()
+	conn.addr.IP = []byte{127, 0, 0, 9}
+	require.Equal(t, cached, peer.RoutingAddrString())
+}

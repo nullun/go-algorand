@@ -86,6 +86,7 @@ func (fp *fakePeer) GetHTTPClient() *http.Client    { return nil }
 func (fp *fakePeer) Disconnect(reason string) error { return nil }
 func (fp *fakePeer) GetNetwork() network.GossipNode { return nil }
 func (fp *fakePeer) RoutingAddr() []byte            { return []byte("playback-peer") }
+func (fp *fakePeer) RoutingAddrString() string      { return string(fp.RoutingAddr()) }
 
 // Handle implements the network.MessageHandler interface for dumpHandler
 func (dh *dumpHandler) Handle(msg network.IncomingMessage) network.OutgoingMessage {

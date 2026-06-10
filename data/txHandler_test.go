@@ -70,6 +70,8 @@ func (m mockSender) GetNetwork() network.GossipNode { panic("not implemented") }
 
 func (m mockSender) RoutingAddr() []byte { return m.addr[:] }
 
+func (m mockSender) RoutingAddrString() string { return string(m.addr[:]) }
+
 // txHandlerConfig is a subset of tx handler related options from config.Local
 type txHandlerConfig struct {
 	enableFilteringRawMsg    bool
@@ -2832,8 +2834,9 @@ func newErlMockPeer(addr string) *erlMockPeer {
 }
 
 // Implement required interface methods
-func (m *erlMockPeer) RoutingAddr() []byte { return []byte(m.addr) }
-func (m *erlMockPeer) OnClose(f func())    { m.closer = f }
+func (m *erlMockPeer) RoutingAddr() []byte       { return []byte(m.addr) }
+func (m *erlMockPeer) RoutingAddrString() string { return m.addr }
+func (m *erlMockPeer) OnClose(f func())          { m.closer = f }
 
 func TestTxHandlerErlClientMapper(t *testing.T) {
 	partitiontest.PartitionTest(t)

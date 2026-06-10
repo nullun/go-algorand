@@ -551,7 +551,7 @@ type erlClientMapper struct {
 
 // getClient returns erlIPClient for a given sender
 func (mp *erlClientMapper) getClient(sender network.DisconnectableAddressablePeer) util.ErlClient {
-	addr := string(sender.RoutingAddr())
+	addr := sender.RoutingAddrString()
 	ec := sender.(util.ErlClient)
 
 	// check if the client is already known
@@ -601,9 +601,20 @@ func (eic *erlIPClient) OnClose(f func()) {
 // register registers a new client to the erlIPClient
 // by adding a helper closer function to track connection closures
 func (eic *erlIPClient) register(ec util.ErlClient) {
+	// Fast path: in steady state the client is already registered, so every
+	// message after the first only needs a read-locked membership check.
+	eic.m.RLock()
+	_, has := eic.clients[ec]
+	eic.m.RUnlock()
+	if has {
+		// this peer is known => noop
+		return
+	}
+
+	// Slow path: take the write lock and re-check, since another goroutine
+	// may have inserted between the RUnlock and the Lock.
 	eic.m.Lock()
 	if _, has := eic.clients[ec]; has {
-		// this peer is known => noop
 		eic.m.Unlock()
 		return
 	}
@@ -785,9 +796,13 @@ func (handler *TxHandler) processIncomingTxn(rawmsg network.IncomingMessage) net
 		return network.OutgoingMessage{Action: network.Ignore}
 	}
 
+	// Copy the message into a backlog-owned allocation only here, after all
+	// drop checks have returned, so that the rawmsg parameter itself never
+	// escapes and dropped messages never heap-allocate the IncomingMessage.
+	msgCopy := rawmsg
 	select {
 	case handler.backlogQueue <- &txBacklogMsg{
-		rawmsg:                &rawmsg,
+		rawmsg:                &msgCopy,
 		unverifiedTxGroup:     unverifiedTxGroup,
 		rawmsgDataHash:        msgKey,
 		unverifiedTxGroupHash: canonicalKey,
@@ -834,8 +849,12 @@ func (handler *TxHandler) validateIncomingTxMessage(rawmsg network.IncomingMessa
 
 	// apply backlog worker logic
 
+	// Copy the message into a backlog-owned allocation only here, after all
+	// drop checks have returned, so that the rawmsg parameter itself never
+	// escapes and dropped messages never heap-allocate the IncomingMessage.
+	msgCopy := rawmsg
 	wi := &txBacklogMsg{
-		rawmsg:                &rawmsg,
+		rawmsg:                &msgCopy,
 		unverifiedTxGroup:     unverifiedTxGroup,
 		unverifiedTxGroupHash: canonicalKey,
 		capguard:              nil,

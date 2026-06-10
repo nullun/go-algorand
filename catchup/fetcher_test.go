@@ -255,6 +255,10 @@ func (p *testUnicastPeer) RoutingAddr() []byte {
 	panic("not implemented")
 }
 
+func (p *testUnicastPeer) RoutingAddrString() string {
+	panic("not implemented")
+}
+
 func (p *testUnicastPeer) Request(ctx context.Context, tag protocol.Tag, topics network.Topics) (resp *network.Response, e error) {
 	select {
 	case <-ctx.Done():

@@ -234,6 +234,12 @@ type wsPeer struct {
 	// createTime is the time at which the connection was established with the peer.
 	createTime time.Time
 
+	// routingAddrStr caches RoutingAddr() as a string. The routing address is
+	// derived from the connection's remote address, which is invariant for the
+	// connection's lifetime, so it is computed at most once.
+	routingAddrStr     string
+	routingAddrStrOnce sync.Once
+
 	// peer version ( this is one of the version supported by the current node and listed in SupportedProtocolVersions )
 	version string
 
@@ -387,6 +393,16 @@ func (wp *wsPeer) RoutingAddr() []byte {
 		return ip[12:16]
 	}
 	return ip[0:8]
+}
+
+// RoutingAddrString returns RoutingAddr() as a string, computed once and
+// cached for the connection's lifetime, so per-message callers (such as the
+// ERL client mapper) do not allocate a fresh slice and string per message.
+func (wp *wsPeer) RoutingAddrString() string {
+	wp.routingAddrStrOnce.Do(func() {
+		wp.routingAddrStr = string(wp.RoutingAddr())
+	})
+	return wp.routingAddrStr
 }
 
 // GetUnderlyingConnTCPInfo unwraps the connection and returns statistics about it on supported underlying implementations

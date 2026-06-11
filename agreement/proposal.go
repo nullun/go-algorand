@@ -65,6 +65,15 @@ type unauthenticatedProposal struct {
 	// delivered to the agreement package (as a messageEvent),
 	// relative to the zero of that round.
 	receivedAt time.Duration
+
+	// encodingDigestMemo caches crypto.HashObj(p) — the digest over the full
+	// encoded block body, which value() would otherwise recompute on every
+	// call. It is a pointer so the computed result is shared across the many
+	// shallow value-copies of a given proposal. Being unexported, it is
+	// excluded from both msgp and go-codec serialization, so it never affects
+	// on-wire/crash-DB bytes nor the consensus-identity EncodingDigest
+	// itself; a decoded copy starts nil and recomputes on first use.
+	encodingDigestMemo *crypto.Digest
 }
 
 // TransmittedPayload exported for dumping textual versions of messages
@@ -75,13 +84,24 @@ func (p unauthenticatedProposal) ToBeHashed() (protocol.HashID, []byte) {
 	return protocol.Payload, protocol.Encode(&p)
 }
 
+// encodingDigest returns crypto.HashObj(p), consulting encodingDigestMemo so
+// that proposals stamped at validation time skip re-encoding and re-hashing
+// the full block body. The result is byte-identical to a fresh
+// crypto.HashObj(p) — only the recomputation is elided.
+func (p unauthenticatedProposal) encodingDigest() crypto.Digest {
+	if p.encodingDigestMemo != nil {
+		return *p.encodingDigestMemo
+	}
+	return crypto.HashObj(p)
+}
+
 // value returns the proposal-value associated with this proposal.
 func (p unauthenticatedProposal) value() proposalValue {
 	return proposalValue{
 		OriginalPeriod:   p.OriginalPeriod,
 		OriginalProposer: p.OriginalProposer,
 		BlockDigest:      p.Digest(),
-		EncodingDigest:   crypto.HashObj(p),
+		EncodingDigest:   p.encodingDigest(),
 	}
 }
 
@@ -199,7 +219,6 @@ func deriveNewSeed(address basics.Address, vrf *crypto.VRFSecrets, rnd round, pe
 // looking into the unauthenticatedProposal or using LookupAgreement. The
 // Proposer, ProposerPayout, and Seed.
 func verifyProposer(p unauthenticatedProposal, ledger LedgerReader) error {
-	value := p.value()
 	rnd := p.Round()
 
 	// ledger.ConsensusParams(rnd) is not allowed because rnd isn't committed.
@@ -207,8 +226,8 @@ func verifyProposer(p unauthenticatedProposal, ledger LedgerReader) error {
 	// upgrade state. So, lacking the current consensus params, we confirm that
 	// the Proposer is *either* correct or missing. `eval` package will using
 	// Payouts.Enabled to confirm which it should be.
-	if !p.Proposer().IsZero() && p.Proposer() != value.OriginalProposer {
-		return fmt.Errorf("wrong proposer (%v != %v)", p.Proposer(), value.OriginalProposer)
+	if !p.Proposer().IsZero() && p.Proposer() != p.OriginalProposer {
+		return fmt.Errorf("wrong proposer (%v != %v)", p.Proposer(), p.OriginalProposer)
 	}
 
 	cparams, err := ledger.ConsensusParams(ParamsRound(rnd))
@@ -221,7 +240,7 @@ func verifyProposer(p unauthenticatedProposal, ledger LedgerReader) error {
 	// OriginalProposer instead of p.Proposer so that the call returns the
 	// proper record, even before Payouts.Enabled (it will be used below to
 	// check the Seed).
-	eligible, proposerRecord, err := payoutEligible(rnd, value.OriginalProposer, ledger, cparams)
+	eligible, proposerRecord, err := payoutEligible(rnd, p.OriginalProposer, ledger, cparams)
 	if err != nil {
 		return fmt.Errorf("failed to determine incentive eligibility %w", err)
 	}
@@ -236,7 +255,7 @@ func verifyProposer(p unauthenticatedProposal, ledger LedgerReader) error {
 		return fmt.Errorf("failed to read seed of round %d: %v", seedRound(rnd, cparams), err)
 	}
 
-	if value.OriginalPeriod == 0 {
+	if p.OriginalPeriod == 0 {
 		verifier := proposerRecord.SelectionID
 		ok, _ := verifier.Verify(p.SeedProof, prevSeed) // ignoring VrfOutput returned by Verify
 		if !ok {
@@ -250,7 +269,7 @@ func verifyProposer(p unauthenticatedProposal, ledger LedgerReader) error {
 			// Panicking is the only safe thing to do.
 			logging.Base().Panicf("VrfProof.Hash() failed on a proof we ourselves generated; this indicates a bug in the VRF code: %v", p.SeedProof)
 		}
-		alpha = crypto.HashObj(proposerSeed{Addr: value.OriginalProposer, VRF: vrfOut})
+		alpha = crypto.HashObj(proposerSeed{Addr: p.OriginalProposer, VRF: vrfOut})
 	} else {
 		alpha = crypto.HashObj(prevSeed)
 	}
@@ -322,6 +341,13 @@ func proposalForBlock(address basics.Address, vrf *crypto.VRFSecrets, blk Unfini
 		BlockDigest:      prop.Block.Digest(),
 		EncodingDigest:   crypto.HashObj(prop),
 	}
+	// Memoize the encoding digest just computed -- the same digest this node
+	// signs into its proposal votes. Own payloads are injected directly as
+	// payloadVerified events and skip validate(), so without this stamp they
+	// would never carry the memo, and the post-broadcast value() calls in the
+	// serialized state-machine loop would re-encode and re-hash our own block.
+	encdig := value.EncodingDigest
+	prop.encodingDigestMemo = &encdig
 	return prop, value, nil
 }
 
@@ -345,5 +371,17 @@ func (p unauthenticatedProposal) validate(ctx context.Context, current round, le
 		return invalid, fmt.Errorf("EntryValidator rejected entry: %w", err)
 	}
 
-	return makeProposalFromValidatedBlock(ve, p.SeedProof, p.OriginalPeriod, p.OriginalProposer), nil
+	prop := makeProposalFromValidatedBlock(ve, p.SeedProof, p.OriginalPeriod, p.OriginalProposer)
+	// Memoize the expensive full-block encoding digest so later value() calls
+	// reuse it instead of re-encoding and re-hashing the block. It is computed
+	// from the returned proposal itself, after the validator's last touch of
+	// the block, so it is byte-identical to a fresh recompute by construction
+	// -- even against a (contract-violating) validator that mutated the input
+	// payset in place or returned different block content. In that case the
+	// memo faithfully reflects the content actually returned, and the
+	// resulting digest mismatch makes the proposalStore reject the payload,
+	// exactly as it did before memoization.
+	encdig := crypto.HashObj(prop.u())
+	prop.encodingDigestMemo = &encdig
+	return prop, nil
 }

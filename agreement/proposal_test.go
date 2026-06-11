@@ -23,8 +23,10 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/algorand/go-algorand/crypto"
 	"github.com/algorand/go-algorand/data/basics"
 	"github.com/algorand/go-algorand/data/bookkeeping"
+	"github.com/algorand/go-algorand/data/transactions"
 	"github.com/algorand/go-algorand/logging"
 	"github.com/algorand/go-algorand/protocol"
 	"github.com/algorand/go-algorand/test/partitiontest"
@@ -210,6 +212,129 @@ func TestProposalUnauthenticated(t *testing.T) {
 	require.NotEqual(t, unauthenticatedProposal4.OriginalProposer, unauthenticatedProposal4.Block.Proposer())
 	_, err = unauthenticatedProposal4.validate(context.Background(), round, ledger, validator)
 	require.ErrorContains(t, err, "wrong proposer")
+}
+
+// TestProposalValueEncodingDigestMemo pins the consensus-identity invariants
+// of the encodingDigestMemo optimization: a memoized EncodingDigest must be
+// byte-identical to a fresh crypto.HashObj recompute, the memo must never be
+// serialized, and a mutated or decoded copy must never reuse a foreign memo.
+func TestProposalValueEncodingDigestMemo(t *testing.T) {
+	partitiontest.PartitionTest(t)
+
+	player, _, accounts, factory, ledger := testSetup(0)
+	round := player.Round
+	period := player.Period
+	ve, err := factory.AssembleBlock(round, accounts.addresses)
+	require.NoError(t, err)
+
+	prop, pv, err := proposalForBlock(accounts.addresses[0], accounts.vrfs[0], ve, period, ledger)
+	require.NoError(t, err)
+	up := prop.u()
+
+	// proposalForBlock stamps the memo with the same digest it signs into the
+	// proposal votes
+	require.NotNil(t, up.encodingDigestMemo)
+	require.Equal(t, pv.EncodingDigest, *up.encodingDigestMemo)
+	require.Equal(t, pv.EncodingDigest, up.value().EncodingDigest)
+
+	// memo cold path: a copy without the memo recomputes identically
+	cold := up
+	cold.encodingDigestMemo = nil
+	require.Equal(t, crypto.HashObj(cold), cold.value().EncodingDigest)
+	require.Equal(t, pv.EncodingDigest, cold.value().EncodingDigest)
+	require.Equal(t, cold.Digest(), cold.value().BlockDigest)
+
+	// validate() stamps the memo onto the returned proposal; the warm path
+	// must still equal a fresh recompute and the original proposalValue
+	validated, err := cold.validate(context.Background(), round, ledger, testBlockValidator{})
+	require.NoError(t, err)
+	require.NotNil(t, validated.encodingDigestMemo)
+	require.Equal(t, crypto.HashObj(validated.u()), validated.value().EncodingDigest)
+	require.Equal(t, pv.EncodingDigest, validated.value().EncodingDigest)
+
+	// the memo must not change the serialized bytes
+	unstamped := validated.unauthenticatedProposal
+	unstamped.encodingDigestMemo = nil
+	require.Equal(t, protocol.Encode(&unstamped), protocol.Encode(&validated.unauthenticatedProposal))
+
+	// Nothing enforces memo consistency under mutation: code that copies and
+	// mutates a stamped proposal must clear (or restamp) the memo itself, as
+	// done here. Production code never mutates encoded fields after stamping
+	// (proposals are only produced by the construction sites and by decoding);
+	// this sub-case pins the required pattern, not an automated defense.
+	mutated := validated.unauthenticatedProposal
+	mutated.encodingDigestMemo = nil
+	mutated.OriginalPeriod++
+	require.NotEqual(t, validated.value().EncodingDigest, mutated.value().EncodingDigest)
+	require.Equal(t, crypto.HashObj(mutated), mutated.value().EncodingDigest)
+
+	// decode round-trip drops the memo and recomputes identically
+	var decoded unauthenticatedProposal
+	err = protocol.Decode(protocol.Encode(&validated.unauthenticatedProposal), &decoded)
+	require.NoError(t, err)
+	require.Nil(t, decoded.encodingDigestMemo)
+	require.Equal(t, validated.value(), decoded.value())
+}
+
+// mutatingBlockValidator violates the BlockValidator contract by returning a
+// block whose content differs from its input.
+type mutatingBlockValidator struct{}
+
+func (v mutatingBlockValidator) Validate(ctx context.Context, e bookkeeping.Block) (ValidatedBlock, error) {
+	mutated := e
+	mutated.Payset = append(transactions.Payset(nil), e.Payset...)
+	mutated.Payset = append(mutated.Payset, transactions.SignedTxnInBlock{})
+	return testValidatedBlock{Inside: mutated}, nil
+}
+
+// TestProposalValidateMutatingValidator pins validate()'s behavior against a
+// (contract-violating) BlockValidator that returns a block whose content
+// differs from its input: the memo is computed from the returned proposal
+// itself, so it must equal a fresh recompute of the actual (mutated) content
+// rather than masking the mutation with the input's digest. The digest
+// mismatch is thus preserved, and the proposalStore -- whose assemblers are
+// keyed by the proposal-value derived from votes -- rejects the mutated
+// payload exactly as it did before memoization, while still binding the
+// honestly-validated one.
+func TestProposalValidateMutatingValidator(t *testing.T) {
+	partitiontest.PartitionTest(t)
+
+	player, router, accounts, factory, ledger := testSetup(0)
+	round := player.Round
+	per := player.Period
+	ve, err := factory.AssembleBlock(round, accounts.addresses)
+	require.NoError(t, err)
+
+	prop, pv, err := proposalForBlock(accounts.addresses[0], accounts.vrfs[0], ve, per, ledger)
+	require.NoError(t, err)
+	up := prop.u()
+
+	mutValidated, err := up.validate(context.Background(), round, ledger, mutatingBlockValidator{})
+	require.NoError(t, err)
+	require.NotNil(t, mutValidated.encodingDigestMemo)
+	require.Equal(t, crypto.HashObj(mutValidated.u()), mutValidated.value().EncodingDigest)
+	require.NotEqual(t, up.value().EncodingDigest, mutValidated.value().EncodingDigest)
+
+	// a store waiting on the vote-derived proposal-value finds no assembler
+	// for the mutated payload and rejects it
+	store := proposalStore{
+		Relevant: map[period]proposalValue{per: pv},
+		Pinned:   pv,
+		Assemblers: map[proposalValue]blockAssembler{
+			pv: {Pipeline: up, Authenticators: []vote{}},
+		},
+	}
+	rHandle := routerHandle{t: &proposalStoreTracer, r: &router, src: proposalMachinePeriod}
+	mutMsg := message{Tag: protocol.ProposalPayloadTag, Proposal: mutValidated, UnauthenticatedProposal: mutValidated.u()}
+	ev := store.handle(rHandle, player, messageEvent{T: payloadVerified, Input: mutMsg})
+	require.Equal(t, payloadRejected, ev.(payloadProcessedEvent).T)
+
+	// while the honestly-validated payload binds to its assembler
+	validated, err := up.validate(context.Background(), round, ledger, testBlockValidator{})
+	require.NoError(t, err)
+	honestMsg := message{Tag: protocol.ProposalPayloadTag, Proposal: validated, UnauthenticatedProposal: validated.u()}
+	ev = store.handle(rHandle, player, messageEvent{T: payloadVerified, Input: honestMsg})
+	require.Equal(t, payloadAccepted, ev.(payloadProcessedEvent).T)
 }
 
 func unauthenticatedProposalBlockPanicWrapper(t *testing.T, message string, uap unauthenticatedProposal, validator BlockValidator) (block bookkeeping.Block) {

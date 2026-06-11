@@ -256,7 +256,7 @@ func (store *proposalStore) handle(r routerHandle, p player, e event) event {
 	case payloadVerified:
 		pp := e.(messageEvent).Input.Proposal
 		pv := pp.value()
-		ea, ok := store.Assemblers[pp.value()]
+		ea, ok := store.Assemblers[pv]
 		if !ok {
 			return payloadProcessedEvent{
 				T:   payloadRejected,

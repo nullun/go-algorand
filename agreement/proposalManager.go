@@ -238,8 +238,13 @@ func (m *proposalManager) handleMessageEvent(r routerHandle, p player, e filtera
 			return filteredEvent{T: payloadMalformed, Err: e.Err}
 		}
 
-		up := e.Input.UnauthenticatedProposal
-		r.t.timeR().RecPayloadValidation(up.OriginalPeriod, propose, up.value())
+		// record timing from the validated Proposal, not the unauthenticated
+		// copy: its value() reuses the encoding digest memoized at validation
+		// time, while the copy would re-encode and re-hash the block here in
+		// the serialized loop (even with timing tracing disabled, since the
+		// argument is evaluated unconditionally)
+		pp := e.Input.Proposal
+		r.t.timeR().RecPayloadValidation(pp.OriginalPeriod, propose, pp.value())
 
 		return r.dispatch(p, e.messageEvent, proposalMachineRound, p.Round, p.Period, 0)
 	}

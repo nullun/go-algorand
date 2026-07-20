@@ -51,9 +51,26 @@ back.
 
 ## Why do we have algod.oas2.json and algod.oas3.yml?
 
-We chose to maintain V2 and V3 versions of the spec because OpenAPI v3 doesn't seem to be widely supported. Some tools worked better with V3 and others with V2, so having both available has been useful. To reduce developer burden, the v2 specfile is automatically converted v3 using [converter.swagger.io](http://converter.swagger.io/).
+We chose to maintain V2 and V3 versions of the spec because OpenAPI v3 wasn't
+widely supported when the V2 API was introduced. Some tools worked better with
+V3 and others with V2, so having both available has been useful. **algod.oas2.json
+is the hand-authored source of truth**; edit it and run `make generate` to
+regenerate everything else. **algod.oas3.yml is a generated artifact** and should
+not be edited by hand.
 
-If you want to run the converter locally, you can build the [swagger-converter](https://github.com/swagger-api/swagger-converter) project or run its [docker image](https://hub.docker.com/r/swaggerapi/swagger-converter) and specify the `SWAGGER_CONVERTER_API` environment variable when using this Makefile, for example by running:
-```
-SWAGGER_CONVERTER_API=http://localhost:8080 make
-```
+The v2 spec is converted to v3 locally by the `oas2to3` helper (see
+`oas2to3/main.go`), which uses [kin-openapi](https://github.com/getkin/kin-openapi)
+(already a dependency of this module). Previously this conversion was performed by
+the external [converter.swagger.io](http://converter.swagger.io/) service; doing it
+locally removes a network dependency from the build and from CI.
+
+kin-openapi handles the structural conversion; `oas2to3` then post-processes
+its output to be byte-identical (after canonicalization) to what the
+swagger.io converter produced for this spec — restoring dropped vendor
+extensions (e.g. `x-go-type`), inlining parameter and response `$ref`s,
+expanding response content for each `produces` media type (msgpack),
+translating Swagger 2.0 `collectionFormat`, and matching several cosmetic
+converter behaviors. This keeps the published spec stable for downstream
+consumers and the generated Go code unchanged. If a future spec change relies
+on a Swagger 2.0 feature the helper does not yet handle, extend `oas2to3`
+accordingly (see the scope note in `oas2to3/main.go`).

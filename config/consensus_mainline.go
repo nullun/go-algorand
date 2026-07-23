@@ -22,6 +22,8 @@ import (
 	"github.com/algorand/go-algorand/protocol"
 )
 
+var _ = registerConsensusNetwork("mainline", initMainlineProtocols)
+
 // initMainlineProtocols defines the parameters for the series of consensus
 // versions used by MainNet, TestNet, and BetaNet, how values change between
 // versions, and vFuture: the in-development successor of the latest released

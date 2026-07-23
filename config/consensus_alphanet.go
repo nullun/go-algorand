@@ -22,6 +22,9 @@ import (
 	"github.com/algorand/go-algorand/protocol"
 )
 
+var _ = registerConsensusNetwork("alphanet", initAlphanetProtocols,
+	protocol.ConsensusV32, protocol.ConsensusV33, protocol.ConsensusV34, protocol.ConsensusV36)
+
 // initAlphanetProtocols defines the vAlphaX versions, a separate series of
 // consensus parameters and versions for AlphaNet.
 func initAlphanetProtocols() {

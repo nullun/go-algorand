@@ -124,9 +124,8 @@ func (cp ConsensusProtocols) Merge(configurableConsensus ConsensusProtocols) Con
 	return staticConsensus
 }
 
-// initConsensusProtocols assembles the consensus protocols known to this
-// binary. The versions are defined across several files, one per network's
-// series of versions:
+// The consensus protocols known to this binary are defined across several
+// files, one per network's series of versions:
 //
 //	consensus_mainline.go - v7 onward plus vFuture: the series shared by
 //	    MainNet, TestNet, and BetaNet. vFuture is the gated staging area
@@ -134,17 +133,65 @@ func (cp ConsensusProtocols) Merge(configurableConsensus ConsensusProtocols) Con
 //	consensus_alphanet.go - vAlpha1..: AlphaNet's series
 //	consensus_fnet.go     - vFnet1..: FNet's series
 //
-// Releasing a new mainline version only touches consensus_mainline.go (moving
-// the released features out of vFuture). Adding a new network is a new
-// consensus_<network>.go file with an init<Network>Protocols function, called
-// below after the networks it branches from.
+// Each file declares itself with registerConsensusNetwork, naming the
+// versions from other networks that it branches from. Releasing a new
+// mainline version only touches consensus_mainline.go (moving the released
+// features out of vFuture). Adding a new network is a single new
+// consensus_<network>.go file; no shared file changes.
 //
 // These are the only valid and tested consensus values and transitions. Other
 // settings are not tested and may lead to unexpected behavior.
+type consensusNetwork struct {
+	name  string
+	bases []protocol.ConsensusVersion
+	init  func()
+}
+
+// consensusNetworks collects the networks registered by the
+// consensus_<network>.go files in this package.
+var consensusNetworks []consensusNetwork
+
+// registerConsensusNetwork records a network's series of consensus versions
+// to be defined by initConsensusProtocols. bases lists the versions from
+// other networks that init derives from (via consensusFrom) or upgrades to;
+// the network runs only once all of them have been registered. It is called
+// from package-level var declarations in each network's file.
+func registerConsensusNetwork(name string, init func(), bases ...protocol.ConsensusVersion) bool {
+	consensusNetworks = append(consensusNetworks, consensusNetwork{name: name, bases: bases, init: init})
+	return true
+}
+
+// initConsensusProtocols assembles the Consensus map by running every
+// registered network, in an order that satisfies each network's declared base
+// versions. It panics if any network's bases cannot be satisfied.
 func initConsensusProtocols() {
-	initMainlineProtocols()
-	initAlphanetProtocols()
-	initFnetProtocols()
+	pending := make([]consensusNetwork, len(consensusNetworks))
+	copy(pending, consensusNetworks)
+	for len(pending) > 0 {
+		var blocked []consensusNetwork
+		for _, network := range pending {
+			ready := true
+			for _, base := range network.bases {
+				if _, ok := Consensus[base]; !ok {
+					ready = false
+					break
+				}
+			}
+			if ready {
+				network.init()
+			} else {
+				blocked = append(blocked, network)
+			}
+		}
+		if len(blocked) == len(pending) {
+			names := make([]string, len(blocked))
+			for i, network := range blocked {
+				names[i] = network.name
+			}
+			panic(fmt.Sprintf("initConsensusProtocols: networks %v declare base versions that no network provides", names))
+		}
+		pending = blocked
+	}
 }
 
 // branch returns a copy of these consensus parameters with a fresh, empty
@@ -158,12 +205,13 @@ func (proto ConsensusParams) branch() ConsensusParams {
 
 // consensusFrom returns a branch (see above) of an already-registered
 // consensus version, allowing a network to derive from a version defined in
-// another file. The base version must already be registered, so
-// initConsensusProtocols must call the initializers in dependency order.
+// another file. The base version must appear in the network's
+// registerConsensusNetwork declaration, which guarantees it is registered
+// before the network's init runs.
 func consensusFrom(v protocol.ConsensusVersion) ConsensusParams {
 	proto, ok := Consensus[v]
 	if !ok {
-		panic(fmt.Sprintf("consensusFrom: %s is not registered (check initConsensusProtocols ordering)", v))
+		panic(fmt.Sprintf("consensusFrom: %s is not registered (missing from this network's registerConsensusNetwork bases?)", v))
 	}
 	return proto.branch()
 }

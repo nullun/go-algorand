@@ -20,6 +20,9 @@ import (
 	"github.com/algorand/go-algorand/protocol"
 )
 
+var _ = registerConsensusNetwork("fnet", initFnetProtocols,
+	protocol.ConsensusV39, protocol.ConsensusV40)
+
 // initFnetProtocols defines the vFnetX versions: the genesis and historical
 // protocols for AF's FNet network. A mainline node needs them to open the
 // FNet genesis ledger (proto fnet1) and to replay the pre-V40 chain. The

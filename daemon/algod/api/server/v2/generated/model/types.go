@@ -181,6 +181,9 @@ type Account struct {
 	// AuthAddr \[spend\] the address against which signing should be checked. If empty, the address of the current account is used. This field can be updated in any transaction by setting the RekeyTo field.
 	AuthAddr *string `json:"auth-addr,omitempty"`
 
+	// Bootstrapper \[boot\] Address of the account that is bootstrapping this account. If empty, the account is not bootstrapped.
+	Bootstrapper *string `json:"bootstrapper,omitempty"`
+
 	// CreatedApps \[appp\] parameters of applications created by this account including app global data.
 	//
 	// Note: the raw account uses `map[int] -> AppParams` for this type.
@@ -232,8 +235,17 @@ type Account struct {
 	// *   NotParticipating - indicates that the associated account is neither a delegator nor a delegate.
 	Status string `json:"status"`
 
+	// TotalAccountsBootstrapping \[tabs\] The number of accounts this account is bootstrapping
+	TotalAccountsBootstrapping *uint64 `json:"total-accounts-bootstrapping,omitempty"`
+
 	// TotalAppsOptedIn The count of all applications that have been opted in, equivalent to the count of application local data (AppLocalState objects) stored in this account.
 	TotalAppsOptedIn uint64 `json:"total-apps-opted-in"`
+
+	// TotalAssetsDelegated \[tadl\] The number of asset holdings delegated to this account by others
+	TotalAssetsDelegated *uint64 `json:"total-assets-delegated,omitempty"`
+
+	// TotalAssetsDelegating \[tadg\] The number of asset holdings this account is delegating for others
+	TotalAssetsDelegating *uint64 `json:"total-assets-delegating,omitempty"`
 
 	// TotalAssetsOptedIn The count of all assets that have been opted in, equivalent to the count of AssetHolding objects held by this account.
 	TotalAssetsOptedIn uint64 `json:"total-assets-opted-in"`
@@ -249,18 +261,6 @@ type Account struct {
 
 	// TotalCreatedAssets The count of all assets (AssetParams objects) created by this account.
 	TotalCreatedAssets uint64 `json:"total-created-assets"`
-
-	// TotalAssetsDelegated \[tadl\] The number of asset holdings delegated to this account by others.
-	TotalAssetsDelegated *uint64 `json:"total-assets-delegated,omitempty"`
-
-	// TotalAssetsDelegating \[tadg\] The number of asset holdings this account is delegating for others.
-	TotalAssetsDelegating *uint64 `json:"total-assets-delegating,omitempty"`
-
-	// TotalAccountsBootstrapping \[tabs\] The number of accounts this account is bootstrapping.
-	TotalAccountsBootstrapping *uint64 `json:"total-accounts-bootstrapping,omitempty"`
-
-	// Bootstrapper \[boot\] Address of the account that is bootstrapping this account. If empty, the account is not bootstrapped.
-	Bootstrapper *string `json:"bootstrapper,omitempty"`
 }
 
 // AccountSigType Indicates what type of signature is used by this account, must be one of:
@@ -487,11 +487,11 @@ type AssetHolding struct {
 	// AssetID Asset ID of the holding.
 	AssetID basics.AssetIndex `json:"asset-id"`
 
-	// IsFrozen \[f\] whether or not the holding is frozen.
-	IsFrozen bool `json:"is-frozen"`
-
 	// Delegator \[d\] Address of the delegating account for this asset holding. If empty, the asset holding is not delegated.
 	Delegator *string `json:"delegator,omitempty"`
+
+	// IsFrozen \[f\] whether or not the holding is frozen.
+	IsFrozen bool `json:"is-frozen"`
 }
 
 // AssetHoldingReference References an asset held by an account.

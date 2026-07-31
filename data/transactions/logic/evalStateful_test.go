@@ -1197,6 +1197,14 @@ asset_params_get AssetCreator; assert
 txn Sender; ==; assert
 `
 
+// v14extras adds test for AssetDelegator, new in v14
+const v14extras = `
+int 0//account
+int 55
+asset_holding_get AssetDelegator; assert
+global ZeroAddress; ==; assert
+`
+
 func substitute(s string, replacements map[string]string) string {
 	for old, new := range replacements {
 		s = strings.ReplaceAll(s, old, new)
@@ -1212,7 +1220,7 @@ func TestAssets(t *testing.T) {
 		4:                      fmt.Sprintf(assetsTestTemplate, ""),
 		5:                      fmt.Sprintf(assetsTestTemplate, v5extras),
 		sharedResourcesVersion: fmt.Sprintf(assetsTestTemplate, v5extras),
-		LogicVersion:           fmt.Sprintf(assetsTestTemplate, v5extras),
+		LogicVersion:           fmt.Sprintf(assetsTestTemplate, v5extras+v14extras),
 	}
 
 	testAssetsByVersion := func(t *testing.T, assetsTestProgram string, version uint64) {
@@ -1368,9 +1376,9 @@ intc_0 // 0
 		// check asset_holding_get with invalid field number
 		ops := testProg(t, source, version)
 		require.Equal(t, OpsByName[now.Proto.LogicSigVersion]["asset_holding_get"].Opcode, ops.Program[8])
-		ops.Program[9] = 0x02
+		ops.Program[9] = 0x20
 		_, err := EvalApp(ops.Program, 0, 888, now)
-		require.ErrorContains(t, err, "invalid asset_holding_get field 2")
+		require.ErrorContains(t, err, "invalid asset_holding_get field 32")
 
 		// check asset_params bool value
 		source = `intcblock 0 1

@@ -1835,8 +1835,13 @@ const testTxnProgramTextV13 = testTxnProgramTextV12 + `
 assert
 int 1`
 
-// v14 adds no new txn fields.
-const testTxnProgramTextV14 = testTxnProgramTextV13
+const testTxnProgramTextV14 = testTxnProgramTextV13 + `
+assert
+txn AssetDelegation
+!
+assert
+txn AccountBootstrap
+!`
 
 func makeSampleTxn() transactions.SignedTxn {
 	var txn transactions.SignedTxn

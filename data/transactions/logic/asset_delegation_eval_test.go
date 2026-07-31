@@ -30,8 +30,8 @@ func TestAssetDelegationVisibility(t *testing.T) {
 	partitiontest.PartitionTest(t)
 	t.Parallel()
 
-	// Testing with versions around the introduction of SupportAssetDelegation (version 13)
-	testLogicRange(t, 10, 13, func(t *testing.T, ep *EvalParams, tx *transactions.Transaction, ledger *Ledger) {
+	// Testing with versions around the introduction of asset delegation
+	testLogicRange(t, 10, assetDelegationVersion, func(t *testing.T, ep *EvalParams, tx *transactions.Transaction, ledger *Ledger) {
 		test := func(source string) {
 			t.Helper()
 			testApp(t, source, ep)
@@ -77,8 +77,8 @@ func TestAssetDelegationVisibility(t *testing.T) {
 		tx.AssetTransferTxnFields.AssetDelegation = transactions.ApproveAssetDelegation
 		tx.PaymentTxnFields.AccountBootstrap = transactions.BootstrapAccount
 
-		if ep.Proto.LogicSigVersion < 13 {
-			// Version < 13: Should only see 2 assets in count
+		if ep.Proto.LogicSigVersion < assetDelegationVersion {
+			// Before delegation: Should only see 2 assets in count
 			test("txn Sender; acct_params_get AcctTotalAssets; assert; int 2; ==")
 
 			// Should NOT see the delegated asset in asset_holding_get
@@ -89,11 +89,11 @@ func TestAssetDelegationVisibility(t *testing.T) {
 			test("txn Sender; acct_params_get AcctMinBalance; assert; int 3003; ==")
 			test("txn Sender; min_balance; int 3003; ==")
 
-			// Programs < 13 should not even assemble the new fields
+			// Programs before assetDelegationVersion should not even assemble the new fields
 			// (testApp internally assembles, so we expect failure if we try to use them)
 			// But for now, we've already verified the hiding logic for existing fields.
 		} else {
-			// Version >= 13: Should see all 3 assets in the holdings count
+			// From assetDelegationVersion: Should see all 3 assets in the holdings count
 			test("txn Sender; acct_params_get AcctTotalAssets; assert; int 3; ==")
 
 			// Should see the delegated asset in asset_holding_get

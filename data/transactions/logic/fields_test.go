@@ -366,18 +366,44 @@ func TestAssetParamsFieldsVersions(t *testing.T) {
 	}
 }
 
-func TestFieldVersions(t *testing.T) {
-	// This test is weird, it confirms that we don't need to bother with a
-	// "good" test for AssetHolding fields.  It will fail if we add a field that
-	// has a different debut version, and then we'll need a test like
-	// TestAppParamsFieldsVersions that checks the field is unavailable before
-	// its debut.
-
+// TestAssetHoldingFieldsVersions tests accessibility of AssetHolding fields that
+// debuted after v2, when asset_holding_get was introduced. Fields from v2 need no
+// such test, since asset_holding_get itself is unavailable before then. The sweep
+// starts at directRefEnabledVersion, the first version that takes an account
+// address rather than an index into the Accounts array.
+func TestAssetHoldingFieldsVersions(t *testing.T) {
 	partitiontest.PartitionTest(t)
 	t.Parallel()
 
+	var fields []assetHoldingFieldSpec
 	for _, fs := range assetHoldingFieldSpecs {
-		require.Equal(t, uint64(2), fs.version)
+		if fs.version > 2 {
+			fields = append(fields, fs)
+		}
+	}
+	require.Greater(t, len(fields), 0)
+
+	for _, field := range fields {
+		// Need to use intc so we can "backversion" the program and not have it
+		// fail because of pushint.
+		text := fmt.Sprintf("intcblock 55 1; txn Sender; intc_0; asset_holding_get %s; bnz ok; err; ok: ", field.field.String())
+		switch field.ftype.AVMType {
+		case avmUint64:
+			text += " intc_1; +"
+		case avmBytes:
+			text += " len"
+		}
+		for v := uint64(directRefEnabledVersion); v <= AssemblerMaxVersion; v++ {
+			ep, txn, ledger := makeSampleEnv()
+			ledger.NewAsset(txn.Sender, 55, basics.AssetParams{})
+			ep.Proto.LogicSigVersion = v
+			if field.version > v {
+				testProg(t, text, v, exp(1, "...was introduced in..."))
+			} else {
+				testProg(t, text, v)
+				testApp(t, text, ep)
+			}
+		}
 	}
 }
 

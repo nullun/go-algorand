@@ -4669,7 +4669,7 @@ func opMinBalance(cx *EvalContext) error {
 			cx.Proto.BalanceRequirements(),
 			false, // Bootstrapper
 			0,     // TotalAccountsBootstrapping
-			account.TotalAssets - account.TotalAssetsDelegated,
+			account.TotalAssets-account.TotalAssetsDelegated,
 			account.TotalAppSchema,
 			account.TotalAppParams, account.TotalAppLocalStates,
 			uint64(account.TotalExtraAppPages),
@@ -5379,7 +5379,7 @@ func opAcctParamsGet(cx *EvalContext) error {
 				cx.Proto.BalanceRequirements(),
 				false, // Bootstrapper
 				0,     // TotalAccountsBootstrapping
-				account.TotalAssets - account.TotalAssetsDelegated,
+				account.TotalAssets-account.TotalAssetsDelegated,
 				account.TotalAppSchema,
 				account.TotalAppParams, account.TotalAppLocalStates,
 				uint64(account.TotalExtraAppPages),

@@ -54,13 +54,13 @@ type balanceRecord struct {
 	proposed  basics.Round // The last round that this account proposed the accepted block
 	heartbeat basics.Round // The last round that this account sent a heartbeat to show it was online.
 
-	locals     map[basics.AppIndex]basics.TealKeyValue
-	holdings   map[basics.AssetIndex]basics.AssetHolding
-	delegated  uint64
-	delegating uint64
+	locals        map[basics.AppIndex]basics.TealKeyValue
+	holdings      map[basics.AssetIndex]basics.AssetHolding
+	delegated     uint64
+	delegating    uint64
 	bootstrapping uint64
-	bootstrapper basics.Address
-	mods       map[basics.AppIndex]map[string]basics.ValueDelta
+	bootstrapper  basics.Address
+	mods          map[basics.AppIndex]map[string]basics.ValueDelta
 }
 
 func newBalanceRecord(addr basics.Address, balance uint64) balanceRecord {

@@ -875,19 +875,36 @@ func TestMaxSizesCorrect(t *testing.T) {
 	// the logicsig args can both be up to MaxLogicSigMaxSize, but that's the max for
 	// them combined, so it double counts and we have to subtract one.
 	maxCombinedTxnSize -= uint64(bounds.MaxLogicSigMaxSize)
+	// A sponsor signature is overestimated in the same ways: it holds the same set
+	// of signature types, of which at most one is effective, and its logicsig
+	// double counts program and args.
+	sponsorSize := uint64(transactions.SponsorSigMaxSize())
+	sponsorSize -= uint64(crypto.SignatureMaxSize() + crypto.MultisigSigMaxSize())
+	sponsorSize -= uint64(transactions.PQSigMaxSize())
+	sponsorSize -= uint64(bounds.MaxLogicSigMaxSize)
+	// SignedTxnMaxSize() already counts a sponsor signature. Take it back out, and
+	// add it only to the cases where a transaction can actually carry one.
+	maxCombinedTxnSize -= uint64(transactions.SponsorSigMaxSize())
 
 	// maxCombinedTxnSize is still an overestimate because it assumes all txn
 	// type fields can be in the same txn.  That's not true, but it provides an
 	// upper bound on the size of ONE transaction, even if the txn is a
-	// stateproof, which is big.  Ensure our constant is big enough to hold one.
+	// stateproof, which is big.  A stateproof carries no signature at all, so it
+	// cannot carry a sponsor signature either (see verify.stxnCoreChecks), which
+	// is why no sponsor size is added here.  Ensure our constant is big enough to
+	// hold one.
 	require.Greater(t, txTagMax, maxCombinedTxnSize)
 
 	// we actually have to hold 16 txns, but in the case of multiple txns in a
 	// group, none can be stateproofs. So derive maxMinusSP, which is a per txn
 	// size estimate that excludes stateproof fields.
 	spTxnSize := uint64(csp.StateProofMaxSize() + stateproofmsg.MessageMaxSize())
-	maxMinusSP := maxCombinedTxnSize - spTxnSize
-	require.Greater(t, txTagMax, 16*maxMinusSP)
+	maxMinusSP := maxCombinedTxnSize - spTxnSize + sponsorSize
+	// Sponsor LogicSigs draw from the same group size pool as the senders' (see
+	// verify.logicSigGroupSizeCheck), so the group cannot hold a full size sponsor
+	// program in each of the 16.  Count one, as the comment below anticipates.
+	pooledSponsorLsigs := uint64(15 * bounds.MaxLogicSigMaxSize)
+	require.Greater(t, txTagMax, 16*maxMinusSP-pooledSponsorLsigs)
 	// when we do logisig pooling, 16*maxMinusSP may be a large overshoot, since
 	// it will assume we can have a big logicsig in _each_ of the 16.  It
 	// probably won't matter, since stateproof will still swamp it.  But if so,

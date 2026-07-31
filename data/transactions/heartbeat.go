@@ -107,6 +107,11 @@ func (hb HeartbeatTxnFields) wellFormed(header Header, proto config.ConsensusPar
 		if !header.RekeyTo.IsZero() {
 			return fmt.Errorf("tx.RekeyTo is set in %s heartbeat", kind)
 		}
+		// A discounted heartbeat must stay minimal: a sponsor signature is extra
+		// encoding and extra verification work claimed at a reduced fee.
+		if header.FeeSponsored {
+			return fmt.Errorf("tx.FeeSponsored is set in %s heartbeat", kind)
+		}
 	}
 
 	if (hb.HbProof == crypto.HeartbeatProof{}) {

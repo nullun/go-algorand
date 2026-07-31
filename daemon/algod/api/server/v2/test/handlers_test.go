@@ -1191,8 +1191,10 @@ func makePQSignedTxnWithAddressCompliance(t *testing.T, compliant bool) transact
 	pqSig.Signature = signature
 
 	return transactions.SignedTxn{
-		Txn:   txn,
-		PQsig: pqSig,
+		Txn: txn,
+		SignatureFields: transactions.SignatureFields{
+			PQsig: pqSig,
+		},
 	}
 }
 
@@ -1223,9 +1225,11 @@ func makePQDelegatedLogicSigTxnWithAddressCompliance(t *testing.T, compliant boo
 
 	return transactions.SignedTxn{
 		Txn: txn,
-		Lsig: transactions.LogicSig{
-			Logic: ops.Program,
-			PQsig: pqSig,
+		SignatureFields: transactions.SignatureFields{
+			Lsig: transactions.LogicSig{
+				Logic: ops.Program,
+				PQsig: pqSig,
+			},
 		},
 	}
 }
@@ -1672,8 +1676,10 @@ func TestPostSimulateTransactionPlaceholderPQSignatureValidation(t *testing.T) {
 			Receiver: roots[0].Address(),
 			Amount:   0,
 		}).Txn(),
-		AuthAddr: pqAuthorizer,
-		PQsig:    pqSig,
+		SignatureFields: transactions.SignatureFields{
+			AuthAddr: pqAuthorizer,
+			PQsig:    pqSig,
+		},
 	}
 
 	t.Run("placeholder passes admission and echoes envelope", func(t *testing.T) {

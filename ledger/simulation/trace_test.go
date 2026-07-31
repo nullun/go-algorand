@@ -44,8 +44,10 @@ func TestPopulateFeeUsageIncludesBigLogicSigProgram(t *testing.T) {
 							Fee: fee,
 						},
 					},
-					Lsig: transactions.LogicSig{
-						Logic: make([]byte, programSize),
+					SignatureFields: transactions.SignatureFields{
+						Lsig: transactions.LogicSig{
+							Logic: make([]byte, programSize),
+						},
 					},
 				},
 			},

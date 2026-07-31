@@ -254,11 +254,11 @@ type APIV1POSTMultisigTransactionSignRequest struct {
 type APIV1POSTSponsorSignRequest struct {
 	_struct struct{} `codec:",omitempty,omitemptyarray"`
 
-	WalletHandleToken string          `json:"wallet_handle_token"`
-	Transaction       []byte          `json:"transaction"`
-	SponsorAddress    string          `json:"sponsor_address"`
+	WalletHandleToken string           `json:"wallet_handle_token"`
+	Transaction       []byte           `json:"transaction"`
+	SponsorAddress    string           `json:"sponsor_address"`
 	PublicKey         crypto.PublicKey `json:"public_key"`
-	WalletPassword    string          `json:"wallet_password"`
+	WalletPassword    string           `json:"wallet_password"`
 }
 
 // APIV1POSTMultisigSponsorSignRequest is the request for `POST /v1/multisig/signsponsor`
@@ -270,7 +270,7 @@ type APIV1POSTMultisigSponsorSignRequest struct {
 	WalletHandleToken string             `json:"wallet_handle_token"`
 	Transaction       []byte             `json:"transaction"`
 	SponsorAddress    string             `json:"sponsor_address"`
-	PublicKey         crypto.PublicKey    `json:"public_key"`
+	PublicKey         crypto.PublicKey   `json:"public_key"`
 	PartialMsig       crypto.MultisigSig `json:"partial_multisig"`
 	Signer            string             `json:"signer"`
 	WalletPassword    string             `json:"wallet_password"`

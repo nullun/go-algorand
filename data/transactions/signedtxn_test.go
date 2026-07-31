@@ -104,11 +104,11 @@ func TestSignedTxnHasSignature(t *testing.T) {
 		hasSignature bool
 	}{
 		{name: "unsigned"},
-		{name: "sig", stxn: SignedTxn{Sig: nonblankSig}, hasSignature: true},
-		{name: "msig", stxn: SignedTxn{Msig: crypto.MultisigSig{Version: 1}}, hasSignature: true},
-		{name: "pqsig", stxn: SignedTxn{PQsig: fixture.pqSig}, hasSignature: true},
-		{name: "lsig program", stxn: SignedTxn{Lsig: LogicSig{Logic: []byte{1}}}, hasSignature: true},
-		{name: "lsig nested pqsig only", stxn: SignedTxn{Lsig: LogicSig{PQsig: fixture.pqSig}}, hasSignature: true},
+		{name: "sig", stxn: SignedTxn{SignatureFields: SignatureFields{Sig: nonblankSig}}, hasSignature: true},
+		{name: "msig", stxn: SignedTxn{SignatureFields: SignatureFields{Msig: crypto.MultisigSig{Version: 1}}}, hasSignature: true},
+		{name: "pqsig", stxn: SignedTxn{SignatureFields: SignatureFields{PQsig: fixture.pqSig}}, hasSignature: true},
+		{name: "lsig program", stxn: SignedTxn{SignatureFields: SignatureFields{Lsig: LogicSig{Logic: []byte{1}}}}, hasSignature: true},
+		{name: "lsig nested pqsig only", stxn: SignedTxn{SignatureFields: SignatureFields{Lsig: LogicSig{PQsig: fixture.pqSig}}}, hasSignature: true},
 	}
 
 	for _, test := range tests {
@@ -133,7 +133,7 @@ func TestSignedTxnFeeFactorPQSignatureContribution(t *testing.T) {
 	lsigSigned.Lsig = LogicSig{Logic: []byte{1}}
 	unknownPQSigned := baseTxn
 	unknownPQSigned.PQsig = PQSig{Scheme: protocol.PQScheme{'x', '1'}}
-	pqSigned := SignedTxn{Txn: fixture.txn, PQsig: fixture.pqSig}
+	pqSigned := SignedTxn{Txn: fixture.txn, SignatureFields: SignatureFields{PQsig: fixture.pqSig}}
 	delegatedPQSigned := baseTxn
 	delegatedPQSigned.Lsig = LogicSig{Logic: []byte{1}, PQsig: fixture.pqSig}
 	unknownDelegatedPQSigned := baseTxn

@@ -112,8 +112,10 @@ func makePQSignedTxn(t *testing.T, firstSeedByte byte) transactions.SignedTxn {
 	pqSig.Signature = signature
 
 	return transactions.SignedTxn{
-		Txn:   txn,
-		PQsig: pqSig,
+		Txn: txn,
+		SignatureFields: transactions.SignatureFields{
+			PQsig: pqSig,
+		},
 	}
 }
 
@@ -172,9 +174,11 @@ func makePQDelegatedLogicSigTxn(t *testing.T, firstSeedByte byte) transactions.S
 
 	return transactions.SignedTxn{
 		Txn: createPayTransaction(config.Consensus[protocol.ConsensusFuture].MinTxnFee, 40, 60, 1, authorizer, basics.Address{1}),
-		Lsig: transactions.LogicSig{
-			Logic: ops.Program,
-			PQsig: pqSig,
+		SignatureFields: transactions.SignatureFields{
+			Lsig: transactions.LogicSig{
+				Logic: ops.Program,
+				PQsig: pqSig,
+			},
 		},
 	}
 }
@@ -399,9 +403,11 @@ func TestTxnValidationPQSigWithAuthAddr(t *testing.T) {
 	pqAuthorizer, pqSig := makePQSigForTxn(t, 8, &txn)
 
 	stxn := transactions.SignedTxn{
-		Txn:      txn,
-		AuthAddr: pqAuthorizer,
-		PQsig:    pqSig,
+		Txn: txn,
+		SignatureFields: transactions.SignatureFields{
+			AuthAddr: pqAuthorizer,
+			PQsig:    pqSig,
+		},
 	}
 
 	_, err := TxnGroup([]transactions.SignedTxn{stxn}, &blkHdr, nil, &dummyLedger)
@@ -603,9 +609,11 @@ func TestTxnValidationPQDelegatedLogicSigSignsRawProgram(t *testing.T) {
 	pqSig.Signature = rawSignature
 	stxn := transactions.SignedTxn{
 		Txn: createPayTransaction(config.Consensus[protocol.ConsensusFuture].MinTxnFee, 40, 60, 1, authorizer, basics.Address{1}),
-		Lsig: transactions.LogicSig{
-			Logic: ops.Program,
-			PQsig: pqSig,
+		SignatureFields: transactions.SignatureFields{
+			Lsig: transactions.LogicSig{
+				Logic: ops.Program,
+				PQsig: pqSig,
+			},
 		},
 	}
 	_, err = TxnGroup([]transactions.SignedTxn{stxn}, &blkHdr, nil, &dummyLedger)
@@ -1288,9 +1296,11 @@ func TestTxnGroupLogicOnlyAccountRemainsUnchanged(t *testing.T) {
 	sender := basics.Address(logic.HashProgram(ops.Program))
 	stxn := transactions.SignedTxn{
 		Txn: createPayTransaction(config.Consensus[protocol.ConsensusCurrentVersion].MinTxnFee, 40, 60, 1, sender, basics.Address{1}),
-		Lsig: transactions.LogicSig{
-			Logic: ops.Program,
-			PQsig: transactions.PQSig{},
+		SignatureFields: transactions.SignatureFields{
+			Lsig: transactions.LogicSig{
+				Logic: ops.Program,
+				PQsig: transactions.PQSig{},
+			},
 		},
 	}
 
@@ -1772,7 +1782,9 @@ func TestBigLogicSigProgramSize(t *testing.T) {
 		}.Txn()
 		return transactions.SignedTxn{
 			Txn: txn,
-			Sig: secrets.Sign(txn),
+			SignatureFields: transactions.SignatureFields{
+				Sig: secrets.Sign(txn),
+			},
 		}
 	}
 	makeSignedTxnWithOrphanLsig := func(proto config.ConsensusParams, lsig transactions.LogicSig) transactions.SignedTxn {

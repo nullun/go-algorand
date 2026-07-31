@@ -122,8 +122,10 @@ func TestCheckGroupFeesBigLogicSigProgram(t *testing.T) {
 						Receiver: addrs[0],
 					},
 				},
-				Lsig: transactions.LogicSig{
-					Logic: program,
+				SignatureFields: transactions.SignatureFields{
+					Lsig: transactions.LogicSig{
+						Logic: program,
+					},
 				},
 			}}
 

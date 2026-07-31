@@ -46,10 +46,14 @@ func TestTxnNeedsSyntheticSignatureLogicSigContent(t *testing.T) {
 
 	require.True(t, txnNeedsSyntheticSignature(transactions.SignedTxn{}))
 	require.False(t, txnNeedsSyntheticSignature(transactions.SignedTxn{
-		Lsig: transactions.LogicSig{Args: [][]byte{{1}}},
+		SignatureFields: transactions.SignatureFields{
+			Lsig: transactions.LogicSig{Args: [][]byte{{1}}},
+		},
 	}))
 	require.False(t, txnNeedsSyntheticSignature(transactions.SignedTxn{
-		Lsig: transactions.LogicSig{Sig: nonblankSig},
+		SignatureFields: transactions.SignatureFields{
+			Lsig: transactions.LogicSig{Sig: nonblankSig},
+		},
 	}))
 }
 

@@ -1964,6 +1964,7 @@ func TestTxHandlerPostProcessError(t *testing.T) { //nolint:paralleltest // Not 
 		transactionMessagesTxnSigNotWellFormed.AddMetric(result)
 		transactionMessagesTxnMsigNotWellFormed.AddMetric(result)
 		transactionMessagesTxnLogicSig.AddMetric(result)
+		transactionMessagesTxnSponsorSigFailed.AddMetric(result)
 		return result
 	}
 	var txh TxHandler
@@ -1976,7 +1977,7 @@ func TestTxHandlerPostProcessError(t *testing.T) { //nolint:paralleltest // Not 
 	require.Len(t, result, 1)
 
 	counter := 0
-	for i := verify.TxGroupErrorReasonGeneric; i <= verify.TxGroupErrorReasonLogicSigFailed; i++ {
+	for i := verify.TxGroupErrorReasonGeneric; i <= verify.TxGroupErrorReasonSponsorSigFailed; i++ {
 		if i == verify.TxGroupErrorReasonNotWellFormed {
 			// skip TxGroupErrorReasonNotWellFormed, tested in TestPostProcessErrorWithVerify.
 			// the test uses global metric counters, skipping makes the test deterministic

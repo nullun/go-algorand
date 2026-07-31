@@ -21,12 +21,32 @@ import (
 
 	"github.com/stretchr/testify/require"
 
+	"github.com/algorand/go-algorand/config"
 	"github.com/algorand/go-algorand/crypto"
 	"github.com/algorand/go-algorand/data/basics"
 	"github.com/algorand/go-algorand/data/transactions"
 	"github.com/algorand/go-algorand/data/transactions/logic"
+	"github.com/algorand/go-algorand/protocol"
 	"github.com/algorand/go-algorand/test/partitiontest"
 )
+
+// verifyTxn prepares and verifies the signatures of a single transaction in a group.
+func verifyTxn(gi int, groupCtx *GroupContext) error {
+	batchVerifier := crypto.MakeBatchVerifier()
+	if err := txnBatchPrep(gi, groupCtx, batchVerifier); err != nil {
+		return err
+	}
+	return batchVerifier.Verify()
+}
+
+// sponsorLogicSigVersions returns the lowest LogicSig version a sponsor may use
+// under ConsensusFuture, and the highest version below it, which must be rejected.
+func sponsorLogicSigVersions(t *testing.T) (minVersion, belowMinVersion uint64) {
+	t.Helper()
+	proto := config.Consensus[protocol.ConsensusFuture]
+	require.NotZero(t, proto.MinSponsorLogicSigVersion, "no minimum sponsor LogicSig version configured")
+	return proto.MinSponsorLogicSigVersion, proto.MinSponsorLogicSigVersion - 1
+}
 
 func TestFeeSponsoredLogicSigVersion(t *testing.T) {
 	partitiontest.PartitionTest(t)
@@ -34,26 +54,28 @@ func TestFeeSponsoredLogicSigVersion(t *testing.T) {
 	senderSecrets, senderAddrs, _ := generateAccounts(1)
 	sender := senderAddrs[0]
 
+	minVersion, belowMinVersion := sponsorLogicSigVersions(t)
+
 	// Program that always returns 1
-	program12, err := logic.AssembleStringWithVersion("int 1", 12)
+	programBelowMin, err := logic.AssembleStringWithVersion("int 1", belowMinVersion)
 	require.NoError(t, err)
 
-	program13, err := logic.AssembleStringWithVersion("int 1", 13)
+	programAtMin, err := logic.AssembleStringWithVersion("int 1", minVersion)
 	require.NoError(t, err)
 
-	p12 := logic.Program(program12.Program)
-	p13 := logic.Program(program13.Program)
-	sponsor12 := basics.Address(crypto.HashObj(&p12))
-	sponsor13 := basics.Address(crypto.HashObj(&p13))
+	pBelow := logic.Program(programBelowMin.Program)
+	pAtMin := logic.Program(programAtMin.Program)
+	sponsorBelowMin := basics.Address(crypto.HashObj(&pBelow))
+	sponsorAtMin := basics.Address(crypto.HashObj(&pAtMin))
 
 	blkHdr := createFeeSponsoredBlockHeader()
 	dummyLedger := DummyLedgerForSignature{}
 
-	t.Run("Version12_ShouldFail", func(t *testing.T) {
-		tx := createFeeSponsoredPayment(sender, sponsor12, 1000, 1000)
+	t.Run("BelowMinVersion_ShouldFail", func(t *testing.T) {
+		tx := createFeeSponsoredPayment(sender, sponsorBelowMin, 1000, 1000)
 		stxn := tx.Sign(senderSecrets[0])
-		stxn.Ssig.Sponsor = sponsor12
-		stxn.Ssig.Lsig = transactions.LogicSig{Logic: program12.Program}
+		stxn.Ssig.Sponsor = sponsorBelowMin
+		stxn.Ssig.Lsig = transactions.LogicSig{Logic: programBelowMin.Program}
 
 		groupCtx, err := PrepareGroupContext([]transactions.SignedTxn{stxn}, blkHdr, &dummyLedger, nil)
 		require.NoError(t, err)
@@ -62,11 +84,11 @@ func TestFeeSponsoredLogicSigVersion(t *testing.T) {
 		require.ErrorIs(t, err, errSponsorLogicSigVersionTooLow)
 	})
 
-	t.Run("Version13_ShouldPass", func(t *testing.T) {
-		tx := createFeeSponsoredPayment(sender, sponsor13, 1000, 1000)
+	t.Run("MinVersion_ShouldPass", func(t *testing.T) {
+		tx := createFeeSponsoredPayment(sender, sponsorAtMin, 1000, 1000)
 		stxn := tx.Sign(senderSecrets[0])
-		stxn.Ssig.Sponsor = sponsor13
-		stxn.Ssig.Lsig = transactions.LogicSig{Logic: program13.Program}
+		stxn.Ssig.Sponsor = sponsorAtMin
+		stxn.Ssig.Lsig = transactions.LogicSig{Logic: programAtMin.Program}
 
 		groupCtx, err := PrepareGroupContext([]transactions.SignedTxn{stxn}, blkHdr, &dummyLedger, nil)
 		require.NoError(t, err)
@@ -84,17 +106,19 @@ func TestFeeSponsoredDelegatedLogicSigVersion(t *testing.T) {
 	sponsorSecrets, sponsorAddrs, _ := generateAccounts(1)
 	sponsor := sponsorAddrs[0]
 
+	minVersion, belowMinVersion := sponsorLogicSigVersions(t)
+
 	// Program that always returns 1
-	program12, err := logic.AssembleStringWithVersion("int 1", 12)
+	programBelowMin, err := logic.AssembleStringWithVersion("int 1", belowMinVersion)
 	require.NoError(t, err)
 
-	program13, err := logic.AssembleStringWithVersion("int 1", 13)
+	programAtMin, err := logic.AssembleStringWithVersion("int 1", minVersion)
 	require.NoError(t, err)
 
 	blkHdr := createFeeSponsoredBlockHeader()
 	dummyLedger := DummyLedgerForSignature{}
 
-	t.Run("DelegatedVersion12_ShouldFail", func(t *testing.T) {
+	t.Run("DelegatedBelowMinVersion_ShouldFail", func(t *testing.T) {
 		tx := createFeeSponsoredPayment(sender, sponsor, 1000, 1000)
 		stxn := tx.Sign(senderSecrets[0])
 		stxn.Ssig.Sponsor = sponsor
@@ -102,7 +126,7 @@ func TestFeeSponsoredDelegatedLogicSigVersion(t *testing.T) {
 		st := transactions.SponsoredTransaction{Txn: tx, Sponsor: sponsor}
 		sig := sponsorSecrets[0].Sign(st)
 
-		stxn.Ssig.Lsig = transactions.LogicSig{Logic: program12.Program, Sig: sig}
+		stxn.Ssig.Lsig = transactions.LogicSig{Logic: programBelowMin.Program, Sig: sig}
 
 		groupCtx, err := PrepareGroupContext([]transactions.SignedTxn{stxn}, blkHdr, &dummyLedger, nil)
 		require.NoError(t, err)
@@ -111,7 +135,7 @@ func TestFeeSponsoredDelegatedLogicSigVersion(t *testing.T) {
 		require.ErrorIs(t, err, errSponsorLogicSigVersionTooLow)
 	})
 
-	t.Run("DelegatedVersion13_ShouldPass", func(t *testing.T) {
+	t.Run("DelegatedMinVersion_ShouldPass", func(t *testing.T) {
 		tx := createFeeSponsoredPayment(sender, sponsor, 1000, 1000)
 		stxn := tx.Sign(senderSecrets[0])
 		stxn.Ssig.Sponsor = sponsor
@@ -119,7 +143,7 @@ func TestFeeSponsoredDelegatedLogicSigVersion(t *testing.T) {
 		st := transactions.SponsoredTransaction{Txn: tx, Sponsor: sponsor}
 		sig := sponsorSecrets[0].Sign(st)
 
-		stxn.Ssig.Lsig = transactions.LogicSig{Logic: program13.Program, Sig: sig}
+		stxn.Ssig.Lsig = transactions.LogicSig{Logic: programAtMin.Program, Sig: sig}
 
 		groupCtx, err := PrepareGroupContext([]transactions.SignedTxn{stxn}, blkHdr, &dummyLedger, nil)
 		require.NoError(t, err)

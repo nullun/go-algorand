@@ -92,6 +92,7 @@ var (
 	errFeeSponsoredNotSupported               = errors.New("nonempty SponsorSig but sponsoring is not supported")
 	errTxnSigHasIncompleteOrMissingSponsorSig = errors.New("signedtxn has incomplete or missing sponsor sig")
 	errSponsorLogicSigVersionTooLow           = errors.New("sponsor LogicSig version too low")
+	errSponsorSigOnUnsignedTxn                = errors.New("signedtxn has a sponsor sig but needs no signature")
 	errUnknownSignature                       = errors.New("has one mystery sig. WAT?")
 )
 
@@ -400,6 +401,11 @@ func stxnCoreChecks(gi int, groupCtx *GroupContext, batch crypto.BatchEnqueuer) 
 		// check ensures that this transaction cannot pay any fee, and
 		// cannot have any other interesting fields, except for the state proof payload.
 		if stxn.Txn.Sender == transactions.StateProofSender && stxn.Txn.Type == protocol.StateProofTx {
+			// Nothing verifies a sponsor signature on an unsigned transaction, so
+			// refuse to carry one rather than accept unchecked bytes.
+			if !stxn.Ssig.Blank() {
+				return &TxGroupError{err: errSponsorSigOnUnsignedTxn, GroupIndex: gi, Reason: TxGroupErrorReasonSponsorSigFailed}
+			}
 			return nil
 		}
 		return &TxGroupError{err: errTxnSigHasNoSig, GroupIndex: gi, Reason: TxGroupErrorReasonHasNoSig}

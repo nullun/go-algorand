@@ -117,6 +117,8 @@ var (
 	TransactionMessagesTxnMsigNotWellFormed = MetricName{Name: "algod_transaction_messages_msig_bad_formed", Description: "Number of transaction messages with bad formed msig"}
 	// TransactionMessagesTxnLogicSig "Number of transaction messages with invalid logic sig"
 	TransactionMessagesTxnLogicSig = MetricName{Name: "algod_transaction_messages_logic_sig_failed", Description: "Number of transaction messages with invalid logic sig"}
+	// TransactionMessagesTxnSponsorSigFailed "Number of transaction messages with invalid sponsor sig"
+	TransactionMessagesTxnSponsorSigFailed = MetricName{Name: "algod_transaction_messages_sponsor_sig_failed", Description: "Number of transaction messages with invalid sponsor sig"}
 	// TransactionMessagesTxnSigVerificationFailed "Number of transaction messages with signature verification failed"
 	TransactionMessagesTxnSigVerificationFailed = MetricName{Name: "algod_transaction_messages_sig_verify_failed", Description: "Number of transaction messages with signature verification failed"}
 	// TransactionMessagesBacklogErr "Number of transaction messages with some validation error"

@@ -1461,13 +1461,15 @@ func signPQRekeyTestTxn(t *testing.T, acct pqRekeyTestAccount, txn transactions.
 	require.NoError(t, err)
 
 	return transactions.SignedTxn{
-		Txn:      txn,
-		AuthAddr: authAddr,
-		PQsig: transactions.PQSig{
-			Scheme:    protocol.PQSchemeFalcon1024,
-			Salt:      acct.salt,
-			PublicKey: acct.publicKey,
-			Signature: signature,
+		Txn: txn,
+		SignatureFields: transactions.SignatureFields{
+			AuthAddr: authAddr,
+			PQsig: transactions.PQSig{
+				Scheme:    protocol.PQSchemeFalcon1024,
+				Salt:      acct.salt,
+				PublicKey: acct.publicKey,
+				Signature: signature,
+			},
 		},
 	}
 }
@@ -1649,7 +1651,7 @@ int 1`)
 			HbChallengeDiscount: true,
 		},
 	}
-	stxn := transactions.SignedTxn{Txn: txn, Lsig: transactions.LogicSig{Logic: acceptingProgram}}
+	stxn := transactions.SignedTxn{Txn: txn, SignatureFields: transactions.SignatureFields{Lsig: transactions.LogicSig{Logic: acceptingProgram}}}
 	txgroup := []transactions.SignedTxn{stxn}
 
 	require.NoError(t, eval.TestTransactionGroup(txgroup))

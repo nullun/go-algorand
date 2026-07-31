@@ -52,6 +52,7 @@ var transactionMessagesTxnNotWellFormed = metrics.MakeCounter(metrics.Transactio
 var transactionMessagesTxnSigNotWellFormed = metrics.MakeCounter(metrics.TransactionMessagesTxnSigNotWellFormed)
 var transactionMessagesTxnMsigNotWellFormed = metrics.MakeCounter(metrics.TransactionMessagesTxnMsigNotWellFormed)
 var transactionMessagesTxnLogicSig = metrics.MakeCounter(metrics.TransactionMessagesTxnLogicSig)
+var transactionMessagesTxnSponsorSigFailed = metrics.MakeCounter(metrics.TransactionMessagesTxnSponsorSigFailed)
 var transactionMessagesTxnSigVerificationFailed = metrics.MakeCounter(metrics.TransactionMessagesTxnSigVerificationFailed)
 var transactionMessagesBacklogErr = metrics.MakeCounter(metrics.TransactionMessagesBacklogErr)
 var transactionMessagesRemember = metrics.MakeCounter(metrics.TransactionMessagesRemember)
@@ -396,6 +397,8 @@ func (handler *TxHandler) postProcessReportErrors(err error) {
 			transactionMessagesTxnMsigNotWellFormed.Inc(nil)
 		case verify.TxGroupErrorReasonLogicSigFailed:
 			transactionMessagesTxnLogicSig.Inc(nil)
+		case verify.TxGroupErrorReasonSponsorSigFailed:
+			transactionMessagesTxnSponsorSigFailed.Inc(nil)
 		default:
 			transactionMessagesBacklogErr.Inc(nil)
 		}

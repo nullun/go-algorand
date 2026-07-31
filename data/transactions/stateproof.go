@@ -41,6 +41,7 @@ var errNoteMustBeEmptyInStateproofTxn = errors.New("note must be empty in state-
 var errGroupMustBeZeroInStateproofTxn = errors.New("group must be zero in state-proof transaction")
 var errRekeyToMustBeZeroInStateproofTxn = errors.New("rekey must be zero in state-proof transaction")
 var errLeaseMustBeZeroInStateproofTxn = errors.New("lease must be zero in state-proof transaction")
+var errFeeSponsoredMustBeUnsetInStateproofTxn = errors.New("fee sponsored must be unset in state-proof transaction")
 
 // wellFormed performs stateless checks on the StateProof transaction
 func (sp StateProofTxnFields) wellFormed(header Header) error {
@@ -65,6 +66,11 @@ func (sp StateProofTxnFields) wellFormed(header Header) error {
 	}
 	if header.Lease != [32]byte{} {
 		return errLeaseMustBeZeroInStateproofTxn
+	}
+	// A state proof pays no fee and carries no signature, so there is nothing
+	// for a sponsor to pay and no sponsor signature to check.
+	if header.FeeSponsored {
+		return errFeeSponsoredMustBeUnsetInStateproofTxn
 	}
 	return nil
 }

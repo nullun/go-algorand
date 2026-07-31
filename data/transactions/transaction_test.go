@@ -262,7 +262,7 @@ func TestHeaderFieldCount(t *testing.T) {
 
 	// Such a new field should probably also be consensus flagged at the end of
 	// transaction.WellFormed()
-	assert.Equal(t, 11, reflect.TypeFor[Header]().NumField())
+	assert.Equal(t, 12, reflect.TypeFor[Header]().NumField())
 }
 
 // TestFeeFactor_BigNotes tests the FeeFactor calculation with various Note sizes
@@ -745,8 +745,10 @@ func TestSummarizeFees_BigLogicSigProgram(t *testing.T) {
 	t.Run("vFuture: single txn with large LogicSig program", func(t *testing.T) {
 		stxn := SignedTxn{
 			Txn: makeTxn(2000),
-			Lsig: LogicSig{
-				Logic: make([]byte, freeSize+500),
+			SignatureFields: SignatureFields{
+				Lsig: LogicSig{
+					Logic: make([]byte, freeSize+500),
+				},
 			},
 		}
 
@@ -759,8 +761,10 @@ func TestSummarizeFees_BigLogicSigProgram(t *testing.T) {
 	t.Run("vFuture: size pooling can cover LogicSig program bytes", func(t *testing.T) {
 		stxn1 := SignedTxn{
 			Txn: makeTxn(1000),
-			Lsig: LogicSig{
-				Logic: make([]byte, freeSize+500),
+			SignatureFields: SignatureFields{
+				Lsig: LogicSig{
+					Logic: make([]byte, freeSize+500),
+				},
 			},
 		}
 		stxn2 := SignedTxn{
@@ -779,8 +783,10 @@ func TestSummarizeFees_BigLogicSigProgram(t *testing.T) {
 	t.Run("vFuture: LogicSig program bytes beyond size pool increase usage", func(t *testing.T) {
 		stxn1 := SignedTxn{
 			Txn: makeTxn(1000),
-			Lsig: LogicSig{
-				Logic: make([]byte, freeSize*2+500),
+			SignatureFields: SignatureFields{
+				Lsig: LogicSig{
+					Logic: make([]byte, freeSize*2+500),
+				},
 			},
 		}
 		stxn2 := SignedTxn{
@@ -799,9 +805,11 @@ func TestSummarizeFees_BigLogicSigProgram(t *testing.T) {
 	t.Run("vFuture: LogicSig args do not affect program surcharge", func(t *testing.T) {
 		stxn1 := SignedTxn{
 			Txn: makeTxn(1000),
-			Lsig: LogicSig{
-				Logic: make([]byte, freeSize+500),
-				Args:  [][]byte{make([]byte, 600)},
+			SignatureFields: SignatureFields{
+				Lsig: LogicSig{
+					Logic: make([]byte, freeSize+500),
+					Args:  [][]byte{make([]byte, 600)},
+				},
 			},
 		}
 		stxn2 := SignedTxn{

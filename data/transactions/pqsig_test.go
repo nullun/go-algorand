@@ -108,7 +108,8 @@ func TestPQDecodeBoundsFeedSignedTxnMaxSize(t *testing.T) {
 		5 + LogicSigMaxSize() +
 		6 + expectedPQSigMaxSize +
 		4 + TransactionMaxSize() +
-		5 + basics.AddressMaxSize()
+		5 + basics.AddressMaxSize() +
+		5 + SponsorSigMaxSize()
 	require.Equal(t, expectedSignedTxnMaxSize, SignedTxnMaxSize())
 }
 

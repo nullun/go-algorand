@@ -785,9 +785,13 @@ var delegateAssetCmd = &cobra.Command{
 		sender := accountList.getAddressByName(account)
 		toAddressResolved := accountList.getAddressByName(toAddress)
 
-		// Revoke always uses amount 0, delegate uses the specified amount
+		// Revoke always uses amount 0, delegate uses the specified amount.
+		// Rather than silently discard an --amount the caller asked for, reject it.
 		delegateAmount := amount
 		if revokeAsset {
+			if cmd.Flags().Changed("amount") {
+				reportErrorln("goal asset delegate --revoke does not take --amount; a revoked holding must already hold zero units")
+			}
 			delegateAmount = 0
 		}
 

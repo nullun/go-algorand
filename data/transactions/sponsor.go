@@ -31,12 +31,12 @@ type SponsorSig struct {
 
 // Blank returns true if there is no content in this SponsorSig.
 func (ssig *SponsorSig) Blank() bool {
-	return ssig.Sponsor.IsZero() && ssig.Sig.Blank() && ssig.Msig.Blank() && ssig.Lsig.Blank() && ssig.AuthAddr.IsZero()
+	return ssig.Sponsor.IsZero() && ssig.SignatureFields.Blank()
 }
 
-// Equal returns true if two SponsorSig are equal, including Address and AuthAddr.
+// Equal returns true if two SponsorSig are equal, including Sponsor and AuthAddr.
 func (ssig *SponsorSig) Equal(b *SponsorSig) bool {
-	return ssig.Sponsor == b.Sponsor && ssig.Sig == b.Sig && ssig.Msig.Equal(b.Msig) && ssig.Lsig.Equal(&b.Lsig) && ssig.AuthAddr == b.AuthAddr
+	return ssig.Sponsor == b.Sponsor && ssig.SignatureFields.Equal(&b.SignatureFields)
 }
 
 // SponsoredTransaction wraps a transaction with the sponsor address for domain-separated signing.

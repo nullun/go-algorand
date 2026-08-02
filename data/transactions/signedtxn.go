@@ -51,6 +51,20 @@ type SignatureFields struct {
 	AuthAddr basics.Address `codec:"sgnr"`
 }
 
+// Blank returns true if no signature of any kind, and no AuthAddr, is present.
+// Every signature category must be checked here: callers use this to decide
+// whether there is anything to verify, so a category omitted from this check
+// would travel over the wire unverified.
+func (s *SignatureFields) Blank() bool {
+	return s.Sig.Blank() && s.Msig.Blank() && s.Lsig.Blank() && s.PQsig.Blank() && s.AuthAddr.IsZero()
+}
+
+// Equal returns true if two SignatureFields hold the same signatures and AuthAddr.
+func (s *SignatureFields) Equal(b *SignatureFields) bool {
+	return s.Sig == b.Sig && s.Msig.Equal(b.Msig) && s.Lsig.Equal(&b.Lsig) &&
+		s.PQsig.Equal(b.PQsig) && s.AuthAddr == b.AuthAddr
+}
+
 // SignedTxnInBlock is how a signed transaction is encoded in a block.
 type SignedTxnInBlock struct {
 	_struct struct{} `codec:",omitempty,omitemptyarray"`

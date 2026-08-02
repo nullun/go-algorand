@@ -76,7 +76,6 @@ var (
 
 	// Fee sponsorship flags
 	sponsorAddress string
-	feeSponsored   bool
 
 	simulateStartRound            basics.Round
 	simulateAllowEmptySignatures  bool
@@ -187,9 +186,6 @@ func init() {
 	sponsorCmd.MarkFlagRequired("infile")
 	sponsorCmd.MarkFlagRequired("outfile")
 	sponsorCmd.MarkFlagRequired("sponsor")
-
-	// Add --fee-sponsored flag to send command
-	sendCmd.Flags().BoolVar(&feeSponsored, "fee-sponsored", false, "Mark transaction as fee-sponsored (fee will be paid by a sponsor)")
 }
 
 var clerkCmd = &cobra.Command{
@@ -275,6 +271,14 @@ func writeSignedTxnsToFile(stxns []transactions.SignedTxn, filename string) erro
 }
 
 func writeTxnToFile(client libgoal.Client, signTx bool, dataDir string, walletName string, tx transactions.Transaction, filename string) error {
+	// A sponsored transaction can only leave goal as a file, since it is not
+	// valid until its sponsor signs it, so this is the one place that needs to
+	// honour --fee-sponsored. goal clerk send writes its own file and sets the
+	// field itself.
+	if feeSponsored {
+		tx.FeeSponsored = true
+	}
+
 	var authAddr basics.Address
 	var err error
 	if signerAddress != "" {

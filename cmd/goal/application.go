@@ -187,6 +187,9 @@ func init() {
 	addTxnFlags(closeOutAppCmd)
 	addTxnFlags(clearAppCmd)
 	addTxnFlags(methodAppCmd)
+	// "goal app method" produces a transaction group, and a sponsor signature
+	// covers a single transaction, so fee sponsorship is not offered here.
+	markNoFeeSponsorship(methodAppCmd)
 
 	readStateAppCmd.Flags().BoolVar(&fetchLocal, "local", false, "Fetch account-specific state for this application. `--from` address is required when using this flag")
 	readStateAppCmd.Flags().BoolVar(&fetchGlobal, "global", false, "Fetch global state for this application.")

@@ -17,6 +17,8 @@
 package main
 
 import (
+	"errors"
+
 	"github.com/spf13/cobra"
 
 	"github.com/algorand/go-algorand/data/basics"
@@ -48,6 +50,7 @@ var (
 	lease           string
 	noWaitAfterSend bool
 	rekeyToAddress  string
+	feeSponsored    bool
 )
 
 func addTxnFlags(cmd *cobra.Command) {
@@ -63,6 +66,41 @@ func addTxnFlags(cmd *cobra.Command) {
 	cmd.Flags().BoolVarP(&noWaitAfterSend, "no-wait", "N", false, "Don't wait for transaction to commit")
 	cmd.Flags().StringVarP(&signerAddress, "signer", "S", "", "Address of key to sign with, if different from transaction \"from\" address due to rekeying")
 	cmd.Flags().StringVar(&rekeyToAddress, "rekey-to", "", "Rekey account to the given spending key/address. (Future transactions from this account will need to be signed with the new key.)")
+	cmd.Flags().BoolVar(&feeSponsored, "fee-sponsored", false, "Mark transaction as fee-sponsored (fee will be paid by a sponsor). Requires -o, since the sponsor must sign the transaction with \"goal clerk sponsor\" before it can be submitted")
+
+	// Attached here so the checks cover exactly the commands that offer the flag.
+	cmd.PreRunE = func(cmd *cobra.Command, _ []string) error {
+		if !feeSponsored {
+			return nil
+		}
+		if _, ok := cmd.Annotations[noFeeSponsorship]; ok {
+			return errors.New("--fee-sponsored is not supported by " + cmd.CommandPath())
+		}
+		// A fee-sponsored transaction is incomplete until its sponsor signs it, so
+		// it cannot be broadcast from here. Say so, rather than letting the node
+		// reject the transaction.
+		if outFilename == "" {
+			return errors.New("--fee-sponsored requires -o: the transaction must be signed by its sponsor with \"goal clerk sponsor\" before it can be submitted")
+		}
+		return nil
+	}
+}
+
+// noFeeSponsorship marks a command that takes the shared transaction flags but
+// cannot honour --fee-sponsored. Set it with markNoFeeSponsorship.
+const noFeeSponsorship = "noFeeSponsorship"
+
+// markNoFeeSponsorship hides --fee-sponsored on a command and makes using it an
+// error. For commands that produce something other than one signed transaction,
+// since a sponsor signature covers a single transaction.
+func markNoFeeSponsorship(cmd *cobra.Command) {
+	if cmd.Annotations == nil {
+		cmd.Annotations = make(map[string]string)
+	}
+	cmd.Annotations[noFeeSponsorship] = "true"
+	if err := cmd.Flags().MarkHidden("fee-sponsored"); err != nil {
+		panic(err) // only fails if the flag is missing, which would be a bug here
+	}
 }
 
 func parseRekey(rekeyToAddress string) basics.Address {

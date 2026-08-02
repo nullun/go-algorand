@@ -18,6 +18,7 @@ package main
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/spf13/cobra"
 
@@ -66,9 +67,17 @@ func addTxnFlags(cmd *cobra.Command) {
 	cmd.Flags().BoolVarP(&noWaitAfterSend, "no-wait", "N", false, "Don't wait for transaction to commit")
 	cmd.Flags().StringVarP(&signerAddress, "signer", "S", "", "Address of key to sign with, if different from transaction \"from\" address due to rekeying")
 	cmd.Flags().StringVar(&rekeyToAddress, "rekey-to", "", "Rekey account to the given spending key/address. (Future transactions from this account will need to be signed with the new key.)")
-	cmd.Flags().BoolVar(&feeSponsored, "fee-sponsored", false, "Mark transaction as fee-sponsored (fee will be paid by a sponsor). Requires -o, since the sponsor must sign the transaction with \"goal clerk sponsor\" before it can be submitted")
+	addFeeSponsoredFlag(cmd, "out")
+}
 
-	// Attached here so the checks cover exactly the commands that offer the flag.
+// addFeeSponsoredFlag offers --fee-sponsored on a command that builds a single
+// transaction. outputFlag names the flag that command uses to write the
+// transaction to a file, which is not always "out".
+func addFeeSponsoredFlag(cmd *cobra.Command, outputFlag string) {
+	cmd.Flags().BoolVar(&feeSponsored, "fee-sponsored", false,
+		fmt.Sprintf("Mark transaction as fee-sponsored (fee will be paid by a sponsor). Requires --%s, since the sponsor must sign the transaction with \"goal clerk sponsor\" before it can be submitted", outputFlag))
+
+	// Attached here so the checks cover exactly the commands offering the flag.
 	cmd.PreRunE = func(cmd *cobra.Command, _ []string) error {
 		if !feeSponsored {
 			return nil
@@ -79,8 +88,16 @@ func addTxnFlags(cmd *cobra.Command) {
 		// A fee-sponsored transaction is incomplete until its sponsor signs it, so
 		// it cannot be broadcast from here. Say so, rather than letting the node
 		// reject the transaction.
-		if outFilename == "" {
-			return errors.New("--fee-sponsored requires -o: the transaction must be signed by its sponsor with \"goal clerk sponsor\" before it can be submitted")
+		f := cmd.Flags().Lookup(outputFlag)
+		if f == nil {
+			return fmt.Errorf("--fee-sponsored is wired to --%s, which %s does not have", outputFlag, cmd.CommandPath())
+		}
+		if f.Value.String() == "" {
+			name := "--" + outputFlag
+			if f.Shorthand != "" {
+				name += " (-" + f.Shorthand + ")"
+			}
+			return errors.New("--fee-sponsored requires " + name + ": the transaction must be signed by its sponsor with \"goal clerk sponsor\" before it can be submitted")
 		}
 		return nil
 	}

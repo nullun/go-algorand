@@ -25,14 +25,17 @@ import (
 	"github.com/algorand/go-algorand/test/partitiontest"
 )
 
+// outputFlagNames are the flags goal commands use to write a transaction to a
+// file. A command offering --fee-sponsored must have exactly one of them, since
+// a sponsored transaction can only leave goal as a file.
+var outputFlagNames = []string{"out", "txfile"}
+
 // feeSponsoredCommands returns every command offering --fee-sponsored, split by
 // whether the command can honour it.
-func feeSponsoredCommands(t *testing.T) (supported, rejected []*cobra.Command) {
-	t.Helper()
-
+func feeSponsoredCommands() (supported, rejected []*cobra.Command) {
 	var walk func(c *cobra.Command)
 	walk = func(c *cobra.Command) {
-		if f := c.Flags().Lookup("fee-sponsored"); f != nil {
+		if c.Flags().Lookup("fee-sponsored") != nil {
 			if _, no := c.Annotations[noFeeSponsorship]; no {
 				rejected = append(rejected, c)
 			} else {
@@ -47,31 +50,55 @@ func feeSponsoredCommands(t *testing.T) (supported, rejected []*cobra.Command) {
 	return
 }
 
+// outputFlagOf returns the single file-output flag a command uses.
+func outputFlagOf(t *testing.T, cmd *cobra.Command) string {
+	t.Helper()
+
+	var found []string
+	for _, name := range outputFlagNames {
+		if cmd.Flags().Lookup(name) != nil {
+			found = append(found, name)
+		}
+	}
+	require.Lenf(t, found, 1, "%s offers --fee-sponsored but has %v file-output flags, expected exactly one of %v",
+		cmd.CommandPath(), found, outputFlagNames)
+	return found[0]
+}
+
 // TestFeeSponsoredFlagIsGuarded pins the two ways --fee-sponsored can be misused:
-// asking for it on a command that cannot apply it, and asking for it without -o,
-// which would broadcast a transaction that no sponsor has signed.
+// asking for it on a command that cannot apply it, and asking for it without a
+// file to write to, which would broadcast a transaction no sponsor has signed.
+// The guard has to name whichever output flag the command actually uses, which
+// is --txfile for the keyreg commands and --out for the rest.
 func TestFeeSponsoredFlagIsGuarded(t *testing.T) {
 	partitiontest.PartitionTest(t)
 
-	supported, rejected := feeSponsoredCommands(t)
+	supported, rejected := feeSponsoredCommands()
 	require.NotEmpty(t, supported, "no command offers --fee-sponsored")
 
-	defer func(sponsored bool, out string) {
-		feeSponsored, outFilename = sponsored, out
-	}(feeSponsored, outFilename)
+	defer func(sponsored bool) { feeSponsored = sponsored }(feeSponsored)
 
 	for _, cmd := range supported {
 		t.Run(cmd.CommandPath(), func(t *testing.T) {
 			require.NotNil(t, cmd.PreRunE, "%s has no --fee-sponsored guard", cmd.CommandPath())
+			out := outputFlagOf(t, cmd)
+			defer func() {
+				feeSponsored = false
+				require.NoError(t, cmd.Flags().Set(out, ""))
+			}()
 
-			feeSponsored, outFilename = false, ""
+			feeSponsored = false
+			require.NoError(t, cmd.Flags().Set(out, ""))
 			require.NoError(t, cmd.PreRunE(cmd, nil), "unsponsored use must not be blocked")
 
-			feeSponsored, outFilename = true, ""
-			require.ErrorContains(t, cmd.PreRunE(cmd, nil), "requires -o",
+			feeSponsored = true
+			err := cmd.PreRunE(cmd, nil)
+			require.ErrorContains(t, err, "--"+out,
+				"%s must point at its own output flag", cmd.CommandPath())
+			require.ErrorContains(t, err, "requires",
 				"%s would broadcast a transaction with no sponsor signature", cmd.CommandPath())
 
-			feeSponsored, outFilename = true, "out.txn"
+			require.NoError(t, cmd.Flags().Set(out, "txn.out"))
 			require.NoError(t, cmd.PreRunE(cmd, nil))
 		})
 	}
@@ -80,9 +107,27 @@ func TestFeeSponsoredFlagIsGuarded(t *testing.T) {
 		t.Run(cmd.CommandPath(), func(t *testing.T) {
 			require.True(t, cmd.Flags().Lookup("fee-sponsored").Hidden,
 				"%s rejects --fee-sponsored but still advertises it", cmd.CommandPath())
+			defer func() { feeSponsored = false }()
 
-			feeSponsored, outFilename = true, "out.txn"
+			feeSponsored = true
 			require.ErrorContains(t, cmd.PreRunE(cmd, nil), "not supported")
 		})
+	}
+}
+
+// TestKeyregCommandsOfferFeeSponsorship pins that the keyreg commands able to
+// write a transaction to a file offer sponsorship. Going online with incentive
+// eligibility costs Payouts.GoOnlineFee, the fee most likely to be sponsored.
+func TestKeyregCommandsOfferFeeSponsorship(t *testing.T) {
+	partitiontest.PartitionTest(t)
+
+	supported, _ := feeSponsoredCommands()
+	paths := make(map[string]bool, len(supported))
+	for _, cmd := range supported {
+		paths[cmd.CommandPath()] = true
+	}
+
+	for _, path := range []string{"goal account changeonlinestatus", "goal account marknonparticipating"} {
+		require.Truef(t, paths[path], "%s no longer offers --fee-sponsored", path)
 	}
 }

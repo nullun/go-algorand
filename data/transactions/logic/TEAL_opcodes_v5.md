@@ -423,6 +423,8 @@ Fields (see [transaction reference](https://developer.algorand.org/docs/referenc
 | 60 | CreatedAssetID | uint64 | v5  | Asset ID allocated by the creation of an ASA (only with `itxn` in v5). Application mode only |
 | 61 | CreatedApplicationID | uint64 | v5  | ApplicationID allocated by the creation of an application (only with `itxn` in v5). Application mode only |
 
+The effects fields (`Logs`, `NumLogs`, `CreatedAssetID`, `CreatedApplicationID`) may only be read from inner transactions, with `itxn` and `itxna`. Reading them from top-level transactions fails.
+
 ## global
 
 - Syntax: `global F` where F: [global Fields](#global-fields)
@@ -775,11 +777,13 @@ When A is a uint64, index 0 is the least significant bit. Setting bit 3 to 1 on 
 
 - Bytecode: 0x60
 - Stack: ..., A &rarr; ..., uint64
-- balance for account A, in microalgos. The balance is observed after the effects of previous transactions in the group, and after the fee for the current transaction is deducted. Changes caused by inner transactions are observable immediately following `itxn_submit`
+- balance for account A, in microalgos. The balance is observed after the effects of previous transactions in the group, and after the fee for the current transaction is deducted
 - Availability: v2
 - Mode: Application
 
-params: Txn.Accounts offset (or, since v4, an _available_ account address). Return: value.
+params: Txn.Accounts offset or an _available_ account address. Return: value.
+
+Changes caused by inner transactions are observable immediately following `itxn_submit`.
 
 ## app_opted_in
 
@@ -789,7 +793,7 @@ params: Txn.Accounts offset (or, since v4, an _available_ account address). Retu
 - Availability: v2
 - Mode: Application
 
-params: Txn.Accounts offset (or, since v4, an _available_ account address), _available_ application id (or, since v4, a Txn.ForeignApps offset). Return: 1 if opted in and 0 otherwise.
+params: Txn.Accounts offset or an _available_ account address, _available_ application id or a Txn.ForeignApps offset. Return: 1 if opted in and 0 otherwise.
 
 ## app_local_get
 
@@ -799,7 +803,7 @@ params: Txn.Accounts offset (or, since v4, an _available_ account address), _ava
 - Availability: v2
 - Mode: Application
 
-params: Txn.Accounts offset (or, since v4, an _available_ account address), state key. Return: value. The value is zero (of type uint64) if the key does not exist.
+params: Txn.Accounts offset or an _available_ account address, state key. Return: value. The value is zero (of type uint64) if the key does not exist.
 
 ## app_local_get_ex
 
@@ -809,7 +813,7 @@ params: Txn.Accounts offset (or, since v4, an _available_ account address), stat
 - Availability: v2
 - Mode: Application
 
-params: Txn.Accounts offset (or, since v4, an _available_ account address), _available_ application id (or, since v4, a Txn.ForeignApps offset), state key. Return: did_exist flag (top of the stack, 1 if the application and key existed and 0 otherwise), value. The value is zero (of type uint64) if the key does not exist.
+params: Txn.Accounts offset or an _available_ account address, _available_ application id or a Txn.ForeignApps offset, state key. Return: did_exist flag (top of the stack, 1 if the application and key existed and 0 otherwise), value. The value is zero (of type uint64) if the key does not exist.
 
 ## app_global_get
 
@@ -829,7 +833,7 @@ params: state key. Return: value. The value is zero (of type uint64) if the key 
 - Availability: v2
 - Mode: Application
 
-params: Txn.ForeignApps offset (or, since v4, an _available_ application id), state key. Return: did_exist flag (top of the stack, 1 if the application and key existed and 0 otherwise), value. The value is zero (of type uint64) if the key does not exist.
+params: Txn.ForeignApps offset or an _available_ application id, state key. Return: did_exist flag (top of the stack, 1 if the application and key existed and 0 otherwise), value. The value is zero (of type uint64) if the key does not exist.
 
 ## app_local_put
 
@@ -839,7 +843,7 @@ params: Txn.ForeignApps offset (or, since v4, an _available_ application id), st
 - Availability: v2
 - Mode: Application
 
-params: Txn.Accounts offset (or, since v4, an _available_ account address), state key, value.
+params: Txn.Accounts offset or an _available_ account address, state key, value.
 
 ## app_global_put
 
@@ -857,7 +861,7 @@ params: Txn.Accounts offset (or, since v4, an _available_ account address), stat
 - Availability: v2
 - Mode: Application
 
-params: Txn.Accounts offset (or, since v4, an _available_ account address), state key.
+params: Txn.Accounts offset or an _available_ account address, state key.
 
 Deleting a key which is already absent has no effect on the application local state. (In particular, it does _not_ cause the program to fail.)
 
@@ -889,7 +893,7 @@ Deleting a key which is already absent has no effect on the application global s
 | 0 | AssetBalance | uint64 | Amount of the asset unit held by this account |
 | 1 | AssetFrozen | bool | Is the asset frozen or not |
 
-params: Txn.Accounts offset (or, since v4, an _available_ address), asset id (or, since v4, a Txn.ForeignAssets offset). Return: did_exist flag (1 if the asset existed and 0 otherwise), value.
+params: Txn.Accounts offset or an _available_ address, asset id or a Txn.ForeignAssets offset. Return: did_exist flag (1 if the asset existed and 0 otherwise), value.
 
 ## asset_params_get
 
@@ -917,7 +921,7 @@ params: Txn.Accounts offset (or, since v4, an _available_ address), asset id (or
 | 10 | AssetClawback | address |      | Clawback address |
 | 11 | AssetCreator | address | v5  | Creator address |
 
-params: Txn.ForeignAssets offset (or, since v4, an _available_ asset id). Return: did_exist flag (1 if the asset existed and 0 otherwise), value.
+params: Txn.ForeignAssets offset or an _available_ asset id. Return: did_exist flag (1 if the asset existed and 0 otherwise), value.
 
 ## app_params_get
 
@@ -948,11 +952,13 @@ params: Txn.ForeignApps offset or an _available_ app id. Return: did_exist flag 
 
 - Bytecode: 0x78
 - Stack: ..., A &rarr; ..., uint64
-- minimum required balance for account A, in microalgos. Required balance is affected by ASA, App, and Box usage. When creating or opting into an app, the minimum balance grows before the app code runs, therefore the increase is visible there. When deleting or closing out, the minimum balance decreases after the app executes. Changes caused by inner transactions or box usage are observable immediately following the opcode effecting the change.
+- minimum required balance for account A, in microalgos
 - Availability: v3
 - Mode: Application
 
-params: Txn.Accounts offset (or, since v4, an _available_ account address). Return: value.
+params: Txn.Accounts offset or an _available_ account address. Return: value.
+
+Required balance is affected by ASA and App usage. When creating or opting into an app, the minimum balance grows before the app code runs, therefore the increase is visible there. When deleting or closing out, the minimum balance decreases after the app executes. Changes caused by inner transactions are observable immediately following `itxn_submit`.
 
 ## pushbytes
 
@@ -1211,6 +1217,8 @@ The default Fee is the additional amount that would make the group's fees suffic
 - field F of the last inner transaction
 - Availability: v5
 - Mode: Application
+
+`GroupIndex` and `TxID` are not available on inner transactions.
 
 ## itxna
 

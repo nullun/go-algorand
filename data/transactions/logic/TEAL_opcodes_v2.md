@@ -520,11 +520,11 @@ See `bnz` for details on how branches work. `b` always jumps to the offset.
 
 - Bytecode: 0x60
 - Stack: ..., A: uint64 &rarr; ..., uint64
-- balance for account A, in microalgos. The balance is observed after the effects of previous transactions in the group, and after the fee for the current transaction is deducted. Changes caused by inner transactions are observable immediately following `itxn_submit`
+- balance for account A, in microalgos. The balance is observed after the effects of previous transactions in the group, and after the fee for the current transaction is deducted
 - Availability: v2
 - Mode: Application
 
-params: Txn.Accounts offset (or, since v4, an _available_ account address). Return: value.
+params: Txn.Accounts offset. Return: value.
 
 ## app_opted_in
 
@@ -534,7 +534,7 @@ params: Txn.Accounts offset (or, since v4, an _available_ account address). Retu
 - Availability: v2
 - Mode: Application
 
-params: Txn.Accounts offset (or, since v4, an _available_ account address), _available_ application id (or, since v4, a Txn.ForeignApps offset). Return: 1 if opted in and 0 otherwise.
+params: Txn.Accounts offset, _available_ application id. Return: 1 if opted in and 0 otherwise.
 
 ## app_local_get
 
@@ -544,7 +544,7 @@ params: Txn.Accounts offset (or, since v4, an _available_ account address), _ava
 - Availability: v2
 - Mode: Application
 
-params: Txn.Accounts offset (or, since v4, an _available_ account address), state key. Return: value. The value is zero (of type uint64) if the key does not exist.
+params: Txn.Accounts offset, state key. Return: value. The value is zero (of type uint64) if the key does not exist.
 
 ## app_local_get_ex
 
@@ -554,7 +554,7 @@ params: Txn.Accounts offset (or, since v4, an _available_ account address), stat
 - Availability: v2
 - Mode: Application
 
-params: Txn.Accounts offset (or, since v4, an _available_ account address), _available_ application id (or, since v4, a Txn.ForeignApps offset), state key. Return: did_exist flag (top of the stack, 1 if the application and key existed and 0 otherwise), value. The value is zero (of type uint64) if the key does not exist.
+params: Txn.Accounts offset, _available_ application id, state key. Return: did_exist flag (top of the stack, 1 if the application and key existed and 0 otherwise), value. The value is zero (of type uint64) if the key does not exist.
 
 ## app_global_get
 
@@ -574,7 +574,7 @@ params: state key. Return: value. The value is zero (of type uint64) if the key 
 - Availability: v2
 - Mode: Application
 
-params: Txn.ForeignApps offset (or, since v4, an _available_ application id), state key. Return: did_exist flag (top of the stack, 1 if the application and key existed and 0 otherwise), value. The value is zero (of type uint64) if the key does not exist.
+params: Txn.ForeignApps offset, state key. Return: did_exist flag (top of the stack, 1 if the application and key existed and 0 otherwise), value. The value is zero (of type uint64) if the key does not exist.
 
 ## app_local_put
 
@@ -584,7 +584,7 @@ params: Txn.ForeignApps offset (or, since v4, an _available_ application id), st
 - Availability: v2
 - Mode: Application
 
-params: Txn.Accounts offset (or, since v4, an _available_ account address), state key, value.
+params: Txn.Accounts offset, state key, value.
 
 ## app_global_put
 
@@ -602,7 +602,7 @@ params: Txn.Accounts offset (or, since v4, an _available_ account address), stat
 - Availability: v2
 - Mode: Application
 
-params: Txn.Accounts offset (or, since v4, an _available_ account address), state key.
+params: Txn.Accounts offset, state key.
 
 Deleting a key which is already absent has no effect on the application local state. (In particular, it does _not_ cause the program to fail.)
 
@@ -634,7 +634,7 @@ Deleting a key which is already absent has no effect on the application global s
 | 0 | AssetBalance | uint64 | Amount of the asset unit held by this account |
 | 1 | AssetFrozen | bool | Is the asset frozen or not |
 
-params: Txn.Accounts offset (or, since v4, an _available_ address), asset id (or, since v4, a Txn.ForeignAssets offset). Return: did_exist flag (1 if the asset existed and 0 otherwise), value.
+params: Txn.Accounts offset, asset id. Return: did_exist flag (1 if the asset existed and 0 otherwise), value.
 
 ## asset_params_get
 
@@ -661,4 +661,4 @@ params: Txn.Accounts offset (or, since v4, an _available_ address), asset id (or
 | 9 | AssetFreeze | address | Freeze address |
 | 10 | AssetClawback | address | Clawback address |
 
-params: Txn.ForeignAssets offset (or, since v4, an _available_ asset id). Return: did_exist flag (1 if the asset existed and 0 otherwise), value.
+params: Txn.ForeignAssets offset. Return: did_exist flag (1 if the asset existed and 0 otherwise), value.

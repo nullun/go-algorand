@@ -425,6 +425,8 @@ Fields (see [transaction reference](https://developer.algorand.org/docs/referenc
 | 62 | LastLog | []byte | v6  | The last message emitted. Empty bytes if none were emitted. Application mode only |
 | 63 | StateProofPK | [64]byte | v6  | State proof public key |
 
+The effects fields (`Logs`, `NumLogs`, `LastLog`, `CreatedAssetID`, `CreatedApplicationID`) of a top-level application call may be read with `gtxn`, `gtxns`, and their array forms, but only from transactions earlier in the group than the one executing. The effects of inner transactions are read with `itxn` and `gitxn`.
+
 ## global
 
 - Syntax: `global F` where F: [global Fields](#global-fields)
@@ -588,13 +590,9 @@ for notes on transaction fields available, see `txn`. If top of stack is _i_, `g
 - Stack: ..., A: uint64 &rarr; ...
 - branch to TARGET if value A is not zero
 
-From v1 to v12, the `bnz` opcode byte 0x40 is followed by exactly two immediate bytes, high byte first, which together form a 16 bit offset N. The instruction is 3 bytes long. For a bnz instruction at `pc`, if the last element of the stack is not zero then branch to the instruction at `pc + 3 + N`, else proceed to the next instruction at `pc + 3`. Starting at v4, the offset is treated as a signed 16 bit integer allowing for backward branches and looping. In prior version (v1 to v3), branch offsets are limited to forward branches only, 0-0x7fff.
+The `bnz` opcode byte 0x40 is followed by exactly two immediate bytes, high byte first, which together form a signed 16 bit offset N, allowing for backward branches and looping. The instruction is 3 bytes long. For a bnz instruction at `pc`, if the last element of the stack is not zero then branch to the instruction at `pc + 3 + N`, else proceed to the next instruction at `pc + 3`.
 
-Starting at v13, the offset is encoded as a `binary.Varint` (zigzag plus ULEB128) of one or more bytes, so the instruction is `1 + len(offset)` bytes long. A non-negative offset N is measured from the end of the instruction: execution continues at `pc + 1 + len(offset) + N`. A negative offset N is measured from the start of the instruction: execution continues at `pc + N`. Not branching always continues at `pc + 1 + len(offset)`. A branch to the start of its own instruction cannot be encoded, since a zero offset means the following instruction; the assembler rejects the attempt.
-
-Branch targets must be aligned instructions at every version. (e.g. Branching to the second byte of a 2 byte op will be rejected.)
-
-At v2 it became allowed to branch to the end of the program exactly after the last instruction: bnz to byte N (with 0-indexing) was illegal for a TEAL program with N bytes before v2, and is legal after it. This change eliminates the need for a last instruction of no-op as a branch target at the end. (Branching beyond the end--in other words, to a byte larger than N--is still illegal and will cause the program to fail.)
+Branch targets must be aligned instructions. (e.g. Branching to the second byte of a 2 byte op will be rejected.) Branching to the end of the program, exactly after the last instruction, is allowed: bnz to byte N (with 0-indexing) is legal for a program with N bytes. This eliminates the need for a final no-op as a branch target. (Branching beyond the end, to a byte larger than N, is illegal and will cause the program to fail.)
 
 ## bz
 
@@ -784,11 +782,13 @@ When A is a uint64, index 0 is the least significant bit. Setting bit 3 to 1 on 
 
 - Bytecode: 0x60
 - Stack: ..., A &rarr; ..., uint64
-- balance for account A, in microalgos. The balance is observed after the effects of previous transactions in the group, and after the fee for the current transaction is deducted. Changes caused by inner transactions are observable immediately following `itxn_submit`
+- balance for account A, in microalgos. The balance is observed after the effects of previous transactions in the group, and after the fee for the current transaction is deducted
 - Availability: v2
 - Mode: Application
 
-params: Txn.Accounts offset (or, since v4, an _available_ account address). Return: value.
+params: Txn.Accounts offset or an _available_ account address. Return: value.
+
+Changes caused by inner transactions are observable immediately following `itxn_submit`.
 
 ## app_opted_in
 
@@ -798,7 +798,7 @@ params: Txn.Accounts offset (or, since v4, an _available_ account address). Retu
 - Availability: v2
 - Mode: Application
 
-params: Txn.Accounts offset (or, since v4, an _available_ account address), _available_ application id (or, since v4, a Txn.ForeignApps offset). Return: 1 if opted in and 0 otherwise.
+params: Txn.Accounts offset or an _available_ account address, _available_ application id or a Txn.ForeignApps offset. Return: 1 if opted in and 0 otherwise.
 
 ## app_local_get
 
@@ -808,7 +808,7 @@ params: Txn.Accounts offset (or, since v4, an _available_ account address), _ava
 - Availability: v2
 - Mode: Application
 
-params: Txn.Accounts offset (or, since v4, an _available_ account address), state key. Return: value. The value is zero (of type uint64) if the key does not exist.
+params: Txn.Accounts offset or an _available_ account address, state key. Return: value. The value is zero (of type uint64) if the key does not exist.
 
 ## app_local_get_ex
 
@@ -818,7 +818,7 @@ params: Txn.Accounts offset (or, since v4, an _available_ account address), stat
 - Availability: v2
 - Mode: Application
 
-params: Txn.Accounts offset (or, since v4, an _available_ account address), _available_ application id (or, since v4, a Txn.ForeignApps offset), state key. Return: did_exist flag (top of the stack, 1 if the application and key existed and 0 otherwise), value. The value is zero (of type uint64) if the key does not exist.
+params: Txn.Accounts offset or an _available_ account address, _available_ application id or a Txn.ForeignApps offset, state key. Return: did_exist flag (top of the stack, 1 if the application and key existed and 0 otherwise), value. The value is zero (of type uint64) if the key does not exist.
 
 ## app_global_get
 
@@ -838,7 +838,7 @@ params: state key. Return: value. The value is zero (of type uint64) if the key 
 - Availability: v2
 - Mode: Application
 
-params: Txn.ForeignApps offset (or, since v4, an _available_ application id), state key. Return: did_exist flag (top of the stack, 1 if the application and key existed and 0 otherwise), value. The value is zero (of type uint64) if the key does not exist.
+params: Txn.ForeignApps offset or an _available_ application id, state key. Return: did_exist flag (top of the stack, 1 if the application and key existed and 0 otherwise), value. The value is zero (of type uint64) if the key does not exist.
 
 ## app_local_put
 
@@ -848,7 +848,7 @@ params: Txn.ForeignApps offset (or, since v4, an _available_ application id), st
 - Availability: v2
 - Mode: Application
 
-params: Txn.Accounts offset (or, since v4, an _available_ account address), state key, value.
+params: Txn.Accounts offset or an _available_ account address, state key, value.
 
 ## app_global_put
 
@@ -866,7 +866,7 @@ params: Txn.Accounts offset (or, since v4, an _available_ account address), stat
 - Availability: v2
 - Mode: Application
 
-params: Txn.Accounts offset (or, since v4, an _available_ account address), state key.
+params: Txn.Accounts offset or an _available_ account address, state key.
 
 Deleting a key which is already absent has no effect on the application local state. (In particular, it does _not_ cause the program to fail.)
 
@@ -898,7 +898,7 @@ Deleting a key which is already absent has no effect on the application global s
 | 0 | AssetBalance | uint64 | Amount of the asset unit held by this account |
 | 1 | AssetFrozen | bool | Is the asset frozen or not |
 
-params: Txn.Accounts offset (or, since v4, an _available_ address), asset id (or, since v4, a Txn.ForeignAssets offset). Return: did_exist flag (1 if the asset existed and 0 otherwise), value.
+params: Txn.Accounts offset or an _available_ address, asset id or a Txn.ForeignAssets offset. Return: did_exist flag (1 if the asset existed and 0 otherwise), value.
 
 ## asset_params_get
 
@@ -926,7 +926,7 @@ params: Txn.Accounts offset (or, since v4, an _available_ address), asset id (or
 | 10 | AssetClawback | address |      | Clawback address |
 | 11 | AssetCreator | address | v5  | Creator address |
 
-params: Txn.ForeignAssets offset (or, since v4, an _available_ asset id). Return: did_exist flag (1 if the asset existed and 0 otherwise), value.
+params: Txn.ForeignAssets offset or an _available_ asset id. Return: did_exist flag (1 if the asset existed and 0 otherwise), value.
 
 ## app_params_get
 
@@ -974,11 +974,13 @@ params: Txn.ForeignApps offset or an _available_ app id. Return: did_exist flag 
 
 - Bytecode: 0x78
 - Stack: ..., A &rarr; ..., uint64
-- minimum required balance for account A, in microalgos. Required balance is affected by ASA, App, and Box usage. When creating or opting into an app, the minimum balance grows before the app code runs, therefore the increase is visible there. When deleting or closing out, the minimum balance decreases after the app executes. Changes caused by inner transactions or box usage are observable immediately following the opcode effecting the change.
+- minimum required balance for account A, in microalgos
 - Availability: v3
 - Mode: Application
 
-params: Txn.Accounts offset (or, since v4, an _available_ account address). Return: value.
+params: Txn.Accounts offset or an _available_ account address. Return: value.
+
+Required balance is affected by ASA and App usage. When creating or opting into an app, the minimum balance grows before the app code runs, therefore the increase is visible there. When deleting or closing out, the minimum balance decreases after the app executes. Changes caused by inner transactions are observable immediately following `itxn_submit`.
 
 ## pushbytes
 

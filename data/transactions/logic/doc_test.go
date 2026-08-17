@@ -111,8 +111,33 @@ func TestOpDocExtra(t *testing.T) {
 	partitiontest.PartitionTest(t)
 	t.Parallel()
 
-	xd := OpDescOf("bnz")
-	require.NotEmpty(t, xd.Extra)
-	xd = OpDescOf("-")
-	require.Empty(t, xd.Extra)
+	require.NotEmpty(t, OpDocExtra("bnz", 1))
+	require.Empty(t, OpDocExtra("-", LogicVersion))
+
+	// every version of bnz explains its encoding, but only its own encoding
+	for v := uint64(1); v <= 12; v++ {
+		require.Contains(t, OpDocExtra("bnz", v), "16 bit offset")
+		require.NotContains(t, OpDocExtra("bnz", v), "Varint")
+	}
+	require.Contains(t, OpDocExtra("bnz", 13), "Varint")
+	require.NotContains(t, OpDocExtra("bnz", 13), "16 bit offset")
+
+	// backward branches arrived at v4
+	require.Contains(t, OpDocExtra("bnz", 3), "forward branches only")
+	require.NotContains(t, OpDocExtra("bnz", 3), "signed")
+	require.Contains(t, OpDocExtra("bnz", 4), "signed")
+	require.NotContains(t, OpDocExtra("bnz", 4), "forward branches only")
+
+	// branching to the end of the program became legal at v2
+	require.Contains(t, OpDocExtra("bnz", 1), "is illegal")
+	require.Contains(t, OpDocExtra("bnz", 2), "is allowed")
+
+	// versioned notes must name real opcodes, like opDescByName entries
+	opsSeen := make(map[string]bool, len(OpSpecs))
+	for _, op := range OpSpecs {
+		opsSeen[op.Name] = true
+	}
+	for name := range opVersionedExtras {
+		assert.True(t, opsSeen[name], "opVersionedExtras contains strange opcode %#v", name)
+	}
 }

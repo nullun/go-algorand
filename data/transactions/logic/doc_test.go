@@ -132,6 +132,30 @@ func TestOpDocExtra(t *testing.T) {
 	require.Contains(t, OpDocExtra("bnz", 1), "is illegal")
 	require.Contains(t, OpDocExtra("bnz", 2), "is allowed")
 
+	// the state access opcodes accept direct references only from v4 on
+	require.NotContains(t, OpDocExtra("balance", 3), "account address")
+	require.Contains(t, OpDocExtra("balance", 4), "account address")
+	require.NotContains(t, OpDocExtra("asset_holding_get", 3), "ForeignAssets")
+	require.Contains(t, OpDocExtra("asset_holding_get", 4), "ForeignAssets")
+	// and no version's docs defer to another version any more
+	for v := uint64(2); v <= LogicVersion; v++ {
+		require.NotContains(t, OpDocExtra("app_local_del", v), "since v4")
+	}
+
+	// effects fields: inner-only at v5, past top-level app calls from v6
+	require.Contains(t, OpDocExtra("txn", 5), "only be read from inner")
+	require.NotContains(t, OpDocExtra("txn", 5), "top-level application call may be read")
+	require.Contains(t, OpDocExtra("txn", 6), "earlier in the group")
+	require.Empty(t, OpDocExtra("txn", 4))
+	require.Contains(t, OpDocExtra("itxn", 5), "GroupIndex")
+	require.Empty(t, OpDocExtra("itxn", 6))
+
+	// min_balance counts boxes only once boxes exist
+	require.NotContains(t, OpDocExtra("min_balance", 7), "Box")
+	require.Contains(t, OpDocExtra("min_balance", 8), "Box")
+	require.NotContains(t, OpDocExtra("balance", 4), "inner")
+	require.Contains(t, OpDocExtra("balance", 5), "itxn_submit")
+
 	// versioned notes must name real opcodes, like opDescByName entries
 	opsSeen := make(map[string]bool, len(OpSpecs))
 	for _, op := range OpSpecs {

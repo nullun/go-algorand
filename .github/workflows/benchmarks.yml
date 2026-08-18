@@ -30,7 +30,13 @@ jobs:
       # degradation, (2) `eval` degradation.  (2) suggests a broader performance
       # issue. 
       - name: Run benchmark
-        run: go test ./data/transactions/logic -bench 'BenchmarkUintMath' -run=^$ | tee benchmark_output.txt
+        # Trim each result line down to the ns/op measurement. The additional
+        # metrics (extra/op, B/op, allocs/op) cause github-action-benchmark to
+        # store five series per benchmark in gh-pages data.js, two of which
+        # duplicate the ns/op value.
+        run: |
+          go test ./data/transactions/logic -bench 'BenchmarkUintMath' -run=^$ | tee benchmark_output_raw.txt
+          sed -E 's|(ns/op).*|\1|' benchmark_output_raw.txt > benchmark_output.txt
       - name: Push benchmark result to gh-pages branch
         if: github.event_name == 'push'
         uses: benchmark-action/github-action-benchmark@v1
@@ -48,7 +54,10 @@ jobs:
           tool: 'go'
           output-file-path: benchmark_output.txt
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          alert-threshold: '200%'
+          # Consecutive-run variance on ubuntu-latest runners has stayed under
+          # 1.5x since 2024, so 150% alerts on real regressions that the old
+          # 200% threshold would miss without producing noise.
+          alert-threshold: '150%'
           comment-on-alert: true
       - name: Slack Notification
         env:

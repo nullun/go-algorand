@@ -130,6 +130,10 @@ func NewRouter(logger logging.Logger, node APINodeInterface, shutdown <-chan str
 	// Registering common routes (no auth)
 	registerHandlers(e, "", common.Routes, ctx)
 
+	// Registering metrics route (public token auth). Metrics expose operational
+	// details of the node and should not be readable without a token.
+	registerHandlers(e, "", common.MetricsRoutes, ctx, publicMiddleware...)
+
 	// Registering v1 routes
 	registerHandlers(e, apiV1Tag, routes.V1Routes, ctx, publicMiddleware...)
 

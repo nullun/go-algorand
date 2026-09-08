@@ -49,13 +49,15 @@ func Metrics(ctx lib.ReqContext, context echo.Context) {
 	w.Write([]byte(buf.String()))
 }
 
-func init() {
-	Routes = append(Routes,
-		lib.Route{
-			Name:        "metrics",
-			Method:      "GET",
-			Path:        "/metrics",
-			HandlerFunc: Metrics,
-		},
-	)
+// MetricsRoutes are the routes that expose operational metrics. They are kept
+// separate from Routes so that the router can register them behind the public
+// API token instead of leaving the metrics registry readable by anyone who can
+// reach the REST listener.
+var MetricsRoutes = lib.Routes{
+	lib.Route{
+		Name:        "metrics",
+		Method:      "GET",
+		Path:        "/metrics",
+		HandlerFunc: Metrics,
+	},
 }

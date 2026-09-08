@@ -104,7 +104,9 @@ type AccountsReader interface {
 
 	LookupResources(addr basics.Address, aidx basics.CreatableIndex, ctype basics.CreatableType) (data PersistedResourcesData, err error)
 	LookupAllResources(addr basics.Address) (data []PersistedResourcesData, rnd basics.Round, err error)
-	LookupLimitedResources(addr basics.Address, minIdx basics.CreatableIndex, maxCreatables uint64, ctype basics.CreatableType) (data []PersistedResourcesDataWithCreator, rnd basics.Round, err error)
+	// LookupLimitedResources returns a page of the account's resources of the given type with their creators.
+	// When includeParams is false the creator's resource data (the creatable's params) is not fetched or decoded.
+	LookupLimitedResources(addr basics.Address, minIdx basics.CreatableIndex, maxCreatables uint64, ctype basics.CreatableType, includeParams bool) (data []PersistedResourcesDataWithCreator, rnd basics.Round, err error)
 
 	LookupKeyValue(key string) (pv PersistedKVData, err error)
 	LookupKeysByPrefix(prefix string, maxKeyNum uint64, results map[string]bool, resultCount uint64) (round basics.Round, err error)

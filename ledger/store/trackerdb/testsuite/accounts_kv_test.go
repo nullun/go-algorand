@@ -346,7 +346,7 @@ func CustomTestResourcesQueryAllLimited(t *customT) {
 	require.NotNil(t, cRefA2)
 
 	// Lookup with limited resources for account A
-	prs, rnd, err := aor.LookupLimitedResources(addrA, 0, 2, basics.AssetCreatable)
+	prs, rnd, err := aor.LookupLimitedResources(addrA, 0, 2, basics.AssetCreatable, true)
 	require.NoError(t, err)
 	require.Equal(t, 2, len(prs))
 	require.Equal(t, aidxResA0, prs[0].Aidx)
@@ -360,7 +360,7 @@ func CustomTestResourcesQueryAllLimited(t *customT) {
 	require.Equal(t, expectedRound, rnd) // db round (from the return)
 
 	// Lookup with limited resources for account B
-	prs, rnd, err = aor.LookupLimitedResources(addrB, 0, 2, basics.AssetCreatable)
+	prs, rnd, err = aor.LookupLimitedResources(addrB, 0, 2, basics.AssetCreatable, true)
 	require.NoError(t, err)
 	require.Equal(t, 2, len(prs))
 	require.Equal(t, aidxResA0, prs[0].Aidx)
@@ -374,8 +374,23 @@ func CustomTestResourcesQueryAllLimited(t *customT) {
 	require.Equal(t, resDataWithParamsA1AcctB, prs[1].Data)
 	require.Equal(t, expectedRound, rnd) // db round (from the return)
 
+	// Lookup without params for account B: creator is still reported, but the
+	// data is the account's own holding record without the creator's params.
+	prs, rnd, err = aor.LookupLimitedResources(addrB, 0, 2, basics.AssetCreatable, false)
+	require.NoError(t, err)
+	require.Equal(t, 2, len(prs))
+	require.Equal(t, aidxResA0, prs[0].Aidx)
+	require.Equal(t, aidxResA2, prs[1].Aidx)
+	require.Equal(t, addrA, prs[0].Creator)
+	require.Equal(t, addrA, prs[1].Creator)
+	require.Equal(t, resDataA0AcctB, prs[0].Data)
+	require.Equal(t, resDataA2AcctB, prs[1].Data)
+	require.True(t, prs[0].Data.IsHolding())
+	require.False(t, prs[0].Data.IsOwning())
+	require.Equal(t, expectedRound, rnd)
+
 	// Set limit to 1, should return only 1 resource
-	prs, rnd, err = aor.LookupLimitedResources(addrB, 0, 1, basics.AssetCreatable)
+	prs, rnd, err = aor.LookupLimitedResources(addrB, 0, 1, basics.AssetCreatable, true)
 	require.NoError(t, err)
 	require.Equal(t, 1, len(prs))
 	require.Equal(t, aidxResA0, prs[0].Aidx)
@@ -389,7 +404,7 @@ func CustomTestResourcesQueryAllLimited(t *customT) {
 	require.NoError(t, err)
 
 	// Set min to 1, should return only 1 resource (index 1)
-	prs, rnd, err = aor.LookupLimitedResources(addrB, 1, 1, basics.AssetCreatable)
+	prs, rnd, err = aor.LookupLimitedResources(addrB, 1, 1, basics.AssetCreatable, true)
 	require.NoError(t, err)
 	require.Equal(t, 1, len(prs))
 	require.Equal(t, aidxResA2, prs[0].Aidx)
@@ -411,10 +426,10 @@ func CustomTestResourcesQueryAllLimited(t *customT) {
 	require.NoError(t, err)
 
 	// Account A should have no resources, account B should have 2 resources without a creator/params
-	prs, rnd, err = aor.LookupLimitedResources(addrA, 0, 2, basics.AssetCreatable)
+	prs, rnd, err = aor.LookupLimitedResources(addrA, 0, 2, basics.AssetCreatable, true)
 	require.NoError(t, err)
 	require.Equal(t, 0, len(prs))
-	prs, rnd, err = aor.LookupLimitedResources(addrB, 0, 2, basics.AssetCreatable)
+	prs, rnd, err = aor.LookupLimitedResources(addrB, 0, 2, basics.AssetCreatable, true)
 	require.NoError(t, err)
 	require.Equal(t, 2, len(prs))
 	require.Equal(t, aidxResA0, prs[0].Aidx)
@@ -423,6 +438,15 @@ func CustomTestResourcesQueryAllLimited(t *customT) {
 	require.True(t, prs[1].Creator.IsZero())
 	require.Equal(t, expectedRound, prs[0].Round) // db round (inside resources)
 	require.Equal(t, expectedRound, prs[1].Round)
+
+	// Without params the deleted creatables are likewise reported without a creator.
+	prs, _, err = aor.LookupLimitedResources(addrB, 0, 2, basics.AssetCreatable, false)
+	require.NoError(t, err)
+	require.Equal(t, 2, len(prs))
+	require.True(t, prs[0].Creator.IsZero())
+	require.True(t, prs[1].Creator.IsZero())
+	require.Equal(t, resDataA0AcctB, prs[0].Data)
+	require.Equal(t, resDataA2AcctB, prs[1].Data)
 	// Note these directly reflect what was inserted into resources table (no creator/params)
 	require.Equal(t, resDataA0AcctB, prs[0].Data)
 	require.Equal(t, resDataA2AcctB, prs[1].Data)

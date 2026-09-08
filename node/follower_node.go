@@ -309,9 +309,9 @@ func (node *AlgorandFollowerNode) SuggestedFee() basics.MicroAlgos {
 	return basics.MicroAlgos{}
 }
 
-// GetPendingTxnsFromPool returns an empty array in follower mode.
-func (node *AlgorandFollowerNode) GetPendingTxnsFromPool() ([]transactions.SignedTxn, error) {
-	return []transactions.SignedTxn{}, nil
+// GetPendingTxGroupsFromPool returns an empty array in follower mode.
+func (node *AlgorandFollowerNode) GetPendingTxGroupsFromPool() ([][]transactions.SignedTxn, error) {
+	return [][]transactions.SignedTxn{}, nil
 }
 
 // ListParticipationKeys returns an empty list in follower mode

@@ -155,7 +155,7 @@ type NodeInterface interface {
 	Simulate(request simulation.Request) (result simulation.Result, err error)
 	GetPeers() (inboundPeers []network.Peer, outboundPeers []network.Peer, err error)
 	GetPendingTransaction(txID transactions.Txid) (res node.TxnWithStatus, found bool)
-	GetPendingTxnsFromPool() ([]transactions.SignedTxn, error)
+	GetPendingTxGroupsFromPool() ([][]transactions.SignedTxn, error)
 	SuggestedFee() basics.MicroAlgos
 	StartCatchup(catchpoint string) error
 	AbortCatchup(catchpoint string) error
@@ -1785,7 +1785,7 @@ func (v2 *Handlers) getPendingTransactions(ctx echo.Context, max *uint64, format
 		return badRequest(ctx, err, errFailedParsingFormatOption, v2.Log)
 	}
 
-	txnPool, err := v2.Node.GetPendingTxnsFromPool()
+	txnGroups, err := v2.Node.GetPendingTxGroupsFromPool()
 	if err != nil {
 		return internalError(ctx, err, errFailedLookingUpTransactionPool, v2.Log)
 	}
@@ -1795,20 +1795,29 @@ func (v2 *Handlers) getPendingTransactions(ctx echo.Context, max *uint64, format
 		txnLimit = *max
 	}
 
-	// Convert transactions to msgp / json strings
+	// Walk the pool's groups in place. The pool is not flattened or copied,
+	// so the only allocation proportional to the request is topTxns, which is
+	// bounded by txnLimit. The total is a count over group lengths.
+	var totalTxns uint64
 	topTxns := make([]transactions.SignedTxn, 0)
-	for _, txn := range txnPool {
-		// break out if we've reached the max number of transactions
+	for _, txgroup := range txnGroups {
+		totalTxns += uint64(len(txgroup))
 		if uint64(len(topTxns)) >= txnLimit {
-			break
-		}
-
-		// continue if we have an address filter and the address doesn't match the transaction.
-		if addrFilter != nil && !txn.Txn.MatchAddress(*addrFilter) {
 			continue
 		}
+		for _, txn := range txgroup {
+			// break out if we've reached the max number of transactions
+			if uint64(len(topTxns)) >= txnLimit {
+				break
+			}
 
-		topTxns = append(topTxns, txn)
+			// continue if we have an address filter and the address doesn't match the transaction.
+			if addrFilter != nil && !txn.Txn.MatchAddress(*addrFilter) {
+				continue
+			}
+
+			topTxns = append(topTxns, txn)
+		}
 	}
 
 	// Encoding wasn't working well without embedding "real" objects.
@@ -1817,7 +1826,7 @@ func (v2 *Handlers) getPendingTransactions(ctx echo.Context, max *uint64, format
 		TotalTransactions uint64                   `json:"total-transactions"`
 	}{
 		TopTransactions:   topTxns,
-		TotalTransactions: uint64(len(txnPool)),
+		TotalTransactions: totalTxns,
 	}
 
 	data, err := encode(handle, response)

@@ -20,6 +20,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
@@ -43,7 +44,7 @@ type Local struct {
 	// Version tracks the current version of the defaults so we can migrate old -> new
 	// This is specifically important whenever we decide to change the default value
 	// for an existing parameter. This field tag must be updated any time we add a new version.
-	Version uint32 `version[0]:"0" version[1]:"1" version[2]:"2" version[3]:"3" version[4]:"4" version[5]:"5" version[6]:"6" version[7]:"7" version[8]:"8" version[9]:"9" version[10]:"10" version[11]:"11" version[12]:"12" version[13]:"13" version[14]:"14" version[15]:"15" version[16]:"16" version[17]:"17" version[18]:"18" version[19]:"19" version[20]:"20" version[21]:"21" version[22]:"22" version[23]:"23" version[24]:"24" version[25]:"25" version[26]:"26" version[27]:"27" version[28]:"28" version[29]:"29" version[30]:"30" version[31]:"31" version[32]:"32" version[33]:"33" version[34]:"34" version[35]:"35" version[36]:"36" version[37]:"37" version[38]:"38"`
+	Version uint32 `version[0]:"0" version[1]:"1" version[2]:"2" version[3]:"3" version[4]:"4" version[5]:"5" version[6]:"6" version[7]:"7" version[8]:"8" version[9]:"9" version[10]:"10" version[11]:"11" version[12]:"12" version[13]:"13" version[14]:"14" version[15]:"15" version[16]:"16" version[17]:"17" version[18]:"18" version[19]:"19" version[20]:"20" version[21]:"21" version[22]:"22" version[23]:"23" version[24]:"24" version[25]:"25" version[26]:"26" version[27]:"27" version[28]:"28" version[29]:"29" version[30]:"30" version[31]:"31" version[32]:"32" version[33]:"33" version[34]:"34" version[35]:"35" version[36]:"36" version[37]:"37" version[38]:"38" version[39]:"39"`
 
 	// Archival nodes retain a full copy of the block history. Non-Archival nodes will delete old blocks and only retain what's need to properly validate blockchain messages (the precise number of recent blocks depends on the consensus parameters. Currently the last 1321 blocks are required). This means that non-Archival nodes require significantly less storage than Archival nodes.  If setting this to true for the first time, the existing ledger may need to be deleted to get the historical values stored as the setting only affects current blocks forward. To do this, shutdown the node and delete all .sqlite files within the data/testnet-version directory, except the crash.sqlite file. Restart the node and wait for the node to sync.
 	Archival bool `version[0]:"false"`
@@ -546,6 +547,18 @@ type Local struct {
 	// RestConnectionsHardLimit is the maximum number of active connections the API server will accept before closing requests with no response.
 	RestConnectionsHardLimit uint64 `version[20]:"2048"`
 
+	// RestExpensiveRequestLimit bounds how many REST requests may run an expensive fallback at the same time.
+	// Some endpoints have a cheap common path and a costly fallback; today this applies to
+	// GET /v2/transactions/pending/{txid}, where a transaction ID that is in neither the transaction pool nor
+	// the recent transaction tail falls back to decoding up to MaxTxnLife (1000) recent blocks looking for it.
+	// Requests beyond the limit wait for a slot and give up if the client disconnects.
+	// A value of 0 means automatic, which is the default value: min(4, (NumCPU+1)/2).
+	// Expect each slot to transiently allocate on the order of the decoded size of the data it walks; for the
+	// pending transaction scan over a window of roughly 30,000 transactions that is about 130 MiB, so a limit
+	// of N should be budgeted as roughly N * 130 MiB of additional heap under load. Public API infrastructure
+	// with many cores and ample memory may raise this; typical nodes should leave it at 0.
+	RestExpensiveRequestLimit int `version[39]:"0"`
+
 	// MaxAPIResourcesPerAccount sets the maximum total number of resources (created assets, created apps,
 	// asset holdings, and application local state) per account that will be allowed in AccountInformation
 	// REST API responses before returning a 400 Bad Request. Set zero for no limit.
@@ -723,6 +736,15 @@ func (cfg Local) SaveToFile(filename string) error {
 	var alwaysInclude []string
 	alwaysInclude = append(alwaysInclude, "Version")
 	return codecs.SaveNonDefaultValuesToFile(filename, cfg, defaultLocal, alwaysInclude)
+}
+
+// ExpensiveRequestLimit returns the number of REST requests allowed to run an expensive fallback at the
+// same time, resolving the automatic (0) setting of RestExpensiveRequestLimit to min(4, (NumCPU+1)/2).
+func (cfg Local) ExpensiveRequestLimit() int {
+	if cfg.RestExpensiveRequestLimit > 0 {
+		return cfg.RestExpensiveRequestLimit
+	}
+	return min(4, (runtime.NumCPU()+1)/2)
 }
 
 // DNSSecuritySRVEnforced returns true if SRV response verification enforced

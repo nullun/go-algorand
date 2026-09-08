@@ -17,6 +17,7 @@
 package test
 
 import (
+	"context"
 	"fmt"
 	"math/rand"
 	"strconv"
@@ -178,7 +179,7 @@ func (m *mockNode) Simulate(request simulation.Request) (simulation.Result, erro
 	return simulator.Simulate(request)
 }
 
-func (m *mockNode) GetPendingTransaction(txID transactions.Txid) (res node.TxnWithStatus, found bool) {
+func (m *mockNode) GetPendingTransaction(_ context.Context, txID transactions.Txid, _ node.Limiter) (res node.TxnWithStatus, found bool) {
 	res = node.TxnWithStatus{}
 	found = true
 	return

@@ -260,7 +260,7 @@ func (node *AlgorandFollowerNode) Simulate(request simulation.Request) (result s
 }
 
 // GetPendingTransaction no-ops in follower mode
-func (node *AlgorandFollowerNode) GetPendingTransaction(_ transactions.Txid) (res TxnWithStatus, found bool) {
+func (node *AlgorandFollowerNode) GetPendingTransaction(_ context.Context, _ transactions.Txid, _ Limiter) (res TxnWithStatus, found bool) {
 	return
 }
 

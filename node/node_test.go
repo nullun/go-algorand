@@ -18,6 +18,7 @@ package node
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"math/rand"
 	"os"
@@ -30,6 +31,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"golang.org/x/sync/semaphore"
 
 	"github.com/algorand/go-algorand/agreement"
 	"github.com/algorand/go-algorand/config"
@@ -1475,4 +1477,60 @@ func TestNodeMakeFullHybrid(t *testing.T) {
 	messages := buf.String()
 	require.Contains(t, messages, "could not create hybrid p2p node: P2PHybridMode requires both NetAddress")
 	require.Contains(t, messages, "Falling back to WS network")
+}
+
+// TestGetPendingTransactionScanRespectsContext checks that the fallback scan
+// over committed blocks in GetPendingTransaction is gated by the caller's
+// limiter and gives up when the caller's context is cancelled.
+func TestGetPendingTransactionScanRespectsContext(t *testing.T) {
+	partitiontest.PartitionTest(t)
+
+	testDirectory := t.TempDir()
+
+	genesis := bookkeeping.Genesis{
+		SchemaID:    "gen",
+		Proto:       protocol.ConsensusCurrentVersion,
+		Network:     config.Devtestnet,
+		FeeSink:     sinkAddr.String(),
+		RewardsPool: poolAddr.String(),
+	}
+
+	n, err := MakeFull(logging.Base(), testDirectory, config.GetDefaultLocal(), []string{}, genesis)
+	require.NoError(t, err)
+	defer n.ledger.Close()
+
+	var txID transactions.Txid
+	txID[0] = 1
+
+	// Unknown transaction with no limiter and a live context: not found.
+	_, found := n.GetPendingTransaction(context.Background(), txID, nil)
+	require.False(t, found)
+
+	// Unknown transaction with an idle limiter: not found.
+	limiter := semaphore.NewWeighted(1)
+	_, found = n.GetPendingTransaction(context.Background(), txID, limiter)
+	require.False(t, found)
+
+	// Hold the limiter so the next caller has to wait for it, then call
+	// with an already cancelled context. The call must return promptly
+	// instead of queueing behind the held slot.
+	require.True(t, limiter.TryAcquire(1))
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	done := make(chan bool, 1)
+	go func() {
+		_, found := n.GetPendingTransaction(ctx, txID, limiter)
+		done <- found
+	}()
+	select {
+	case found := <-done:
+		require.False(t, found)
+	case <-time.After(10 * time.Second):
+		require.Fail(t, "GetPendingTransaction did not return while the limiter was held and the context was cancelled")
+	}
+	limiter.Release(1)
+
+	// With the slot released the scan runs again and still finds nothing.
+	_, found = n.GetPendingTransaction(context.Background(), txID, limiter)
+	require.False(t, found)
 }

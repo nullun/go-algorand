@@ -24,6 +24,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"regexp"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -1247,4 +1248,22 @@ func TestEncodedAccountAllocationBounds(t *testing.T) {
 		}
 		// There is no protocol limit to the number of Boxes per account, so that allocbound is not checked.
 	}
+}
+
+func TestExpensiveRequestLimit(t *testing.T) {
+	partitiontest.PartitionTest(t)
+	t.Parallel()
+
+	cfg := GetDefaultLocal()
+	require.Equal(t, 0, cfg.RestExpensiveRequestLimit)
+	auto := cfg.ExpensiveRequestLimit()
+	require.GreaterOrEqual(t, auto, 1)
+	require.LessOrEqual(t, auto, 4)
+	require.Equal(t, min(4, (runtime.NumCPU()+1)/2), auto)
+
+	cfg.RestExpensiveRequestLimit = 48
+	require.Equal(t, 48, cfg.ExpensiveRequestLimit())
+
+	cfg.RestExpensiveRequestLimit = -1
+	require.Equal(t, auto, cfg.ExpensiveRequestLimit())
 }

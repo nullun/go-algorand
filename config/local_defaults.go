@@ -20,7 +20,7 @@
 package config
 
 var defaultLocal = Local{
-	Version:                                    38,
+	Version:                                    39,
 	AccountUpdatesStatsInterval:                5000000000,
 	AccountsRebuildSynchronousMode:             1,
 	AgreementIncomingBundlesQueueLength:        15,
@@ -138,6 +138,7 @@ var defaultLocal = Local{
 	ReservedFDs:                                256,
 	RestConnectionsHardLimit:                   2048,
 	RestConnectionsSoftLimit:                   1024,
+	RestExpensiveRequestLimit:                  0,
 	RestReadTimeoutSeconds:                     15,
 	RestWriteTimeoutSeconds:                    120,
 	RunHosted:                                  false,

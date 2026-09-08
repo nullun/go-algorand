@@ -135,10 +135,11 @@ func NewRouter(logger logging.Logger, node APINodeInterface, shutdown <-chan str
 
 	// Registering v2 routes
 	v2Handler := v2.Handlers{
-		Node:          node,
-		Log:           logger,
-		Shutdown:      shutdown,
-		KeygenLimiter: semaphore.NewWeighted(1),
+		Node:                    node,
+		Log:                     logger,
+		Shutdown:                shutdown,
+		KeygenLimiter:           semaphore.NewWeighted(1),
+		ExpensiveRequestLimiter: semaphore.NewWeighted(int64(node.Config().ExpensiveRequestLimit())),
 	}
 	nppublic.RegisterHandlers(e, &v2Handler, publicMiddleware...)
 	npprivate.RegisterHandlers(e, &v2Handler, adminMiddleware...)

@@ -671,11 +671,24 @@ func (node *AlgorandFullNode) Simulate(request simulation.Request) (result simul
 	return simulator.Simulate(request)
 }
 
+// Limiter bounds concurrent expensive work. *semaphore.Weighted satisfies it.
+type Limiter interface {
+	Acquire(ctx context.Context, n int64) error
+	Release(n int64)
+}
+
 // GetPendingTransaction looks for the required txID in the recent ledger
 // blocks, in the txpool, and in the txpool's status cache.  It returns
 // the SignedTxn (with status information), and a bool to indicate if the
 // transaction was found.
-func (node *AlgorandFullNode) GetPendingTransaction(txID transactions.Txid) (res TxnWithStatus, found bool) {
+//
+// When the transaction is in neither the pool nor the recent transaction
+// tail, the lookup falls back to scanning up to MaxTxnLife committed blocks,
+// which is CPU and memory intensive. That scan is gated by scanLimiter when
+// one is provided, so that callers can share a budget for expensive
+// requests, and it stops early when ctx is cancelled. In both cases the
+// transaction is then reported as not found.
+func (node *AlgorandFullNode) GetPendingTransaction(ctx context.Context, txID transactions.Txid, scanLimiter Limiter) (res TxnWithStatus, found bool) {
 	// We need to check both the pool and the ledger's blocks.
 	// If the transaction is found in a committed block, that
 	// takes precedence.  But we check the pool first, because
@@ -749,7 +762,20 @@ func (node *AlgorandFullNode) GetPendingTransaction(txID transactions.Txid) (res
 		}
 	}
 
+	// Only a bounded number of requests may run the block scan at once. A
+	// caller whose context is cancelled while waiting gives up rather than
+	// queueing work that nobody will read.
+	if scanLimiter != nil {
+		if err := scanLimiter.Acquire(ctx, 1); err != nil {
+			return res, found
+		}
+		defer scanLimiter.Release(1)
+	}
+
 	for r := maxRound; r >= minRound; r-- {
+		if ctx.Err() != nil {
+			return res, found
+		}
 		tx, found, err := node.ledger.LookupTxid(txID, r)
 		if err != nil || !found {
 			continue

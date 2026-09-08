@@ -115,6 +115,22 @@ type Handlers struct {
 
 	// KeygenLimiter is used to limit the number of concurrent key generation requests.
 	KeygenLimiter *semaphore.Weighted
+
+	// ExpensiveRequestLimiter bounds how many requests may run an expensive
+	// fallback at the same time. It is shared by every endpoint that has such
+	// a path; today that is the committed-block scan behind
+	// PendingTransactionInformation. It may be nil, in which case no bound
+	// is applied.
+	ExpensiveRequestLimiter *semaphore.Weighted
+}
+
+// expensiveRequestLimiter returns the shared limiter as a node.Limiter, or a
+// nil interface when none is configured.
+func (v2 *Handlers) expensiveRequestLimiter() node.Limiter {
+	if v2.ExpensiveRequestLimiter == nil {
+		return nil
+	}
+	return v2.ExpensiveRequestLimiter
 }
 
 // LedgerForAPI describes the Ledger methods used by the v2 API.
@@ -154,7 +170,7 @@ type NodeInterface interface {
 	AsyncBroadcastSignedTxGroup(txgroup []transactions.SignedTxn) error
 	Simulate(request simulation.Request) (result simulation.Result, err error)
 	GetPeers() (inboundPeers []network.Peer, outboundPeers []network.Peer, err error)
-	GetPendingTransaction(txID transactions.Txid) (res node.TxnWithStatus, found bool)
+	GetPendingTransaction(ctx context.Context, txID transactions.Txid, scanLimiter node.Limiter) (res node.TxnWithStatus, found bool)
 	GetPendingTxnsFromPool() ([]transactions.SignedTxn, error)
 	SuggestedFee() basics.MicroAlgos
 	StartCatchup(catchpoint string) error
@@ -1726,7 +1742,10 @@ func (v2 *Handlers) PendingTransactionInformation(ctx echo.Context, txid string,
 		return badRequest(ctx, err0, errNoValidTxnSpecified, v2.Log)
 	}
 
-	txn, ok := v2.Node.GetPendingTransaction(txID)
+	// Pass the request context so that a client that disconnects stops the
+	// fallback scan over committed blocks, and the shared limiter so that
+	// only a bounded number of such scans run at once.
+	txn, ok := v2.Node.GetPendingTransaction(ctx.Request().Context(), txID, v2.expensiveRequestLimiter())
 
 	// We didn't find it, return a failure
 	if !ok {

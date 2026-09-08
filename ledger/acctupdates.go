@@ -1404,7 +1404,7 @@ func (au *accountUpdates) lookupAssetResources(addr basics.Address, assetIDGT ba
 		// page — modifications and new creations cannot reduce the DB contribution.
 		dbLimit := limit + uint64(numDeltaDeleted)
 
-		persistedResources, resourceDbRound, err := au.accountsq.LookupLimitedResources(addr, basics.CreatableIndex(assetIDGT), dbLimit, basics.AssetCreatable)
+		persistedResources, resourceDbRound, err := au.accountsq.LookupLimitedResources(addr, basics.CreatableIndex(assetIDGT), dbLimit, basics.AssetCreatable, true)
 		if err != nil {
 			return nil, 0, err
 		}
@@ -1623,7 +1623,7 @@ func (au *accountUpdates) lookupApplicationResources(addr basics.Address, appIDG
 		// page — modifications and new creations cannot reduce the DB contribution.
 		dbLimit := limit + uint64(numDeltaDeleted)
 
-		persistedResources, resourceDbRound, err := au.accountsq.LookupLimitedResources(addr, basics.CreatableIndex(appIDGT), dbLimit, basics.AppCreatable)
+		persistedResources, resourceDbRound, err := au.accountsq.LookupLimitedResources(addr, basics.CreatableIndex(appIDGT), dbLimit, basics.AppCreatable, includeParams)
 		if err != nil {
 			return nil, 0, err
 		}

@@ -34,6 +34,10 @@ type accountsDbQueries struct {
 	lookupResourcesStmt        *sql.Stmt
 	lookupAllResourcesStmt     *sql.Stmt
 	lookupLimitedResourcesStmt *sql.Stmt
+	// lookupLimitedResourcesNoParamsStmt is the same query as
+	// lookupLimitedResourcesStmt but does not select the creator's resource
+	// blob, for callers that do not need the creatable's params.
+	lookupLimitedResourcesNoParamsStmt *sql.Stmt
 
 	lookupKvPairStmt                     *sql.Stmt
 	lookupKeysByRangeStmt                *sql.Stmt
@@ -99,6 +103,32 @@ func AccountsInitDbQueries(q db.Queryable) (*accountsDbQueries, error) {
       	 				ac.creator,
        					r.data,
        					cr.data
+				FROM acctrounds ar
+				JOIN accountbase ab ON ab.address = ?
+				JOIN resources r ON r.addrid = ab.addrid
+				LEFT JOIN assetcreators ac ON r.aidx = ac.asset
+				LEFT JOIN accountbase cab ON ac.creator = cab.address
+				LEFT JOIN resources cr ON cr.addrid = cab.addrid
+				AND cr.aidx = r.aidx
+				WHERE ar.id = 'acctbase'
+  					AND r.ctype = ?
+  					AND r.aidx > ?
+				ORDER BY r.aidx ASC
+				LIMIT ?`)
+	if err != nil {
+		return nil, err
+	}
+
+	// Same as lookupLimitedResourcesStmt, but selects only whether the
+	// creator's resource row exists rather than its data so that the params
+	// blob is neither read from the database nor decoded.
+	qs.lookupLimitedResourcesNoParamsStmt, err = q.Prepare(
+		`SELECT ab.rowid,
+						ar.rnd,
+       					r.aidx,
+      	 				ac.creator,
+       					r.data,
+       					cr.aidx
 				FROM acctrounds ar
 				JOIN accountbase ab ON ab.address = ?
 				JOIN resources r ON r.addrid = ab.addrid
@@ -589,9 +619,19 @@ func (qs *accountsDbQueries) LookupAllResources(addr basics.Address) (data []tra
 	return
 }
 
-func (qs *accountsDbQueries) LookupLimitedResources(addr basics.Address, minIdx basics.CreatableIndex, maxCreatables uint64, ctype basics.CreatableType) (data []trackerdb.PersistedResourcesDataWithCreator, rnd basics.Round, err error) {
+// LookupLimitedResources returns up to maxCreatables resources of the given
+// type held by addr with index greater than minIdx, together with each
+// creatable's creator. When includeParams is true the creator's resource
+// data (which holds the creatable's params) is fetched, decoded and merged
+// into the returned record. When it is false the params are not read from
+// the database at all and only the account's own resource data is returned.
+func (qs *accountsDbQueries) LookupLimitedResources(addr basics.Address, minIdx basics.CreatableIndex, maxCreatables uint64, ctype basics.CreatableType, includeParams bool) (data []trackerdb.PersistedResourcesDataWithCreator, rnd basics.Round, err error) {
+	stmt := qs.lookupLimitedResourcesNoParamsStmt
+	if includeParams {
+		stmt = qs.lookupLimitedResourcesStmt
+	}
 	err = db.Retry(func() error {
-		rows, err0 := qs.lookupLimitedResourcesStmt.Query(addr[:], ctype, minIdx, maxCreatables)
+		rows, err0 := stmt.Query(addr[:], ctype, minIdx, maxCreatables)
 		if err0 != nil {
 			return err0
 		}
@@ -602,9 +642,14 @@ func (qs *accountsDbQueries) LookupLimitedResources(addr basics.Address, minIdx 
 		data = nil
 		var actResourceBuf []byte
 		var crtResourceBuf []byte
+		var crtAidx sql.NullInt64
 		var creatorAddrBuf []byte
 		for rows.Next() {
-			err = rows.Scan(&addrid, &dbRound, &aidx, &creatorAddrBuf, &actResourceBuf, &crtResourceBuf)
+			if includeParams {
+				err = rows.Scan(&addrid, &dbRound, &aidx, &creatorAddrBuf, &actResourceBuf, &crtResourceBuf)
+			} else {
+				err = rows.Scan(&addrid, &dbRound, &aidx, &creatorAddrBuf, &actResourceBuf, &crtAidx)
+			}
 			if err != nil {
 				return err
 			}
@@ -618,14 +663,34 @@ func (qs *accountsDbQueries) LookupLimitedResources(addr basics.Address, minIdx 
 				break
 			}
 			var actResData trackerdb.ResourcesData
-			var crtResData trackerdb.ResourcesData
 			err = protocol.Decode(actResourceBuf, &actResData)
 			if err != nil {
 				return err
 			}
 
-			var prdwc trackerdb.PersistedResourcesDataWithCreator
-			if len(crtResourceBuf) > 0 {
+			// The creator's resource row exists iff its data was returned
+			// (params mode) or its index was non-NULL (no-params mode).
+			creatorFound := len(crtResourceBuf) > 0
+			if !includeParams {
+				creatorFound = crtAidx.Valid
+			}
+
+			prdwc := trackerdb.PersistedResourcesDataWithCreator{
+				PersistedResourcesData: trackerdb.PersistedResourcesData{
+					AcctRef: sqlRowRef{addrid.Int64},
+					Aidx:    basics.CreatableIndex(aidx.Int64),
+					Data:    actResData,
+					Round:   dbRound,
+				},
+			}
+			if creatorFound {
+				copy(prdwc.Creator[:], creatorAddrBuf)
+			}
+			// If no creator was found the creatable was likely deleted and
+			// will not have params; the account's own data is all we return.
+
+			if creatorFound && includeParams {
+				var crtResData trackerdb.ResourcesData
 				err = protocol.Decode(crtResourceBuf, &crtResData)
 				if err != nil {
 					return err
@@ -644,28 +709,7 @@ func (qs *accountsDbQueries) LookupLimitedResources(addr basics.Address, minIdx 
 					crtResData.KeyValue = actResData.KeyValue
 				}
 				crtResData.ResourceFlags = actResData.ResourceFlags
-
-				creatorAddr := basics.Address{}
-				copy(creatorAddr[:], creatorAddrBuf)
-
-				prdwc = trackerdb.PersistedResourcesDataWithCreator{
-					PersistedResourcesData: trackerdb.PersistedResourcesData{
-						AcctRef: sqlRowRef{addrid.Int64},
-						Aidx:    basics.CreatableIndex(aidx.Int64),
-						Data:    crtResData,
-						Round:   dbRound,
-					},
-					Creator: creatorAddr,
-				}
-			} else { // no creator found, creatable was likely deleted, will not have params
-				prdwc = trackerdb.PersistedResourcesDataWithCreator{
-					PersistedResourcesData: trackerdb.PersistedResourcesData{
-						AcctRef: sqlRowRef{addrid.Int64},
-						Aidx:    basics.CreatableIndex(aidx.Int64),
-						Data:    actResData,
-						Round:   dbRound,
-					},
-				}
+				prdwc.Data = crtResData
 			}
 
 			data = append(data, prdwc)
@@ -798,6 +842,7 @@ func (qs *accountsDbQueries) Close() {
 		&qs.lookupResourcesStmt,
 		&qs.lookupAllResourcesStmt,
 		&qs.lookupLimitedResourcesStmt,
+		&qs.lookupLimitedResourcesNoParamsStmt,
 		&qs.lookupKvPairStmt,
 		&qs.lookupKeysByRangeStmt,
 		&qs.lookupKeysByRangeCursorStmt,

@@ -23,7 +23,9 @@ import (
 	"github.com/labstack/echo/v4"
 	"github.com/stretchr/testify/assert"
 
+	"github.com/algorand/go-algorand/daemon/algod/api/server/common"
 	"github.com/algorand/go-algorand/daemon/algod/api/server/lib"
+	"github.com/algorand/go-algorand/daemon/algod/api/server/lib/middlewares"
 	"github.com/algorand/go-algorand/daemon/algod/api/server/v1/routes"
 	"github.com/algorand/go-algorand/logging"
 	"github.com/algorand/go-algorand/test/partitiontest"
@@ -75,4 +77,42 @@ func TestGetTransactionV1Sunset(t *testing.T) {
 		assert.NotNil(t, rec.Body)
 		assert.Equal(t, http.StatusGone, rec.Code)
 	}
+}
+
+// TestMetricsRequiresToken verifies that /metrics is registered behind the
+// public API token while the other common routes stay unauthenticated.
+func TestMetricsRequiresToken(t *testing.T) {
+	partitiontest.PartitionTest(t)
+
+	const token = "metrics-test-token"
+	e := echo.New()
+	reqCtx := lib.ReqContext{Log: logging.NewLogger()}
+	registerHandlers(e, "", common.Routes, reqCtx)
+	registerHandlers(e, "", common.MetricsRoutes, reqCtx, middlewares.MakeAuth(TokenHeader, []string{token}))
+
+	// No token: rejected.
+	rec := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/metrics", nil)
+	e.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusUnauthorized, rec.Code)
+
+	// Wrong token: rejected.
+	rec = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodGet, "/metrics", nil)
+	req.Header.Set(TokenHeader, "wrong")
+	e.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusUnauthorized, rec.Code)
+
+	// Correct token: served.
+	rec = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodGet, "/metrics", nil)
+	req.Header.Set(TokenHeader, token)
+	e.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusOK, rec.Code)
+
+	// Other common routes remain reachable without a token.
+	rec = httptest.NewRecorder()
+	req = httptest.NewRequest(http.MethodGet, "/swagger.json", nil)
+	e.ServeHTTP(rec, req)
+	assert.Equal(t, http.StatusOK, rec.Code)
 }

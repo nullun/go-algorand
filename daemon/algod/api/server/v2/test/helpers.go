@@ -184,8 +184,8 @@ func (m *mockNode) GetPendingTransaction(txID transactions.Txid) (res node.TxnWi
 	return
 }
 
-func (m *mockNode) GetPendingTxnsFromPool() ([]transactions.SignedTxn, error) {
-	return txnPoolGolden, m.err
+func (m *mockNode) GetPendingTxGroupsFromPool() ([][]transactions.SignedTxn, error) {
+	return bookkeeping.SignedTxnsToGroups(txnPoolGolden), m.err
 }
 
 func (m *mockNode) SuggestedFee() basics.MicroAlgos {

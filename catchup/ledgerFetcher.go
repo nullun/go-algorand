@@ -18,6 +18,7 @@ package catchup
 
 import (
 	"archive/tar"
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -39,8 +40,31 @@ import (
 var errNoLedgerForRound = errors.New("no ledger available for given round")
 
 const (
-	// maxCatchpointFileChunkSize is a rough estimate for the worst-case scenario we're going to have of all the accounts data per a single catchpoint file chunk and one account with max resources.
-	maxCatchpointFileChunkSize = ledger.BalancesPerCatchpointFileChunk*(ledger.MaxEncodedBaseAccountDataSize+encoded.MaxEncodedKVDataSize) + ledger.ResourcesPerCatchpointFileChunk*ledger.MaxEncodedBaseResourceDataSize
+	// legacyResourcesPerCatchpointFileChunk is the resource count that writers
+	// predating the byte-based bound used to batch by. It survives only to size
+	// maxCatchpointFileChunkDownloadSize.
+	legacyResourcesPerCatchpointFileChunk = 100_000
+
+	// maxCatchpointSectionAllocHint is the non-resource portion of a catchpoint
+	// chunk: up to BalancesPerCatchpointFileChunk accounts plus the same number of
+	// KV pairs, both hard-capped in count (a maximal KV chunk is exactly
+	// BalancesPerCatchpointFileChunk*MaxEncodedKVDataSize). It bounds how much
+	// memory readCatchpointFileChunk reserves up front for a section whose size a
+	// peer has declared but not yet sent. The much larger remaining term of
+	// maxCatchpointFileChunkDownloadSize comes from per-account resources, which
+	// only approach their bound for pathological all-max-app accounts that do not
+	// occur in practice, so realistic sections are received in a single allocation.
+	maxCatchpointSectionAllocHint = ledger.BalancesPerCatchpointFileChunk * (ledger.MaxEncodedBaseAccountDataSize + encoded.MaxEncodedKVDataSize)
+
+	// maxCatchpointFileChunkDownloadSize accepts the largest chunk that an older
+	// writer could produce, which is roughly 2.8 GiB. The writer now bounds its
+	// chunks at ledger.MaxCatchpointFileChunkSize, so once catchpoint files
+	// predating that bound age out of support this can be lowered to match.
+	// Until then it is only an acceptance ceiling: what a download actually
+	// allocates is governed by maxCatchpointSectionAllocHint and by the bytes
+	// the peer really sends.
+	maxCatchpointFileChunkDownloadSize = maxCatchpointSectionAllocHint +
+		legacyResourcesPerCatchpointFileChunk*ledger.MaxEncodedBaseResourceDataSize
 	// defaultMinCatchpointFileDownloadBytesPerSecond defines the worst-case scenario download speed we expect to get while downloading a catchpoint file
 	defaultMinCatchpointFileDownloadBytesPerSecond = 20 * 1024
 	// catchpointFileStreamReadSize defines the number of bytes we would attempt to read at each iteration from the incoming http data stream
@@ -48,6 +72,37 @@ const (
 )
 
 var errNonHTTPPeer = fmt.Errorf("downloadLedger : non-HTTPPeer encountered")
+
+func validateCatchpointFileChunkSize(size int64) error {
+	if size > maxCatchpointFileChunkDownloadSize || size < 1 {
+		return fmt.Errorf("getPeerLedger received a tar header with data size of %d", size)
+	}
+	return nil
+}
+
+// readCatchpointFileChunk reads one catchpoint tar section into buf and returns
+// its contents, which remain valid only until the next call.
+//
+// size is declared by the remote peer and checked against
+// maxCatchpointFileChunkDownloadSize before this is called, but that ceiling is
+// far larger than any real chunk. Reserving it outright would let a peer force a
+// multi-gigabyte allocation by declaring a section it never sends, so only
+// maxCatchpointSectionAllocHint is reserved up front and buf grows to hold
+// whatever actually arrives. buf is reused across sections, so a download of
+// same-sized chunks settles into a single allocation.
+func readCatchpointFileChunk(reader io.Reader, size int64, buf *bytes.Buffer) ([]byte, error) {
+	buf.Reset()
+	buf.Grow(int(min(size, maxCatchpointSectionAllocHint)))
+	if _, err := io.Copy(buf, io.LimitReader(reader, size)); err != nil {
+		return nil, err
+	}
+	// io.Copy stops at the end of the section rather than at size, so this
+	// restores the "exactly size bytes or fail" guarantee io.ReadFull gave.
+	if int64(buf.Len()) != size {
+		return nil, fmt.Errorf("catchpoint chunk declared %d bytes but %d were received", size, buf.Len())
+	}
+	return buf.Bytes(), nil
+}
 
 type ledgerFetcherReporter interface {
 	updateLedgerFetcherProgress(*ledger.CatchpointCatchupAccessorProgress)
@@ -156,12 +211,12 @@ func (lf *ledgerFetcher) getPeerLedger(ctx context.Context, peer network.HTTPPee
 	// maxCatchpointFileChunkDownloadDuration is the maximum amount of time we would wait to download a single chunk off a catchpoint file
 	maxCatchpointFileChunkDownloadDuration := 2 * time.Minute
 	if lf.config.MinCatchpointFileDownloadBytesPerSecond > 0 {
-		maxCatchpointFileChunkDownloadDuration += maxCatchpointFileChunkSize * time.Second / time.Duration(lf.config.MinCatchpointFileDownloadBytesPerSecond)
+		maxCatchpointFileChunkDownloadDuration += maxCatchpointFileChunkDownloadSize * time.Second / time.Duration(lf.config.MinCatchpointFileDownloadBytesPerSecond)
 	} else {
-		maxCatchpointFileChunkDownloadDuration += maxCatchpointFileChunkSize * time.Second / defaultMinCatchpointFileDownloadBytesPerSecond
+		maxCatchpointFileChunkDownloadDuration += maxCatchpointFileChunkDownloadSize * time.Second / defaultMinCatchpointFileDownloadBytesPerSecond
 	}
 
-	watchdogReader := util.MakeWatchdogStreamReader(response.Body, catchpointFileStreamReadSize, 2*maxCatchpointFileChunkSize, maxCatchpointFileChunkDownloadDuration)
+	watchdogReader := util.MakeWatchdogStreamReader(response.Body, catchpointFileStreamReadSize, 2*maxCatchpointFileChunkDownloadSize, maxCatchpointFileChunkDownloadDuration)
 	defer watchdogReader.Close()
 	tarReader := tar.NewReader(watchdogReader)
 	var downloadProgress ledger.CatchpointCatchupAccessorProgress
@@ -181,6 +236,7 @@ func (lf *ledgerFetcher) getPeerLedger(ctx context.Context, peer network.HTTPPee
 			writeDuration/time.Second)
 	}
 
+	var chunkBuffer bytes.Buffer
 	for {
 		header, err := tarReader.Next()
 		if err != nil {
@@ -190,11 +246,10 @@ func (lf *ledgerFetcher) getPeerLedger(ctx context.Context, peer network.HTTPPee
 			}
 			return err
 		}
-		if header.Size > maxCatchpointFileChunkSize || header.Size < 1 {
-			return fmt.Errorf("getPeerLedger received a tar header with data size of %d", header.Size)
+		if err = validateCatchpointFileChunkSize(header.Size); err != nil {
+			return err
 		}
-		balancesBlockBytes := make([]byte, header.Size)
-		_, err = io.ReadFull(tarReader, balancesBlockBytes)
+		balancesBlockBytes, err := readCatchpointFileChunk(tarReader, header.Size, &chunkBuffer)
 		if err != nil {
 			return err
 		}

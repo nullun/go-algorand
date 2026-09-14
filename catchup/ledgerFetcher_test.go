@@ -18,10 +18,12 @@ package catchup
 
 import (
 	"archive/tar"
+	"bytes"
 	"context"
 	"fmt"
 	"net"
 	"net/http"
+	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -40,6 +42,111 @@ type dummyLedgerFetcherReporter struct {
 }
 
 func (lf *dummyLedgerFetcherReporter) updateLedgerFetcherProgress(*ledger.CatchpointCatchupAccessorProgress) {
+}
+
+func TestValidateCatchpointFileChunkSize(t *testing.T) {
+	partitiontest.PartitionTest(t)
+	t.Parallel()
+
+	require.Error(t, validateCatchpointFileChunkSize(0))
+	require.NoError(t, validateCatchpointFileChunkSize(ledger.MaxCatchpointFileChunkSize))
+	require.NoError(t, validateCatchpointFileChunkSize(maxCatchpointFileChunkDownloadSize))
+	require.Error(t, validateCatchpointFileChunkSize(maxCatchpointFileChunkDownloadSize+1))
+	// the download bound must accept everything the writer can produce
+	require.GreaterOrEqual(t, int64(maxCatchpointFileChunkDownloadSize), int64(ledger.MaxCatchpointFileChunkSize))
+}
+
+func TestReadCatchpointFileChunk(t *testing.T) {
+	partitiontest.PartitionTest(t)
+	t.Parallel()
+
+	var buf bytes.Buffer
+	data, err := readCatchpointFileChunk(bytes.NewReader([]byte("first")), 5, &buf)
+	require.NoError(t, err)
+	require.Equal(t, []byte("first"), data)
+	firstCapacity := buf.Cap()
+
+	// the buffer is reused, so a second section of the same shape does not grow it
+	data, err = readCatchpointFileChunk(bytes.NewReader([]byte("next")), 4, &buf)
+	require.NoError(t, err)
+	require.Equal(t, []byte("next"), data)
+	require.Equal(t, firstCapacity, buf.Cap())
+}
+
+func TestReadCatchpointFileChunkRejectsShortSection(t *testing.T) {
+	partitiontest.PartitionTest(t)
+	t.Parallel()
+
+	var buf bytes.Buffer
+	_, err := readCatchpointFileChunk(bytes.NewReader([]byte("short")), 64, &buf)
+	require.ErrorContains(t, err, "declared 64 bytes but 5 were received")
+}
+
+// TestReadCatchpointFileChunkDoesNotPreallocate asserts that a section size a
+// peer declares but does not send is not reserved up front. A peer may legally
+// declare up to maxCatchpointFileChunkDownloadSize (~2.8 GiB); only
+// maxCatchpointSectionAllocHint may be reserved before data arrives.
+func TestReadCatchpointFileChunkDoesNotPreallocate(t *testing.T) {
+	partitiontest.PartitionTest(t)
+	t.Parallel()
+
+	var buf bytes.Buffer
+	_, err := readCatchpointFileChunk(bytes.NewReader(nil), maxCatchpointFileChunkDownloadSize, &buf)
+	require.ErrorContains(t, err, "0 were received")
+	require.LessOrEqual(t, buf.Cap(), 2*maxCatchpointSectionAllocHint,
+		"reserved %d bytes for a declared but unsent section", buf.Cap())
+}
+
+// TestLedgerFetcherDoesNotPreallocateTarSize is the end-to-end form of the
+// check above: a peer declaring a large tar section and sending almost nothing
+// must not drive the fetch's allocation.
+func TestLedgerFetcherDoesNotPreallocateTarSize(t *testing.T) {
+	partitiontest.PartitionTest(t)
+	// Intentionally not parallel: this measures process-wide allocation, which
+	// concurrently running tests would perturb.
+
+	// Large enough that a pre-allocation dwarfs the threshold asserted below,
+	// small enough that a regressed build fails rather than exhausting memory.
+	const declaredSize = int64(512 << 20) // 512 MiB
+
+	mux := http.NewServeMux()
+	s := &http.Server{Handler: mux}
+	listener, err := net.Listen("tcp", "localhost:")
+	require.NoError(t, err)
+	go s.Serve(listener)
+	defer s.Close()
+	defer listener.Close()
+
+	mux.HandleFunc("/", func(w http.ResponseWriter, req *http.Request) {
+		w.Header().Add("Content-Type", rpcs.LedgerResponseContentType)
+		w.WriteHeader(http.StatusOK)
+		wtar := tar.NewWriter(w)
+		// Declare a large section but send only a few bytes, then end the
+		// response so the client observes a truncated section.
+		if werr := wtar.WriteHeader(&tar.Header{Name: "balances.1.msgpack", Size: declaredSize}); werr != nil {
+			return
+		}
+		_, _ = wtar.Write([]byte("truncated section"))
+	})
+
+	peer := testHTTPPeer(listener.Addr().String())
+	lf := makeLedgerFetcher(&mocks.MockNetwork{}, &mocks.MockCatchpointCatchupAccessor{}, logging.TestingLog(t), &dummyLedgerFetcherReporter{}, config.GetDefaultLocal())
+
+	var before, after runtime.MemStats
+	runtime.GC()
+	runtime.ReadMemStats(&before)
+	err = lf.getPeerLedger(context.Background(), &peer, basics.Round(0))
+	runtime.ReadMemStats(&after)
+
+	// The truncated section must surface as an error rather than being processed.
+	require.Error(t, err)
+
+	// TotalAlloc is cumulative, so the delta is what the fetch allocated. Before
+	// the fix this included make([]byte, header.Size).
+	allocated := after.TotalAlloc - before.TotalAlloc
+	require.Less(t, allocated, uint64(64<<20),
+		"getPeerLedger allocated %d bytes for a peer-declared section size of %d; it must not pre-allocate based on the tar header",
+		allocated, declaredSize)
 }
 
 func TestNoPeersAvailable(t *testing.T) {

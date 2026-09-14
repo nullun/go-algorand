@@ -683,7 +683,7 @@ func (ct *catchpointTracker) postCommit(ctx context.Context, dcc *deferredCommit
 	}
 }
 
-func doRepackCatchpoint(ctx context.Context, header CatchpointFileHeader, biggestChunkLen uint64, in *tar.Reader, out *tar.Writer) error {
+func doRepackCatchpoint(ctx context.Context, header CatchpointFileHeader, in *tar.Reader, out *tar.Writer) error {
 	bytes := protocol.Encode(&header)
 
 	err := out.WriteHeader(&tar.Header{
@@ -700,8 +700,6 @@ func doRepackCatchpoint(ctx context.Context, header CatchpointFileHeader, bigges
 		return err
 	}
 
-	// make buffer for re-use that can fit biggest chunk
-	buf := make([]byte, biggestChunkLen)
 	for {
 		err := ctx.Err()
 		if err != nil {
@@ -716,20 +714,12 @@ func doRepackCatchpoint(ctx context.Context, header CatchpointFileHeader, bigges
 			return err
 		}
 
-		n, err := io.ReadAtLeast(in, buf, int(header.Size))
-		if (err != nil) && (err != io.EOF) {
-			return err
-		}
-		if int64(n) != header.Size { // should not happen
-			return fmt.Errorf("read too many bytes from chunk %+v", header)
-		}
-
 		err = out.WriteHeader(header)
 		if err != nil {
 			return err
 		}
 
-		_, err = out.Write(buf[:header.Size])
+		_, err = io.CopyN(out, in, header.Size)
 		if err != nil {
 			return err
 		}
@@ -741,7 +731,7 @@ func doRepackCatchpoint(ctx context.Context, header CatchpointFileHeader, bigges
 // dataPath and regurgitates it to look like catchpoints have always looked - a
 // tar file with the header in the first "file" and the catchpoint data in file
 // chunks, all compressed with gzip instead of snappy.
-func repackCatchpoint(ctx context.Context, header CatchpointFileHeader, biggestChunkLen uint64, dataPath string, outPath string) error {
+func repackCatchpoint(ctx context.Context, header CatchpointFileHeader, dataPath string, outPath string) error {
 	// Initialize streams.
 	fin, err := os.OpenFile(dataPath, os.O_RDONLY, 0666)
 	if err != nil {
@@ -773,7 +763,7 @@ func repackCatchpoint(ctx context.Context, header CatchpointFileHeader, biggestC
 	defer tarOut.Close()
 
 	// Repack.
-	err = doRepackCatchpoint(ctx, header, biggestChunkLen, tarIn, tarOut)
+	err = doRepackCatchpoint(ctx, header, tarIn, tarOut)
 	if err != nil {
 		return err
 	}
@@ -883,7 +873,7 @@ func (ct *catchpointTracker) createCatchpoint(ctx context.Context, accountsRound
 		return err
 	}
 
-	err = repackCatchpoint(ctx, header, dataInfo.BiggestChunkLen, catchpointDataFilePath, absCatchpointFilePath)
+	err = repackCatchpoint(ctx, header, catchpointDataFilePath, absCatchpointFilePath)
 	if err != nil {
 		return err
 	}

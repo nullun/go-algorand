@@ -85,6 +85,44 @@ func TestAccountsDbQueriesCreateClose(t *testing.T) {
 	require.Nil(t, qs.lookupAccountStmt)
 }
 
+func TestEncodedAccountsBatchIterResourceByteLimit(t *testing.T) {
+	partitiontest.PartitionTest(t)
+
+	dbs, _ := storetesting.DbOpenTest(t, true)
+	defer dbs.Close()
+
+	address := basics.Address{1}
+	account := basics.AccountData{
+		MicroAlgos: basics.MicroAlgos{Raw: 1_000_000},
+		Assets: map[basics.AssetIndex]basics.AssetHolding{
+			1: {Amount: 1},
+			2: {Amount: 2},
+			3: {Amount: 3},
+		},
+	}
+
+	err := dbs.Wdb.Atomic(func(ctx context.Context, tx *sql.Tx) error {
+		AccountsInitTest(t, tx, map[basics.Address]basics.AccountData{address: account}, protocol.ConsensusCurrentVersion)
+		iterator := MakeEncodedAccountsBatchIter(tx)
+		defer iterator.Close()
+
+		var resources, completeAccounts int
+		for resources < len(account.Assets) {
+			balances, _, err := iterator.Next(ctx, 512, 100_000, 1)
+			require.NoError(t, err)
+			require.Len(t, balances, 1)
+			resources += len(balances[0].Resources)
+			if !balances[0].ExpectingMoreEntries {
+				completeAccounts++
+			}
+		}
+		require.Equal(t, len(account.Assets), resources)
+		require.Equal(t, 1, completeAccounts)
+		return nil
+	})
+	require.NoError(t, err)
+}
+
 // TestWrapIOError ensures that SQL ErrIOErr is converted to trackerdb.ErrIoErr
 // github.com/mattn/go-sqlite3/blob/master/error.go
 // github.com/mattn/go-sqlite3/blob/master/sqlite3.go#L830

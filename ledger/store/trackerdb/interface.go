@@ -254,7 +254,7 @@ type TableIterator[T any] interface {
 
 // EncodedAccountsBatchIter is an iterator for a accounts.
 type EncodedAccountsBatchIter interface {
-	Next(ctx context.Context, accountCount int, resourceCount int) (bals []encoded.BalanceRecordV6, numAccountsProcessed uint64, err error)
+	Next(ctx context.Context, accountCount int, resourceCount int, resourceBytes int) (bals []encoded.BalanceRecordV6, numAccountsProcessed uint64, err error)
 	Close()
 }
 

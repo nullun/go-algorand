@@ -168,7 +168,7 @@ func (iterator *orderedAccountsIter) Next(ctx context.Context) (acct []trackerdb
 		count, iterator.pendingBaseRow, iterator.pendingResourceRow, err = processAllBaseAccountRecords(
 			iterator.accountBaseRows, iterator.resourcesRows,
 			baseCb, resCb,
-			iterator.pendingBaseRow, iterator.pendingResourceRow, iterator.accountCount, math.MaxInt,
+			iterator.pendingBaseRow, iterator.pendingResourceRow, iterator.accountCount, math.MaxInt, 0,
 		)
 		if err != nil {
 			iterator.Close(ctx)
@@ -282,7 +282,7 @@ func processAllBaseAccountRecords(
 	resRows *sql.Rows,
 	baseCb func(addr basics.Address, rowid int64, accountData *trackerdb.BaseAccountData, encodedAccountData []byte) error,
 	resCb func(addr basics.Address, creatableIdx basics.CreatableIndex, resData *trackerdb.ResourcesData, encodedResourceData []byte, lastResource bool) error,
-	pendingBase pendingBaseRow, pendingResource pendingResourceRow, accountCount int, resourceCount int,
+	pendingBase pendingBaseRow, pendingResource pendingResourceRow, accountCount int, resourceCount int, resourceBytes int,
 ) (int, pendingBaseRow, pendingResourceRow, error) {
 	var addr basics.Address
 	var prevAddr basics.Address
@@ -329,14 +329,17 @@ func processAllBaseAccountRecords(
 			return 0, pendingBaseRow{}, pendingResourceRow{}, err
 		}
 
-		var resourcesProcessed int
-		pendingResource, resourcesProcessed, err = processAllResources(resRows, addr, &accountData, rowid, pendingResource, resourceCount, resCb)
+		var resourcesProcessed, resourceBytesProcessed int
+		pendingResource, resourcesProcessed, resourceBytesProcessed, err = processAllResources(
+			resRows, addr, &accountData, rowid, pendingResource, resourceCount, resourceBytes, resCb)
 		if err != nil {
 			err = fmt.Errorf("failed to gather resources for account %v, addrid %d, prev address %v : %w", addr, rowid, prevAddr, err)
 			return 0, pendingBaseRow{}, pendingResourceRow{}, err
 		}
 
-		if resourcesProcessed == resourceCount {
+		resourceLimitReached := resourcesProcessed == resourceCount
+		byteLimitReached := resourceBytes > 0 && resourceBytesProcessed >= resourceBytes
+		if resourceLimitReached || byteLimitReached {
 			// we're done with this iteration.
 			pendingBase := pendingBaseRow{
 				addr:               addr,
@@ -347,6 +350,9 @@ func processAllBaseAccountRecords(
 			return count, pendingBase, pendingResource, nil
 		}
 		resourceCount -= resourcesProcessed
+		if resourceBytes > 0 {
+			resourceBytes -= resourceBytesProcessed
+		}
 
 		count++
 		if accountCount > 0 && count == accountCount {
@@ -361,11 +367,12 @@ func processAllBaseAccountRecords(
 
 func processAllResources(
 	resRows *sql.Rows,
-	addr basics.Address, accountData *trackerdb.BaseAccountData, acctRowid int64, pr pendingResourceRow, resourceCount int,
+	addr basics.Address, accountData *trackerdb.BaseAccountData, acctRowid int64, pr pendingResourceRow, resourceCount int, resourceBytes int,
 	callback func(addr basics.Address, creatableIdx basics.CreatableIndex, resData *trackerdb.ResourcesData, encodedResourceData []byte, lastResource bool) error,
-) (pendingResourceRow, int, error) {
+) (pendingResourceRow, int, int, error) {
 	var err error
 	count := 0
+	encodedBytes := 0
 
 	// Declare variabled outside of the loop to prevent allocations per iteration.
 	// At least resData is resolved as "escaped" because of passing it by a pointer to protocol.Decode()
@@ -381,11 +388,11 @@ func processAllResources(
 			// and we need to skip accounts without resources
 			if pr.addrid > acctRowid {
 				err = callback(addr, 0, nil, nil, false)
-				return pr, count, err
+				return pr, count, encodedBytes, err
 			}
 			if pr.addrid < acctRowid {
 				err = fmt.Errorf("resource table entries mismatches accountbase table entries : reached addrid %d while expecting resource for %d", pr.addrid, acctRowid)
-				return pendingResourceRow{}, count, err
+				return pendingResourceRow{}, count, encodedBytes, err
 			}
 			addrid = pr.addrid
 			buf = pr.buf
@@ -395,37 +402,40 @@ func processAllResources(
 			if !resRows.Next() {
 				err = callback(addr, 0, nil, nil, false)
 				if err != nil {
-					return pendingResourceRow{}, count, err
+					return pendingResourceRow{}, count, encodedBytes, err
 				}
 				break
 			}
 			err = resRows.Scan(&addrid, &aidx, &buf)
 			if err != nil {
-				return pendingResourceRow{}, count, err
+				return pendingResourceRow{}, count, encodedBytes, err
 			}
 			if addrid < acctRowid {
 				err = fmt.Errorf("resource table entries mismatches accountbase table entries : reached addrid %d while expecting resource for %d", addrid, acctRowid)
-				return pendingResourceRow{}, count, err
+				return pendingResourceRow{}, count, encodedBytes, err
 			} else if addrid > acctRowid {
 				err = callback(addr, 0, nil, nil, false)
-				return pendingResourceRow{addrid, aidx, buf}, count, err
+				return pendingResourceRow{addrid, aidx, buf}, count, encodedBytes, err
 			}
 		}
 		resData = trackerdb.ResourcesData{}
 		err = protocol.Decode(buf, &resData)
 		if err != nil {
-			return pendingResourceRow{}, count, err
+			return pendingResourceRow{}, count, encodedBytes, err
 		}
 		count++
-		if resourceCount > 0 && count == resourceCount {
+		encodedBytes += len(buf)
+		resourceLimitReached := resourceCount > 0 && count == resourceCount
+		byteLimitReached := resourceBytes > 0 && encodedBytes >= resourceBytes
+		if resourceLimitReached || byteLimitReached {
 			// last resource to be included in chunk
 			err = callback(addr, aidx, &resData, buf, true)
-			return pendingResourceRow{}, count, err
+			return pendingResourceRow{}, count, encodedBytes, err
 		}
 		err = callback(addr, aidx, &resData, buf, false)
 		if err != nil {
-			return pendingResourceRow{}, count, err
+			return pendingResourceRow{}, count, encodedBytes, err
 		}
 	}
-	return pendingResourceRow{}, count, nil
+	return pendingResourceRow{}, count, encodedBytes, nil
 }

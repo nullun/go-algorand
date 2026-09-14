@@ -53,7 +53,7 @@ func MakeEncodedAccountsBatchIter(q db.Queryable) *encodedAccountsBatchIter {
 
 // Next returns an array containing the account data, in the same way it appear in the database
 // returning accountCount accounts data at a time.
-func (iterator *encodedAccountsBatchIter) Next(ctx context.Context, accountCount int, resourceCount int) (bals []encoded.BalanceRecordV6, numAccountsProcessed uint64, err error) {
+func (iterator *encodedAccountsBatchIter) Next(ctx context.Context, accountCount int, resourceCount int, resourceBytes int) (bals []encoded.BalanceRecordV6, numAccountsProcessed uint64, err error) {
 	if iterator.accountsRows == nil {
 		iterator.accountsRows, err = iterator.q.QueryContext(ctx, "SELECT rowid, address, data FROM accountbase ORDER BY rowid")
 		if err != nil {
@@ -133,7 +133,7 @@ func (iterator *encodedAccountsBatchIter) Next(ctx context.Context, accountCount
 	_, iterator.nextBaseRow, iterator.nextResourceRow, err = processAllBaseAccountRecords(
 		iterator.accountsRows, iterator.resourcesRows,
 		baseCb, resCb,
-		iterator.nextBaseRow, iterator.nextResourceRow, accountCount, resourceCount,
+		iterator.nextBaseRow, iterator.nextResourceRow, accountCount, resourceCount, resourceBytes,
 	)
 	if err != nil {
 		iterator.Close()

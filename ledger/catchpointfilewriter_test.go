@@ -23,6 +23,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -55,6 +56,38 @@ import (
 type decodedCatchpointChunkData struct {
 	headerName string
 	data       []byte
+}
+
+func TestMaxCatchpointFileChunkSize(t *testing.T) {
+	partitiontest.PartitionTest(t)
+	t.Parallel()
+
+	maxBudgetedBalanceChunkSize := catchpointFileChunkEncodingOverhead +
+		BalancesPerCatchpointFileChunk*MaxEncodedBaseAccountDataSize +
+		resourceDataBytesPerCatchpointFileChunk +
+		MaxEncodedBaseResourceDataSize
+	require.LessOrEqual(t, maxBudgetedBalanceChunkSize, MaxCatchpointFileChunkSize)
+	require.Equal(t, 100_000, ResourcesPerCatchpointFileChunk)
+
+	worstCaseKVChunkSize := BalancesPerCatchpointFileChunk * encoded.MaxEncodedKVDataSize
+	require.LessOrEqual(t, worstCaseKVChunkSize, MaxCatchpointFileChunkSize)
+
+	require.NoError(t, validateCatchpointFileChunkSize(MaxCatchpointFileChunkSize))
+	require.Error(t, validateCatchpointFileChunkSize(MaxCatchpointFileChunkSize+1))
+}
+
+func TestQueueCatchpointFileChunkReturnsWriterErrorWhenQueueIsFull(t *testing.T) {
+	partitiontest.PartitionTest(t)
+	t.Parallel()
+
+	chunks := make(chan CatchpointSnapshotChunkV6, 1)
+	chunks <- CatchpointSnapshotChunkV6{KVs: []encoded.KVRecordV6{{}}}
+	response := make(chan error, 1)
+	expectedErr := errors.New("writer failed")
+	response <- expectedErr
+
+	err := queueCatchpointFileChunk(context.Background(), chunks, response, CatchpointSnapshotChunkV6{})
+	require.ErrorIs(t, err, expectedErr)
 }
 
 func readCatchpointContent(t *testing.T, tarReader *tar.Reader) []decodedCatchpointChunkData {
@@ -203,7 +236,7 @@ func TestCatchpointFileBalancesChunkEncoding(t *testing.T) {
 	const numChunkEntries = BalancesPerCatchpointFileChunk / 50
 	require.Greater(t, numChunkEntries, 1)
 
-	const numResources = ResourcesPerCatchpointFileChunk / 10000
+	const numResources = ResourcesPerCatchpointFileChunk / 1000
 	require.Greater(t, numResources, 1)
 
 	baseAD := randomBaseAccountData()
@@ -310,15 +343,22 @@ func TestBasicCatchpointWriter(t *testing.T) {
 	balanceFileName := fmt.Sprintf(catchpointBalancesFileNameTemplate, 1)
 	require.Equal(t, balanceFileName, catchpointContent[1].headerName)
 
-	var chunk CatchpointSnapshotChunkV6
-	err = protocol.Decode(catchpointContent[1].data, &chunk)
-	require.NoError(t, err)
-	require.Equal(t, uint64(len(accts)), uint64(len(chunk.Balances)))
+	var completeAccounts int
+	for _, content := range catchpointContent[1:] {
+		var chunk CatchpointSnapshotChunkV6
+		err = protocol.Decode(content.data, &chunk)
+		require.NoError(t, err)
+		for _, balance := range chunk.Balances {
+			if !balance.ExpectingMoreEntries {
+				completeAccounts++
+			}
+		}
+	}
+	require.Equal(t, len(accts), completeAccounts)
 }
 
 func testWriteCatchpoint(t *testing.T, params config.ConsensusParams, rdb trackerdb.Store, datapath string, filepath string, maxResourcesPerChunk int, onlineExcludeBefore basics.Round) CatchpointFileHeader {
 	var totalAccounts, totalKVs, totalOnlineAccounts, totalOnlineRoundParams, totalChunks uint64
-	var biggestChunkLen uint64
 	var accountsRnd basics.Round
 	var totals ledgercore.AccountTotals
 	if maxResourcesPerChunk <= 0 {
@@ -362,7 +402,6 @@ func testWriteCatchpoint(t *testing.T, params config.ConsensusParams, rdb tracke
 		totalOnlineAccounts = writer.totalOnlineAccounts
 		totalOnlineRoundParams = writer.totalOnlineRoundParams
 		totalChunks = writer.chunkNum
-		biggestChunkLen = writer.biggestChunkLen
 		totals, err = ar.AccountsTotals(ctx, false)
 		return
 	})
@@ -384,7 +423,7 @@ func testWriteCatchpoint(t *testing.T, params config.ConsensusParams, rdb tracke
 		BlockHeaderDigest:      blockHeaderDigest,
 	}
 	err = repackCatchpoint(
-		context.Background(), catchpointFileHeader, biggestChunkLen,
+		context.Background(), catchpointFileHeader,
 		datapath, filepath)
 	require.NoError(t, err)
 

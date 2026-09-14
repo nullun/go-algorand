@@ -37,16 +37,35 @@ const (
 	// note that the last chunk would typically be less than this number.
 	BalancesPerCatchpointFileChunk = 512
 
+	// MaxCatchpointFileChunkSize bounds the memory needed to receive and
+	// decode one catchpoint archive entry.
+	MaxCatchpointFileChunkSize = 64 * 1024 * 1024
+
+	// catchpointFileChunkEncodingOverhead leaves room for account data and
+	// messagepack framing around the encoded resources in a balance chunk.
+	catchpointFileChunkEncodingOverhead = 1024 * 1024
+
 	// ResourcesPerCatchpointFileChunk defines the max number of resources that go in a singular chunk
-	// 100,000 resources * 20KB/resource => roughly max 2GB per chunk if all of them are max'ed out apps.
-	// In reality most entries are asset holdings, and they are very small.
 	ResourcesPerCatchpointFileChunk = 100_000
+
+	// resourceDataBytesPerCatchpointFileChunk limits chunks by their actual encoded
+	// resource data size without penalizing small asset resources. One maximum-size
+	// resource is reserved because the iterator stops after crossing this threshold.
+	resourceDataBytesPerCatchpointFileChunk = MaxCatchpointFileChunkSize - catchpointFileChunkEncodingOverhead -
+		BalancesPerCatchpointFileChunk*MaxEncodedBaseAccountDataSize - MaxEncodedBaseResourceDataSize
 
 	// SPContextPerCatchpointFile defines the maximum number of state proof verification data stored
 	// in the catchpoint file.
 	// (2 years * 31536000 seconds per year) / (256 rounds per state proof verification data * 3.6 seconds per round) ~= 70000
 	SPContextPerCatchpointFile = 70000
 )
+
+func validateCatchpointFileChunkSize(size int) error {
+	if size > MaxCatchpointFileChunkSize {
+		return fmt.Errorf("catchpoint chunk size %d exceeds limit %d", size, MaxCatchpointFileChunkSize)
+	}
+	return nil
+}
 
 // catchpointFileWriter is the struct managing the persistence of accounts data into the catchpoint file.
 // it's designed to work in a step fashion : a caller will call the FileWriteStep method in a loop until
@@ -184,6 +203,9 @@ func (cw *catchpointFileWriter) Abort() error {
 }
 
 func (cw *catchpointFileWriter) FileWriteSPVerificationContext(encodedData []byte) error {
+	if err := validateCatchpointFileChunkSize(len(encodedData)); err != nil {
+		return err
+	}
 	err := cw.tar.WriteHeader(&tar.Header{
 		Name: catchpointSPVerificationFileName,
 		Mode: 0600,
@@ -204,6 +226,17 @@ func (cw *catchpointFileWriter) FileWriteSPVerificationContext(encodedData []byt
 	}
 
 	return nil
+}
+
+func queueCatchpointFileChunk(ctx context.Context, chunks chan<- CatchpointSnapshotChunkV6, response <-chan error, chunk CatchpointSnapshotChunkV6) error {
+	select {
+	case chunks <- chunk:
+		return nil
+	case err := <-response:
+		return err
+	case <-ctx.Done():
+		return ctx.Err()
+	}
 }
 
 // FileWriteStep works for a short period of time (determined by stepCtx) to get
@@ -290,18 +323,14 @@ func (cw *catchpointFileWriter) FileWriteStep(stepCtx context.Context) (more boo
 			return
 		}
 
-		// check if we had any error on the writer from previous iterations.
-		// this should not be required for correctness, since we'll find the
-		// error in the defer block. But this might notice earlier.
-		select {
-		case err := <-writerResponse:
+		err = queueCatchpointFileChunk(stepCtx, writerRequest, writerResponse, cw.chunk)
+		if err != nil {
+			if stepCtx.Err() != nil {
+				return hasContextDeadlineExceeded(stepCtx)
+			}
 			return false, err
-		default:
 		}
-
-		// send the chunk to the asyncWriter channel
 		cw.chunkNum++
-		writerRequest <- cw.chunk
 		// indicate that we need a readDatabaseStep
 		cw.chunk = CatchpointSnapshotChunkV6{}
 	}
@@ -315,6 +344,10 @@ func (cw *catchpointFileWriter) asyncWriter(chunks chan CatchpointSnapshotChunkV
 			break
 		}
 		encodedChunk := protocol.Encode(&chk)
+		if err := validateCatchpointFileChunkSize(len(encodedChunk)); err != nil {
+			response <- err
+			break
+		}
 		err := cw.tar.WriteHeader(&tar.Header{
 			Name: fmt.Sprintf(catchpointBalancesFileNameTemplate, chunkNum),
 			Mode: 0600,
@@ -341,7 +374,8 @@ func (cw *catchpointFileWriter) asyncWriter(chunks chan CatchpointSnapshotChunkV
 // empty chunk between accounts and kvs.
 func (cw *catchpointFileWriter) readDatabaseStep(ctx context.Context) error {
 	if !cw.accountsDone {
-		balances, numAccounts, err := cw.accountsIterator.Next(ctx, BalancesPerCatchpointFileChunk, cw.maxResourcesPerChunk)
+		balances, numAccounts, err := cw.accountsIterator.Next(
+			ctx, BalancesPerCatchpointFileChunk, cw.maxResourcesPerChunk, resourceDataBytesPerCatchpointFileChunk)
 		if err != nil {
 			return err
 		}

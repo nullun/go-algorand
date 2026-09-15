@@ -32,6 +32,16 @@ type OpDesc struct {
 	Sugar      string // pseudo calling information
 }
 
+// A versionedNote is a paragraph of an opcode's extra documentation that is
+// only true for a range of program versions. Notes let the generated docs for
+// each version describe that version alone, instead of narrating the opcode's
+// whole history in every version's files.
+type versionedNote struct {
+	since uint64 // first version the note applies to
+	until uint64 // last version the note applies to; 0 means it still applies
+	text  string
+}
+
 var opDescByName = map[string]OpDesc{
 	"err": {"Fail immediately.", "", nil, ""},
 
@@ -222,7 +232,7 @@ var opDescByName = map[string]OpDesc{
 		"_Warning_: Usage should be restricted to very rare use cases, as JSON decoding is expensive and quite limited. In addition, JSON objects are large and not optimized for size.\n\nAlmost all smart contracts should use simpler and smaller methods (such as the [ABI](https://arc.algorand.foundation/ARCs/arc-0004)). This opcode should only be used in cases where JSON is the only available option, e.g. when a third-party only signs JSON.",
 		[]string{"return type index"}, ""},
 
-	"bnz":    {"branch to TARGET if value A is not zero", "From v1 to v12, the `bnz` opcode byte 0x40 is followed by exactly two immediate bytes, high byte first, which together form a 16 bit offset N. The instruction is 3 bytes long. For a bnz instruction at `pc`, if the last element of the stack is not zero then branch to the instruction at `pc + 3 + N`, else proceed to the next instruction at `pc + 3`. Starting at v4, the offset is treated as a signed 16 bit integer allowing for backward branches and looping. In prior version (v1 to v3), branch offsets are limited to forward branches only, 0-0x7fff.\n\nStarting at v13, the offset is encoded as a `binary.Varint` (zigzag plus ULEB128) of one or more bytes, so the instruction is `1 + len(offset)` bytes long. A non-negative offset N is measured from the end of the instruction: execution continues at `pc + 1 + len(offset) + N`. A negative offset N is measured from the start of the instruction: execution continues at `pc + N`. Not branching always continues at `pc + 1 + len(offset)`. A branch to the start of its own instruction cannot be encoded, since a zero offset means the following instruction; the assembler rejects the attempt.\n\nBranch targets must be aligned instructions at every version. (e.g. Branching to the second byte of a 2 byte op will be rejected.)\n\nAt v2 it became allowed to branch to the end of the program exactly after the last instruction: bnz to byte N (with 0-indexing) was illegal for a TEAL program with N bytes before v2, and is legal after it. This change eliminates the need for a last instruction of no-op as a branch target at the end. (Branching beyond the end--in other words, to a byte larger than N--is still illegal and will cause the program to fail.)", []string{"branch offset"}, ""},
+	"bnz":    {"branch to TARGET if value A is not zero", "", []string{"branch offset"}, ""},
 	"bz":     {"branch to TARGET if value A is zero", "See `bnz` for details on how branches work. `bz` inverts the behavior of `bnz`.", []string{"branch offset"}, ""},
 	"b":      {"branch unconditionally to TARGET", "See `bnz` for details on how branches work. `b` always jumps to the offset.", []string{"branch offset"}, ""},
 	"return": {"use A as success value; end", "", nil, ""},
@@ -255,19 +265,19 @@ var opDescByName = map[string]OpDesc{
 
 	"base64_decode": {"decode A which was base64-encoded using _encoding_ E. Fail if A is not base64 encoded with encoding E", "_Warning_: Usage should be restricted to very rare use cases. In almost all cases, smart contracts should directly handle non-encoded byte-strings. This opcode should only be used in cases where base64 is the only available option, e.g. interoperability with a third-party that only signs base64 strings.\n\n Decodes A using the base64 encoding E. Specify the encoding with an immediate arg either as URL and Filename Safe (`URLEncoding`) or Standard (`StdEncoding`). See [RFC 4648 sections 4 and 5](https://rfc-editor.org/rfc/rfc4648.html#section-4). It is assumed that the encoding ends with the exact number of `=` padding characters as required by the RFC. When padding occurs, any unused pad bits in the encoding must be set to zero or the decoding will fail. The special cases of `\\n` and `\\r` are allowed but completely ignored. An error will result when attempting to decode a string with a character that is not in the encoding alphabet or not one of `=`, `\\r`, or `\\n`.", []string{"encoding index"}, ""},
 
-	"balance":           {"balance for account A, in microalgos. The balance is observed after the effects of previous transactions in the group, and after the fee for the current transaction is deducted. Changes caused by inner transactions are observable immediately following `itxn_submit`", "params: Txn.Accounts offset (or, since v4, an _available_ account address). Return: value.", nil, ""},
-	"min_balance":       {"minimum required balance for account A, in microalgos. Required balance is affected by ASA, App, and Box usage. When creating or opting into an app, the minimum balance grows before the app code runs, therefore the increase is visible there. When deleting or closing out, the minimum balance decreases after the app executes. Changes caused by inner transactions or box usage are observable immediately following the opcode effecting the change.", "params: Txn.Accounts offset (or, since v4, an _available_ account address). Return: value.", nil, ""},
-	"app_opted_in":      {"1 if account A is opted in to application B, else 0", "params: Txn.Accounts offset (or, since v4, an _available_ account address), _available_ application id (or, since v4, a Txn.ForeignApps offset). Return: 1 if opted in and 0 otherwise.", nil, ""},
-	"app_local_get":     {"local state of the key B in the current application in account A", "params: Txn.Accounts offset (or, since v4, an _available_ account address), state key. Return: value. The value is zero (of type uint64) if the key does not exist.", nil, ""},
-	"app_local_get_ex":  {"X is the local state of application B, key C in account A. Y is 1 if key existed, else 0", "params: Txn.Accounts offset (or, since v4, an _available_ account address), _available_ application id (or, since v4, a Txn.ForeignApps offset), state key. Return: did_exist flag (top of the stack, 1 if the application and key existed and 0 otherwise), value. The value is zero (of type uint64) if the key does not exist.", nil, ""},
+	"balance":           {"balance for account A, in microalgos. The balance is observed after the effects of previous transactions in the group, and after the fee for the current transaction is deducted", "", nil, ""},
+	"min_balance":       {"minimum required balance for account A, in microalgos", "", nil, ""},
+	"app_opted_in":      {"1 if account A is opted in to application B, else 0", "", nil, ""},
+	"app_local_get":     {"local state of the key B in the current application in account A", "", nil, ""},
+	"app_local_get_ex":  {"X is the local state of application B, key C in account A. Y is 1 if key existed, else 0", "", nil, ""},
 	"app_global_get":    {"global state of the key A in the current application", "params: state key. Return: value. The value is zero (of type uint64) if the key does not exist.", nil, ""},
-	"app_global_get_ex": {"X is the global state of application A, key B. Y is 1 if key existed, else 0", "params: Txn.ForeignApps offset (or, since v4, an _available_ application id), state key. Return: did_exist flag (top of the stack, 1 if the application and key existed and 0 otherwise), value. The value is zero (of type uint64) if the key does not exist.", nil, ""},
-	"app_local_put":     {"write C to key B in account A's local state of the current application", "params: Txn.Accounts offset (or, since v4, an _available_ account address), state key, value.", nil, ""},
+	"app_global_get_ex": {"X is the global state of application A, key B. Y is 1 if key existed, else 0", "", nil, ""},
+	"app_local_put":     {"write C to key B in account A's local state of the current application", "", nil, ""},
 	"app_global_put":    {"write B to key A in the global state of the current application", "", nil, ""},
-	"app_local_del":     {"delete key B from account A's local state of the current application", "params: Txn.Accounts offset (or, since v4, an _available_ account address), state key.\n\nDeleting a key which is already absent has no effect on the application local state. (In particular, it does _not_ cause the program to fail.)", nil, ""},
+	"app_local_del":     {"delete key B from account A's local state of the current application", "", nil, ""},
 	"app_global_del":    {"delete key A from the global state of the current application", "params: state key.\n\nDeleting a key which is already absent has no effect on the application global state. (In particular, it does _not_ cause the program to fail.)", nil, ""},
-	"asset_holding_get": {"X is field F from account A's holding of asset B. Y is 1 if A is opted into B, else 0", "params: Txn.Accounts offset (or, since v4, an _available_ address), asset id (or, since v4, a Txn.ForeignAssets offset). Return: did_exist flag (1 if the asset existed and 0 otherwise), value.", []string{"asset holding field index"}, ""},
-	"asset_params_get":  {"X is field F from asset A. Y is 1 if A exists, else 0", "params: Txn.ForeignAssets offset (or, since v4, an _available_ asset id). Return: did_exist flag (1 if the asset existed and 0 otherwise), value.", []string{"asset params field index"}, ""},
+	"asset_holding_get": {"X is field F from account A's holding of asset B. Y is 1 if A is opted into B, else 0", "", []string{"asset holding field index"}, ""},
+	"asset_params_get":  {"X is field F from asset A. Y is 1 if A exists, else 0", "", []string{"asset params field index"}, ""},
 	"app_params_get":    {"X is field F from app A. Y is 1 if A exists, else 0", "params: Txn.ForeignApps offset or an _available_ app id. Return: did_exist flag (1 if the application existed and 0 otherwise), value.", []string{"app params field index"}, ""},
 	"app_params_set":    {"set field F of the current app to A", "Setting `AppForeignBoxReads` allows any app to read this app's boxes. Setting `AppFamilyBoxAccess` allows any app with the same creator, present or future, to read and write them, and subjects this app's boxes to the family reentrancy rule. Either flag may be set (A nonzero) or cleared (A zero) at any time by the app itself.", []string{"app params field index"}, ""},
 	"acct_params_get":   {"X is field F from account A. Y is 1 if A owns positive algos, else 0", "", []string{"account params field index"}, ""},
@@ -336,6 +346,100 @@ var opDescByName = map[string]OpDesc{
 // OpDescOf returns the OpDesc for a mnemonic opcode
 func OpDescOf(opName string) OpDesc {
 	return opDescByName[opName]
+}
+
+// opVersionedExtras holds the extra documentation paragraphs that apply only
+// to a range of versions. OpDocExtra appends whichever are in force to the
+// opcode's (version-independent) Extra. Use a note when a whole paragraph is
+// true only for some versions; a one-line caveat inside an unversioned Extra
+// can instead name its version inline ("Since v4, ..."), which reads fine in
+// every version's docs.
+var opVersionedExtras = map[string][]versionedNote{
+	// v4 allowed the state access opcodes to take account addresses, asset
+	// ids, and application ids directly, where before they took offsets into
+	// (or in some spots, members of) the foreign arrays. Each version's
+	// params line describes only what that version accepts.
+	"balance": {
+		{1, 3, "params: Txn.Accounts offset. Return: value."},
+		{4, 0, "params: Txn.Accounts offset or an _available_ account address. Return: value."},
+		{5, 0, "Changes caused by inner transactions are observable immediately following `itxn_submit`."},
+	},
+	"min_balance": {
+		{1, 3, "params: Txn.Accounts offset. Return: value."},
+		{4, 0, "params: Txn.Accounts offset or an _available_ account address. Return: value."},
+		{3, 4, "Required balance is affected by ASA and App usage. When creating or opting into an app, the minimum balance grows before the app code runs, therefore the increase is visible there. When deleting or closing out, the minimum balance decreases after the app executes."},
+		{5, 7, "Required balance is affected by ASA and App usage. When creating or opting into an app, the minimum balance grows before the app code runs, therefore the increase is visible there. When deleting or closing out, the minimum balance decreases after the app executes. Changes caused by inner transactions are observable immediately following `itxn_submit`."},
+		{8, 0, "Required balance is affected by ASA, App, and Box usage. When creating or opting into an app, the minimum balance grows before the app code runs, therefore the increase is visible there. When deleting or closing out, the minimum balance decreases after the app executes. Changes caused by inner transactions or box usage are observable immediately following the opcode effecting the change."},
+	},
+	// the effects fields appeared at v5, readable only on inner transactions;
+	// v6 made the effects of earlier top-level app calls readable too
+	"txn": {
+		{5, 5, "The effects fields (`Logs`, `NumLogs`, `CreatedAssetID`, `CreatedApplicationID`) may only be read from inner transactions, with `itxn` and `itxna`. Reading them from top-level transactions fails."},
+		{6, 0, "The effects fields (`Logs`, `NumLogs`, `LastLog`, `CreatedAssetID`, `CreatedApplicationID`) of a top-level application call may be read with `gtxn`, `gtxns`, and their array forms, but only from transactions earlier in the group than the one executing. The effects of inner transactions are read with `itxn` and `gitxn`."},
+	},
+	"itxn": {
+		{5, 5, "`GroupIndex` and `TxID` are not available on inner transactions."},
+	},
+	"app_opted_in": {
+		{1, 3, "params: Txn.Accounts offset, _available_ application id. Return: 1 if opted in and 0 otherwise."},
+		{4, 0, "params: Txn.Accounts offset or an _available_ account address, _available_ application id or a Txn.ForeignApps offset. Return: 1 if opted in and 0 otherwise."},
+	},
+	"app_local_get": {
+		{1, 3, "params: Txn.Accounts offset, state key. Return: value. The value is zero (of type uint64) if the key does not exist."},
+		{4, 0, "params: Txn.Accounts offset or an _available_ account address, state key. Return: value. The value is zero (of type uint64) if the key does not exist."},
+	},
+	"app_local_get_ex": {
+		{1, 3, "params: Txn.Accounts offset, _available_ application id, state key. Return: did_exist flag (top of the stack, 1 if the application and key existed and 0 otherwise), value. The value is zero (of type uint64) if the key does not exist."},
+		{4, 0, "params: Txn.Accounts offset or an _available_ account address, _available_ application id or a Txn.ForeignApps offset, state key. Return: did_exist flag (top of the stack, 1 if the application and key existed and 0 otherwise), value. The value is zero (of type uint64) if the key does not exist."},
+	},
+	"app_global_get_ex": {
+		{1, 3, "params: Txn.ForeignApps offset, state key. Return: did_exist flag (top of the stack, 1 if the application and key existed and 0 otherwise), value. The value is zero (of type uint64) if the key does not exist."},
+		{4, 0, "params: Txn.ForeignApps offset or an _available_ application id, state key. Return: did_exist flag (top of the stack, 1 if the application and key existed and 0 otherwise), value. The value is zero (of type uint64) if the key does not exist."},
+	},
+	"app_local_put": {
+		{1, 3, "params: Txn.Accounts offset, state key, value."},
+		{4, 0, "params: Txn.Accounts offset or an _available_ account address, state key, value."},
+	},
+	"app_local_del": {
+		{1, 3, "params: Txn.Accounts offset, state key."},
+		{4, 0, "params: Txn.Accounts offset or an _available_ account address, state key."},
+		{1, 0, "Deleting a key which is already absent has no effect on the application local state. (In particular, it does _not_ cause the program to fail.)"},
+	},
+	"asset_holding_get": {
+		{1, 3, "params: Txn.Accounts offset, asset id. Return: did_exist flag (1 if the asset existed and 0 otherwise), value."},
+		{4, 0, "params: Txn.Accounts offset or an _available_ address, asset id or a Txn.ForeignAssets offset. Return: did_exist flag (1 if the asset existed and 0 otherwise), value."},
+	},
+	"asset_params_get": {
+		{1, 3, "params: Txn.ForeignAssets offset. Return: did_exist flag (1 if the asset existed and 0 otherwise), value."},
+		{4, 0, "params: Txn.ForeignAssets offset or an _available_ asset id. Return: did_exist flag (1 if the asset existed and 0 otherwise), value."},
+	},
+	// Notes are shaped by era, not by fact, so that each version's docs read
+	// as a few flowing paragraphs rather than a stack of one-line diffs. The
+	// small duplication between adjacent eras is deliberate.
+	"bnz": {
+		{1, 3, "The `bnz` opcode byte 0x40 is followed by exactly two immediate bytes, high byte first, which together form a 16 bit offset N, limited to forward branches only, 0-0x7fff. The instruction is 3 bytes long. For a bnz instruction at `pc`, if the last element of the stack is not zero then branch to the instruction at `pc + 3 + N`, else proceed to the next instruction at `pc + 3`."},
+		{4, 12, "The `bnz` opcode byte 0x40 is followed by exactly two immediate bytes, high byte first, which together form a signed 16 bit offset N, allowing for backward branches and looping. The instruction is 3 bytes long. For a bnz instruction at `pc`, if the last element of the stack is not zero then branch to the instruction at `pc + 3 + N`, else proceed to the next instruction at `pc + 3`."},
+		{13, 0, "The offset is encoded as a `binary.Varint` (zigzag plus ULEB128) of one or more bytes, so the instruction is `1 + len(offset)` bytes long. A non-negative offset N is measured from the end of the instruction: execution continues at `pc + 1 + len(offset) + N`. A negative offset N is measured from the start of the instruction: execution continues at `pc + N`. Not branching always continues at `pc + 1 + len(offset)`. A branch to the start of its own instruction cannot be encoded, since a zero offset means the following instruction; the assembler rejects the attempt."},
+		{1, 1, "Branch targets must be aligned instructions. (e.g. Branching to the second byte of a 2 byte op will be rejected.) Branching to the end of the program, exactly after the last instruction, is illegal, so skipping the rest of a program requires a final no-op to serve as the branch target."},
+		{2, 0, "Branch targets must be aligned instructions. (e.g. Branching to the second byte of a 2 byte op will be rejected.) Branching to the end of the program, exactly after the last instruction, is allowed: bnz to byte N (with 0-indexing) is legal for a program with N bytes. This eliminates the need for a final no-op as a branch target. (Branching beyond the end, to a byte larger than N, is illegal and will cause the program to fail.)"},
+	},
+}
+
+// OpDocExtra returns the extra documentation for opName as it stands at
+// version: the version-independent Extra, followed by whichever versioned
+// notes are in force.
+func OpDocExtra(opName string, version uint64) string {
+	notes := opVersionedExtras[opName]
+	parts := make([]string, 0, 1+len(notes))
+	if extra := opDescByName[opName].Extra; extra != "" {
+		parts = append(parts, extra)
+	}
+	for _, note := range notes {
+		if note.since <= version && (note.until == 0 || version <= note.until) {
+			parts = append(parts, note.text)
+		}
+	}
+	return strings.Join(parts, "\n\n")
 }
 
 // OpImmediateDetails contains information about an immediate argument for

@@ -111,8 +111,57 @@ func TestOpDocExtra(t *testing.T) {
 	partitiontest.PartitionTest(t)
 	t.Parallel()
 
-	xd := OpDescOf("bnz")
-	require.NotEmpty(t, xd.Extra)
-	xd = OpDescOf("-")
-	require.Empty(t, xd.Extra)
+	require.NotEmpty(t, OpDocExtra("bnz", 1))
+	require.Empty(t, OpDocExtra("-", LogicVersion))
+
+	// every version of bnz explains its encoding, but only its own encoding
+	for v := uint64(1); v <= 12; v++ {
+		require.Contains(t, OpDocExtra("bnz", v), "16 bit offset")
+		require.NotContains(t, OpDocExtra("bnz", v), "Varint")
+	}
+	require.Contains(t, OpDocExtra("bnz", 13), "Varint")
+	require.NotContains(t, OpDocExtra("bnz", 13), "16 bit offset")
+
+	// backward branches arrived at v4
+	require.Contains(t, OpDocExtra("bnz", 3), "forward branches only")
+	require.NotContains(t, OpDocExtra("bnz", 3), "signed")
+	require.Contains(t, OpDocExtra("bnz", 4), "signed")
+	require.NotContains(t, OpDocExtra("bnz", 4), "forward branches only")
+
+	// branching to the end of the program became legal at v2
+	require.Contains(t, OpDocExtra("bnz", 1), "is illegal")
+	require.Contains(t, OpDocExtra("bnz", 2), "is allowed")
+
+	// the state access opcodes accept direct references only from v4 on
+	require.NotContains(t, OpDocExtra("balance", 3), "account address")
+	require.Contains(t, OpDocExtra("balance", 4), "account address")
+	require.NotContains(t, OpDocExtra("asset_holding_get", 3), "ForeignAssets")
+	require.Contains(t, OpDocExtra("asset_holding_get", 4), "ForeignAssets")
+	// and no version's docs defer to another version any more
+	for v := uint64(2); v <= LogicVersion; v++ {
+		require.NotContains(t, OpDocExtra("app_local_del", v), "since v4")
+	}
+
+	// effects fields: inner-only at v5, past top-level app calls from v6
+	require.Contains(t, OpDocExtra("txn", 5), "only be read from inner")
+	require.NotContains(t, OpDocExtra("txn", 5), "top-level application call may be read")
+	require.Contains(t, OpDocExtra("txn", 6), "earlier in the group")
+	require.Empty(t, OpDocExtra("txn", 4))
+	require.Contains(t, OpDocExtra("itxn", 5), "GroupIndex")
+	require.Empty(t, OpDocExtra("itxn", 6))
+
+	// min_balance counts boxes only once boxes exist
+	require.NotContains(t, OpDocExtra("min_balance", 7), "Box")
+	require.Contains(t, OpDocExtra("min_balance", 8), "Box")
+	require.NotContains(t, OpDocExtra("balance", 4), "inner")
+	require.Contains(t, OpDocExtra("balance", 5), "itxn_submit")
+
+	// versioned notes must name real opcodes, like opDescByName entries
+	opsSeen := make(map[string]bool, len(OpSpecs))
+	for _, op := range OpSpecs {
+		opsSeen[op.Name] = true
+	}
+	for name := range opVersionedExtras {
+		assert.True(t, opsSeen[name], "opVersionedExtras contains strange opcode %#v", name)
+	}
 }

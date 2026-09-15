@@ -279,8 +279,8 @@ func opToMarkdown(out io.Writer, op *logic.OpSpec, groupDocWritten map[string]bo
 			groupDocWritten[group.Name] = true
 		}
 	}
-	if desc.Extra != "" {
-		fmt.Fprintf(out, "\n%s\n", desc.Extra)
+	if extra := logic.OpDocExtra(op.Name, version); extra != "" {
+		fmt.Fprintf(out, "\n%s\n", extra)
 	}
 	return nil
 }
@@ -510,7 +510,7 @@ func buildLanguageSpec(opGroups map[string][]string, namedTypes []namedType, ver
 		records[i].ArgEnum, records[i].ArgEnumTypes, records[i].ArgDetails = argEnums(spec, version)
 		desc := logic.OpDescOf(spec.Name)
 		records[i].Doc = desc.Short
-		records[i].DocExtra = desc.Extra
+		records[i].DocExtra = logic.OpDocExtra(spec.Name, version)
 		records[i].ImmediateNote = logic.OpImmediateDetailsFromSpec(spec)
 		records[i].Groups = opGroups[spec.Name]
 		records[i].IntroducedVersion = spec.Version

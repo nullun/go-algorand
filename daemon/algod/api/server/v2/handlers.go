@@ -1051,11 +1051,34 @@ func convertPeers(peers []network.Peer, connType model.PeerStatusConnectionType)
 		if !ok {
 			networkType = model.PeerStatusNetworkTypeWs
 		}
-		statuses = append(statuses, model.PeerStatus{
+		status := model.PeerStatus{
 			ConnectionType: connType,
 			NetworkAddress: info.GetAddress(),
 			NetworkType:    networkType,
-		})
+		}
+		if usageInfo, ok := p.(network.PeerUsageInfo); ok {
+			usage := usageInfo.GetUsage()
+			if usage.PeerID != "" {
+				peerID := usage.PeerID
+				status.PeerId = &peerID
+			}
+			if len(usage.SupportedProtocols) > 0 {
+				status.SupportedProtocols = &usage.SupportedProtocols
+			}
+			// always reported, even when empty: the absence of the field
+			// means the peer reports no usage information at all, which a
+			// client cannot treat as "this peer has no open streams"
+			activeStreams := usage.ActiveStreams
+			if activeStreams == nil {
+				activeStreams = []string{}
+			}
+			status.ActiveStreams = &activeStreams
+			bytesReceived := usage.TotalBytesReceived
+			bytesSent := usage.TotalBytesSent
+			status.TotalBytesReceived = &bytesReceived
+			status.TotalBytesSent = &bytesSent
+		}
+		statuses = append(statuses, status)
 	}
 	slices.SortFunc(statuses, func(a, b model.PeerStatus) int {
 		return strings.Compare(a.NetworkAddress, b.NetworkAddress)

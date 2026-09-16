@@ -2132,6 +2132,13 @@
       "PeerStatus": {
         "description": "The status of a connected peer in the P2P network",
         "properties": {
+          "active-streams": {
+            "description": "Protocol IDs of the streams currently open on the connection. Websocket peers report the label ws-gossip/<version>, where <version> is the negotiated gossip protocol version; it is not a libp2p protocol ID. An empty string is a stream whose protocol is still being negotiated. An empty list means no stream is open. The field is absent when the peer reports no usage information.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
           "connection-type": {
             "description": "Connection type",
             "enum": [
@@ -2151,6 +2158,27 @@
               "ws"
             ],
             "type": "string"
+          },
+          "peer-id": {
+            "description": "libp2p identity of the remote peer. Only present for p2p peers. Connections with the same peer ID belong to one node and each repeat that node's traffic totals, so do not sum totals across them.",
+            "type": "string"
+          },
+          "supported-protocols": {
+            "description": "Protocols the remote peer supports, as reported by libp2p identify. Only present for p2p peers.",
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "total-bytes-received": {
+            "description": "Approximate bytes received from the peer, counted at the stream layer and so excluding transport framing and encryption. For p2p peers this aggregates every protocol on every connection to the peer ID. For websocket peers it counts gossip messages on this connection only. Totals reset when the last connection to the peer closes.",
+            "format": "uint64",
+            "type": "integer"
+          },
+          "total-bytes-sent": {
+            "description": "Approximate bytes sent to the peer, counted at the stream layer and so excluding transport framing and encryption. For p2p peers this aggregates every protocol on every connection to the peer ID. For websocket peers it counts gossip messages on this connection only. Totals reset when the last connection to the peer closes.",
+            "format": "uint64",
+            "type": "integer"
           }
         },
         "required": [

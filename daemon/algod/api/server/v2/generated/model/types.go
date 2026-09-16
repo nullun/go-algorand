@@ -728,6 +728,9 @@ type ParticipationKey struct {
 
 // PeerStatus The status of a connected peer in the P2P network
 type PeerStatus struct {
+	// ActiveStreams Protocol IDs of the streams currently open on the connection. Websocket peers report the label ws-gossip/<version>, where <version> is the negotiated gossip protocol version; it is not a libp2p protocol ID. An empty string is a stream whose protocol is still being negotiated. An empty list means no stream is open. The field is absent when the peer reports no usage information.
+	ActiveStreams *[]string `json:"active-streams,omitempty"`
+
 	// ConnectionType Connection type
 	ConnectionType PeerStatusConnectionType `json:"connection-type"`
 
@@ -736,6 +739,18 @@ type PeerStatus struct {
 
 	// NetworkType Network type
 	NetworkType PeerStatusNetworkType `json:"network-type"`
+
+	// PeerId libp2p identity of the remote peer. Only present for p2p peers. Connections with the same peer ID belong to one node and each repeat that node's traffic totals, so do not sum totals across them.
+	PeerId *string `json:"peer-id,omitempty"`
+
+	// SupportedProtocols Protocols the remote peer supports, as reported by libp2p identify. Only present for p2p peers.
+	SupportedProtocols *[]string `json:"supported-protocols,omitempty"`
+
+	// TotalBytesReceived Approximate bytes received from the peer, counted at the stream layer and so excluding transport framing and encryption. For p2p peers this aggregates every protocol on every connection to the peer ID. For websocket peers it counts gossip messages on this connection only. Totals reset when the last connection to the peer closes.
+	TotalBytesReceived *uint64 `json:"total-bytes-received,omitempty"`
+
+	// TotalBytesSent Approximate bytes sent to the peer, counted at the stream layer and so excluding transport framing and encryption. For p2p peers this aggregates every protocol on every connection to the peer ID. For websocket peers it counts gossip messages on this connection only. Totals reset when the last connection to the peer closes.
+	TotalBytesSent *uint64 `json:"total-bytes-sent,omitempty"`
 }
 
 // PeerStatusConnectionType Connection type

@@ -29,8 +29,11 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/spf13/cobra"
 
@@ -50,6 +53,7 @@ var listenIP string
 var targetDir string
 var noLedger bool
 var runUnderHost bool
+var peersVerbose bool
 var telemetryOverride string
 var maxPendingTransactions uint64
 var waitSec uint32
@@ -81,6 +85,8 @@ func init() {
 	// Once the server-side implementation of the shutdown command is ready, we should enable this one.
 	//nodeCmd.AddCommand(shutdownCmd)
 	nodeCmd.AddCommand(p2pID)
+
+	peersCmd.Flags().BoolVarP(&peersVerbose, "verbose", "v", false, "Also show each peer's ID and supported protocols")
 
 	startCmd.Flags().StringVarP(&peerDial, "peer", "p", "", "Peer address to dial for initial connection")
 	startCmd.Flags().StringVarP(&listenIP, "listen", "l", "", "Endpoint / REST address to listen on")
@@ -413,8 +419,12 @@ var generateTokenCmd = &cobra.Command{
 var peersCmd = &cobra.Command{
 	Use:   "peers",
 	Short: "Get peers",
-	Long:  `Show the Algorand node's current peers`,
-	Args:  validateNoPosArgsFn,
+	Long: `Show the connections this node holds, the streams active on each, and traffic totals.
+
+STREAMS lists the protocols with a stream open at the moment of the query, so it can change between calls. On a p2p network a connection may carry the gossip stream, pubsub (which also propagates transactions), DHT, or only libp2p machinery such as identify. Pass --verbose to also show each peer's ID and the protocols it supports, as learned from libp2p identify.
+
+RECEIVED and SENT are cumulative byte counts. For a ws peer they cover that connection. For a p2p peer they cover all of this node's connections to that peer ID, across every libp2p protocol, and are shown on the peer's first row only. They are approximate: traffic exchanged before a connection is registered is missed, and a rapid reconnect can carry over the previous totals.`,
+	Args: validateNoPosArgsFn,
 	Run: func(cmd *cobra.Command, _ []string) {
 		datadir.OnDataDirs(getPeers)
 	},
@@ -428,12 +438,227 @@ func getPeers(dataDir string) {
 		reportErrorf(errorNodePeers, err)
 	}
 
-	rowFormat := "%-9s  %-7s  %s\n"
-	fmt.Printf(rowFormat, "CONN TYPE", "NETWORK", "ADDRESS")
-	for _, peer := range response.Peers {
-		fmt.Printf(rowFormat, peer.ConnectionType, peer.NetworkType, peer.NetworkAddress)
+	printPeers(os.Stdout, response.Peers, peersVerbose)
+}
+
+// printPeers writes the peer table. Rows keep the order algod returned them
+// in. A trailing PEER column, holding the tail of the libp2p peer ID, is added
+// only when some peer ID appears on more than one row: connections sharing a
+// peer ID belong to one node, and algod reports that node's traffic totals on
+// each of them. The totals are printed on the first such row only and zeroed
+// on the rest, so that summing the column gives the right answer, and a footer
+// says so. Being last, the column adds nothing to rows that do not need it.
+func printPeers(w io.Writer, peers []model.PeerStatus, verbose bool) {
+	repeated := repeatedPeerIDs(peers)
+
+	type row struct {
+		received, sent, streams, peerID string
+	}
+	rows := make([]row, len(peers))
+	addressWidth, streamsWidth := len("ADDRESS"), len("STREAMS")
+	counted := make(map[string]bool, len(repeated))
+	for i, peer := range peers {
+		r := row{received: "-", sent: "-", streams: "-"}
+		if peer.TotalBytesReceived != nil {
+			r.received = formatByteCount(*peer.TotalBytesReceived)
+		}
+		if peer.TotalBytesSent != nil {
+			r.sent = formatByteCount(*peer.TotalBytesSent)
+		}
+		if peer.ActiveStreams != nil && len(*peer.ActiveStreams) > 0 {
+			r.streams = friendlyStreams(*peer.ActiveStreams)
+		}
+		if peer.PeerId != nil && repeated[*peer.PeerId] {
+			r.peerID = peerIDTail(*peer.PeerId)
+			if counted[*peer.PeerId] {
+				// this node's totals were already printed on an earlier row
+				if peer.TotalBytesReceived != nil {
+					r.received = formatByteCount(0)
+				}
+				if peer.TotalBytesSent != nil {
+					r.sent = formatByteCount(0)
+				}
+			}
+			counted[*peer.PeerId] = true
+		}
+		rows[i] = r
+		addressWidth = max(addressWidth, len(peer.NetworkAddress))
+		streamsWidth = max(streamsWidth, len(r.streams))
 	}
 
+	// the STREAMS column is padded only when a column follows it
+	rowFormat := "%-9s  %-7s  %-*s  %9s  %9s  %-*s"
+	if len(repeated) == 0 {
+		streamsWidth = 0
+	} else {
+		rowFormat += "  %s"
+	}
+	rowFormat += "\n"
+	printRow := func(connType, netType, addr, received, sent, streams, peerID string) {
+		if len(repeated) == 0 {
+			fmt.Fprintf(w, rowFormat, connType, netType, addressWidth, addr, received, sent, streamsWidth, streams)
+			return
+		}
+		fmt.Fprintf(w, rowFormat, connType, netType, addressWidth, addr, received, sent, streamsWidth, streams, peerID)
+	}
+
+	printRow("CONN TYPE", "NETWORK", "ADDRESS", "RECEIVED", "SENT", "STREAMS", "PEER")
+	for i, peer := range peers {
+		r := rows[i]
+		printRow(string(peer.ConnectionType), string(peer.NetworkType), peer.NetworkAddress, r.received, r.sent, r.streams, r.peerID)
+		if !verbose {
+			continue
+		}
+		if peer.PeerId != nil && *peer.PeerId != "" {
+			printPeerDetail(w, "peer", sanitizeTerminal(*peer.PeerId))
+		}
+		if peer.SupportedProtocols != nil {
+			// one per line: a node supports a dozen or more protocol IDs,
+			// which joined on one line wrap badly on most terminals
+			printPeerDetail(w, "supported protocols", "")
+			for _, proto := range *peer.SupportedProtocols {
+				printPeerDetailItem(w, sanitizeTerminal(proto))
+			}
+		}
+	}
+	if len(repeated) > 0 {
+		fmt.Fprintf(w, "%d peer ID(s) with more than one connection: traffic totals cover all of a peer's connections and are shown on its first row only\n", len(repeated))
+	}
+}
+
+// printPeerDetail prints a continuation line under a peer row, indented past
+// the CONN TYPE and NETWORK columns.
+func printPeerDetail(w io.Writer, label, value string) {
+	if value == "" {
+		fmt.Fprintf(w, "%-9s  %-7s  %s:\n", "", "", label)
+		return
+	}
+	fmt.Fprintf(w, "%-9s  %-7s  %s: %s\n", "", "", label, value)
+}
+
+// printPeerDetailItem prints one entry of a list opened by printPeerDetail.
+func printPeerDetailItem(w io.Writer, value string) {
+	fmt.Fprintf(w, "%-9s  %-7s    %s\n", "", "", value)
+}
+
+// repeatedPeerIDs returns the peer IDs that appear on more than one of the
+// given peers. Each is a node the host holds several connections to.
+func repeatedPeerIDs(peers []model.PeerStatus) map[string]bool {
+	seen := make(map[string]bool)
+	repeated := make(map[string]bool)
+	for _, peer := range peers {
+		if peer.PeerId == nil || *peer.PeerId == "" {
+			continue
+		}
+		if seen[*peer.PeerId] {
+			repeated[*peer.PeerId] = true
+		}
+		seen[*peer.PeerId] = true
+	}
+	return repeated
+}
+
+// peerIDDisplayLen is how many trailing characters of a peer ID are shown in
+// the PEER column. Peer IDs derived from Ed25519 keys all begin "12D3KooW",
+// so it is the tail that tells them apart.
+const peerIDDisplayLen = 8
+
+// peerIDTail renders a peer ID for the PEER column: its last few characters,
+// marked as cut when the ID is longer than that. The ID is escaped first and
+// cut on runes, so that the cut cannot land inside an escape.
+func peerIDTail(peerID string) string {
+	id := []rune(sanitizeTerminal(peerID))
+	if len(id) > peerIDDisplayLen {
+		id = append([]rune(".."), id[len(id)-peerIDDisplayLen:]...)
+	}
+	return string(id)
+}
+
+// streamNames maps stream protocol ID prefixes to short display names, listed
+// in display order. pubsub comes before gossip: on a p2p network nearly every
+// connection carries pubsub while only some carry gossip, so this order keeps
+// the column reading consistently down a table. Then the rest of the
+// application traffic, then libp2p machinery.
+var streamNames = []struct{ prefix, name string }{
+	{"/meshsub/", "pubsub"},
+	{"/algorand-ws/", "gossip"},
+	{"ws-gossip/", "gossip"},
+	{"/algorand/kad/", "dht"},
+	{"/http/", "http"},
+	{"/ipfs/id/", "identify"},
+	{"/ipfs/ping/", "ping"},
+}
+
+// friendlyStreams renders stream protocol IDs as short names, deduplicated and
+// in streamNames order. A stream whose protocol is still being negotiated has
+// an empty ID and is shown as "negotiating", after the known names.
+// Unrecognized protocols are shown verbatim, last.
+func friendlyStreams(protos []string) string {
+	ranks := make(map[string]int, len(protos))
+	names := make([]string, 0, len(protos))
+	for _, proto := range protos {
+		name, rank := sanitizeTerminal(proto), len(streamNames)+1
+		if proto == "" {
+			name, rank = "negotiating", len(streamNames)
+		}
+		for i, s := range streamNames {
+			if strings.HasPrefix(proto, s.prefix) {
+				name, rank = s.name, i
+				break
+			}
+		}
+		if _, seen := ranks[name]; !seen {
+			ranks[name] = rank
+			names = append(names, name)
+		}
+	}
+	slices.SortFunc(names, func(a, b string) int {
+		if d := ranks[a] - ranks[b]; d != 0 {
+			return d
+		}
+		return strings.Compare(a, b)
+	})
+	return strings.Join(names, ",")
+}
+
+// sanitizeTerminal makes s safe to print to a terminal. Protocol names reach
+// us from the remote peer, which is free to put control characters, newlines
+// or ANSI/OSC escape sequences in them; every rune that is not printable is
+// replaced by its escape so a peer cannot rewrite the operator's display.
+func sanitizeTerminal(s string) string {
+	var b strings.Builder
+	b.Grow(len(s))
+	for i := 0; i < len(s); {
+		r, size := utf8.DecodeRuneInString(s[i:])
+		switch {
+		case r == utf8.RuneError && size == 1: // not valid UTF-8, escape the byte
+			fmt.Fprintf(&b, `\x%02x`, s[i])
+		case unicode.IsPrint(r):
+			b.WriteRune(r)
+		case r <= 0xff:
+			fmt.Fprintf(&b, `\x%02x`, r)
+		case r <= 0xffff:
+			fmt.Fprintf(&b, `\u%04x`, r)
+		default:
+			fmt.Fprintf(&b, `\U%08x`, r)
+		}
+		i += size
+	}
+	return b.String()
+}
+
+// formatByteCount renders a byte count in a compact human-readable form.
+func formatByteCount(b uint64) string {
+	const unit = 1024
+	if b < unit {
+		return fmt.Sprintf("%dB", b)
+	}
+	div, exp := uint64(unit), 0
+	for n := b / unit; n >= unit; n /= unit {
+		div *= unit
+		exp++
+	}
+	return fmt.Sprintf("%.1f%cB", float64(b)/float64(div), "KMGTPE"[exp])
 }
 
 var statusCmd = &cobra.Command{

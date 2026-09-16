@@ -1332,6 +1332,13 @@ func TestGetPeers(t *testing.T) {
 	assert.Equal(t, addrA, bTransportPeer.GetAddress())
 	assert.Equal(t, PeerNetworkTypeWebsocket, bTransportPeer.GetNetworkType())
 	assert.Empty(t, netB.GetPeers(PeersTransportConnectionsIn))
+
+	// websocket transport peers report the negotiated gossip protocol as
+	// their only active stream and no libp2p identify protocols
+	bUsage := bTransportOut[0].(PeerUsageInfo).GetUsage()
+	assert.Len(t, bUsage.ActiveStreams, 1)
+	assert.True(t, strings.HasPrefix(bUsage.ActiveStreams[0], "ws-gossip/"), bUsage.ActiveStreams[0])
+	assert.Empty(t, bUsage.SupportedProtocols)
 }
 
 // confirms that if the config PublicAddress is set to "testing",
@@ -4296,6 +4303,7 @@ func TestDiscardUnrequestedBlockResponse(t *testing.T) {
 	netC.log.SetOutput(logBuffer)
 
 	// send a late TS response from A -> C
+	oldBytesReceived := netC.peers[0].bytesReceived.Load()
 	netA.peers[0].sendBufferBulk <- msg
 	require.Eventually(
 		t,
@@ -4303,6 +4311,10 @@ func TestDiscardUnrequestedBlockResponse(t *testing.T) {
 		500*time.Millisecond,
 		20*time.Millisecond,
 	)
+
+	// the discarded response still consumed bandwidth, so its bytes, tag
+	// included, are counted in the peer's received total
+	require.GreaterOrEqual(t, netC.peers[0].bytesReceived.Load(), oldBytesReceived+uint64(len(msg.data)))
 
 	// Stop and confirm that we hit the case of disconnecting a peer for sending a stale block response
 	netC.Stop()

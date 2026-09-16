@@ -31,6 +31,7 @@ import (
 	connmgrcore "github.com/libp2p/go-libp2p/core/connmgr"
 	"github.com/libp2p/go-libp2p/core/crypto"
 	"github.com/libp2p/go-libp2p/core/host"
+	lpmetrics "github.com/libp2p/go-libp2p/core/metrics"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
 	"github.com/libp2p/go-libp2p/core/protocol"
@@ -108,7 +109,8 @@ const cnmgrTag = "algorand-ws-mesh"
 
 // MakeHost creates a libp2p host but does not start listening.
 // Use host.Network().Listen() on the returned address to start listening.
-func MakeHost(cfg config.Local, datadir string, pstore *pstore.PeerStore) (host.Host, string, error) {
+// If bwc is not nil, it is installed as the host's bandwidth reporter.
+func MakeHost(cfg config.Local, datadir string, pstore *pstore.PeerStore, bwc lpmetrics.Reporter) (host.Host, string, error) {
 	// load stored peer ID, or make ephemeral peer ID
 	privKey, err := GetPrivKey(cfg, datadir)
 	if err != nil {
@@ -164,7 +166,7 @@ func MakeHost(cfg config.Local, datadir string, pstore *pstore.PeerStore) (host.
 		return nil, "", err
 	}
 
-	host, err := libp2p.New(
+	opts := []libp2p.Option{
 		libp2p.Identity(privKey),
 		libp2p.UserAgent(ua),
 		libp2p.Transport(tcp.NewTCPTransport),
@@ -176,7 +178,11 @@ func MakeHost(cfg config.Local, datadir string, pstore *pstore.PeerStore) (host.
 		libp2p.ResourceManager(rm),
 		libp2p.ConnectionManager(cm),
 		libp2p.AddrsFactory(addrFactory),
-	)
+	}
+	if bwc != nil {
+		opts = append(opts, libp2p.BandwidthReporter(bwc))
+	}
+	host, err := libp2p.New(opts...)
 	return host, listenAddr, err
 }
 

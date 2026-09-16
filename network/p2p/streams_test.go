@@ -127,11 +127,11 @@ func TestStreamNonDialedOutgoingConnection(t *testing.T) {
 	var dialerHost, listenerHost host.Host
 	var dialerSM, listenerSM *streamManager
 
-	host1, _, err := MakeHost(cfg, t.TempDir(), pstore1)
+	host1, _, err := MakeHost(cfg, t.TempDir(), pstore1, nil)
 	require.NoError(t, err)
 	defer host1.Close()
 
-	host2, _, err := MakeHost(cfg, t.TempDir(), pstore2)
+	host2, _, err := MakeHost(cfg, t.TempDir(), pstore2, nil)
 	require.NoError(t, err)
 	defer host2.Close()
 

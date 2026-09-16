@@ -234,6 +234,13 @@ type wsPeer struct {
 	// createTime is the time at which the connection was established with the peer.
 	createTime time.Time
 
+	// bytesReceived and bytesSent count gossip message payload bytes, for
+	// usage reporting. They are maintained only for peerTypeWs: the usage of a
+	// p2p peer is reported from the libp2p host per-peer byte totals instead,
+	// by P2PNetwork.connUsage.
+	bytesReceived atomic.Uint64
+	bytesSent     atomic.Uint64
+
 	// peer version ( this is one of the version supported by the current node and listed in SupportedProtocolVersions )
 	version string
 
@@ -482,6 +489,17 @@ func (wp *wsPeer) OriginAddress() string {
 	return wp.originAddress
 }
 
+// usage reports how this gossip connection is used. The connection carries no
+// libp2p stream, so the active stream is reported as the label
+// "ws-gossip/<version>" rather than a protocol ID.
+func (wp *wsPeer) usage() PeerUsage {
+	return PeerUsage{
+		ActiveStreams:      []string{"ws-gossip/" + wp.version},
+		TotalBytesReceived: wp.bytesReceived.Load(),
+		TotalBytesSent:     wp.bytesSent.Load(),
+	}
+}
+
 func (wp *wsPeer) reportReadErr(err error) {
 	// only report error if we haven't already closed the peer
 	if wp.didInnerClose.Load() == 0 {
@@ -549,6 +567,11 @@ func (wp *wsPeer) readLoop() {
 			var n int64
 			// Peer sent us a response to a request we made but we've already timed out -- discard
 			n, err = io.Copy(io.Discard, reader)
+			// these bytes were still consumed off the wire, so they belong in
+			// the received total even though the message is dropped
+			if wp.peerType == peerTypeWs {
+				wp.bytesReceived.Add(uint64(n) + 2)
+			}
 			if err != nil {
 				wp.log.Infof("wsPeer readloop: could not discard timed-out TS message from %s : %s", wp.conn.RemoteAddrString(), err)
 				wp.reportReadErr(err)
@@ -572,6 +595,7 @@ func (wp *wsPeer) readLoop() {
 		wp.lastPacketTime.Store(msg.Received)
 
 		if wp.peerType == peerTypeWs {
+			wp.bytesReceived.Add(uint64(len(msg.Data) + 2))
 			msg.Outgoing = wp.outgoing
 
 			networkReceivedBytesTotal.AddUint64(uint64(len(msg.Data)+2), nil)
@@ -866,6 +890,7 @@ func (wp *wsPeer) writeLoopSendMsg(msg sendMessage) disconnectReason {
 	}
 	wp.lastPacketTime.Store(time.Now().UnixNano())
 	if wp.peerType == peerTypeWs {
+		wp.bytesSent.Add(uint64(len(dataToSend)))
 		networkSentBytesTotal.AddUint64(uint64(len(dataToSend)), nil)
 		networkSentBytesByTag.Add(string(tag), uint64(len(dataToSend)))
 		networkMessageSentTotal.AddUint64(1, nil)

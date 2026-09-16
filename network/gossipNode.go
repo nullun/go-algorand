@@ -112,16 +112,48 @@ type PeerConnectionInfo interface {
 	GetNetworkType() PeerNetworkType
 }
 
+// PeerUsage describes what a peer connection offers and how this node uses it.
+// A websocket connection carries only the gossip protocol, so it reports no
+// supported protocols and one active stream.
+type PeerUsage struct {
+	// PeerID is the remote's libp2p identity, empty for a websocket peer.
+	// Connections sharing a peer ID are connections to one node, and the
+	// traffic totals below are that node's aggregate, reported on each.
+	PeerID string
+	// SupportedProtocols is what the remote reports supporting via libp2p identify.
+	SupportedProtocols []string
+	// ActiveStreams is the protocol IDs of the streams currently open. A
+	// stream still negotiating its protocol has an empty ID. A websocket
+	// peer carries no libp2p stream and reports the label
+	// "ws-gossip/<version>" instead, naming the negotiated gossip version.
+	ActiveStreams []string
+	// TotalBytesReceived and TotalBytesSent count traffic exchanged with the
+	// remote peer: for libp2p, across all connections to it, as read when
+	// this connection was reported.
+	// Totals are approximate: connection notification timing can omit initial
+	// traffic or retain totals across a rapid reconnect.
+	TotalBytesReceived uint64
+	TotalBytesSent     uint64
+}
+
+// PeerUsageInfo is optionally implemented by peers returned from GetPeers
+// that can report how their connection is being used.
+type PeerUsageInfo interface {
+	GetUsage() PeerUsage
+}
+
 // transportPeer is a proxy for a transport-level connection to a remote peer,
 // which is not necessarily running the gossip protocol. It is returned by
 // GetPeers for the PeersTransportConnectionsIn/Out options.
 type transportPeer struct {
 	addr        string
 	networkType PeerNetworkType
+	usage       PeerUsage
 }
 
 func (p transportPeer) GetAddress() string              { return p.addr }
 func (p transportPeer) GetNetworkType() PeerNetworkType { return p.networkType }
+func (p transportPeer) GetUsage() PeerUsage             { return p.usage }
 
 // GossipNode represents a node in the gossip network
 type GossipNode interface {

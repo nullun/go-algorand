@@ -196,7 +196,7 @@ func TestP2PMakeHostAddressFilter(t *testing.T) {
 	for _, addr := range []string{":0", "0.0.0.0:0"} {
 		cfg := config.GetDefaultLocal()
 		cfg.NetAddress = addr
-		host, la, err := MakeHost(cfg, td, pstore)
+		host, la, err := MakeHost(cfg, td, pstore, nil)
 		require.NoError(t, err)
 		require.Equal(t, "/ip4/0.0.0.0/tcp/0", la)
 		require.Empty(t, host.Addrs())
@@ -237,7 +237,7 @@ func TestP2PMakeHostAddressFilter(t *testing.T) {
 	for _, addr := range addresses {
 		cfg := config.GetDefaultLocal()
 		cfg.NetAddress = addr + ":0"
-		host, la, err := MakeHost(cfg, td, pstore)
+		host, la, err := MakeHost(cfg, td, pstore, nil)
 		require.NoError(t, err)
 		require.Equal(t, "/ip4/"+addr+"/tcp/0", la)
 		require.Empty(t, host.Addrs())
@@ -262,7 +262,7 @@ func TestP2PServiceStartZeroIncomingDoesNotListen(t *testing.T) {
 	pstore, err := peerstore.NewPeerStore(nil, "test")
 	require.NoError(t, err)
 
-	host, la, err := MakeHost(cfg, td, pstore)
+	host, la, err := MakeHost(cfg, td, pstore, nil)
 	require.NoError(t, err)
 
 	svc, err := MakeService(context.Background(), logging.TestingLog(t), cfg, host, la, StreamHandlers{})

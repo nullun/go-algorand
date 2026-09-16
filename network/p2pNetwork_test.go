@@ -1715,6 +1715,25 @@ func TestP2PGetPeersTransportConnections(t *testing.T) {
 
 	require.Empty(t, netA.GetPeers(PeersTransportConnectionsOut))
 	require.Empty(t, netB.GetPeers(PeersTransportConnectionsIn))
+
+	// transport peers report how the connection is used: the gossip stream is
+	// active, the remote's supported protocols arrive via identify, and the
+	// bandwidth counter has seen at least the gossip handshake traffic
+	require.Eventually(t, func() bool {
+		outConnPeers = netB.GetPeers(PeersTransportConnectionsOut)
+		if len(outConnPeers) != 1 {
+			return false
+		}
+		usage := outConnPeers[0].(PeerUsageInfo).GetUsage()
+		return slices.Contains(usage.ActiveStreams, string(p2p.AlgorandWsProtocolV22)) &&
+			slices.Contains(usage.SupportedProtocols, string(p2p.AlgorandWsProtocolV22)) &&
+			usage.TotalBytesReceived > 0 && usage.TotalBytesSent > 0
+	}, 5*time.Second, 50*time.Millisecond, "outbound transport peer should report gossip stream, identify protocols, and traffic totals")
+
+	// the connection is attributed to the remote's libp2p identity, which is
+	// what the traffic totals are keyed on
+	usage := outConnPeers[0].(PeerUsageInfo).GetUsage()
+	require.Equal(t, netA.service.ID().String(), usage.PeerID)
 }
 
 // TestP2PMetainfoV1vsV22 checks v1 and v22 nodes works together.
@@ -1875,3 +1894,111 @@ func TestP2PVoteCompression(t *testing.T) {
 		})
 	}
 }
+
+// TestP2PBandwidthCounterLifecycle checks that the per-peer bandwidth counters
+// follow the host's connections: they appear with the first connection to a
+// peer and are dropped with the last, so that a peer cycling through identities
+// cannot grow the counter without bound.
+func TestP2PBandwidthCounterLifecycle(t *testing.T) {
+	partitiontest.PartitionTest(t)
+	t.Parallel()
+
+	bwc := makePeerBandwidthCounter()
+	connected := peer.ID("connected")
+	gone := peer.ID("gone")
+
+	// bytes logged for a peer that has no connection are not attributed to it
+	bwc.LogRecvMessageStream(9, p2p.AlgorandWsProtocolV22, connected)
+	require.Empty(t, bwc.GetBandwidthByPeer())
+
+	// two connections to one peer, one to the other
+	bwc.Connected(nil, bandwidthTestConn{remote: connected})
+	bwc.Connected(nil, bandwidthTestConn{remote: connected})
+	bwc.Connected(nil, bandwidthTestConn{remote: gone})
+
+	bwc.LogRecvMessageStream(100, p2p.AlgorandWsProtocolV22, connected)
+	bwc.LogSentMessageStream(50, p2p.AlgorandWsProtocolV22, connected)
+	bwc.LogRecvMessageStream(70, p2p.AlgorandWsProtocolV22, gone)
+
+	in, out := bwc.bytesForPeer(connected)
+	require.EqualValues(t, 100, in)
+	require.EqualValues(t, 50, out)
+	in, out = bwc.bytesForPeer(gone)
+	require.EqualValues(t, 70, in)
+	require.Zero(t, out)
+	require.Len(t, bwc.GetBandwidthByPeer(), 2)
+
+	// closing one of two connections to a peer keeps its totals
+	bwc.Disconnected(nil, bandwidthTestConn{remote: connected})
+	in, out = bwc.bytesForPeer(connected)
+	require.EqualValues(t, 100, in)
+	require.EqualValues(t, 50, out)
+
+	// closing the last one forgets the peer, and a stream read that lands
+	// after the close does not bring it back
+	bwc.Disconnected(nil, bandwidthTestConn{remote: gone})
+	bwc.LogRecvMessageStream(70, p2p.AlgorandWsProtocolV22, gone)
+	in, out = bwc.bytesForPeer(gone)
+	require.Zero(t, in)
+	require.Zero(t, out)
+	require.Len(t, bwc.GetBandwidthByPeer(), 1)
+
+	// the peer returning starts from zero
+	bwc.Connected(nil, bandwidthTestConn{remote: gone})
+	in, out = bwc.bytesForPeer(gone)
+	require.Zero(t, in)
+	require.Zero(t, out)
+
+	// host-wide totals are not tracked
+	bwc.LogRecvMessage(11)
+	bwc.LogSentMessage(22)
+	require.Zero(t, bwc.GetBandwidthTotals())
+
+	// Reset zeroes the totals but leaves the connection bookkeeping, so the
+	// remaining connections still account for themselves when they close
+	bwc.Reset()
+	require.Len(t, bwc.GetBandwidthByPeer(), 2)
+	in, out = bwc.bytesForPeer(connected)
+	require.Zero(t, in)
+	require.Zero(t, out)
+	bwc.Disconnected(nil, bandwidthTestConn{remote: connected})
+	bwc.Disconnected(nil, bandwidthTestConn{remote: gone})
+	require.Empty(t, bwc.GetBandwidthByPeer())
+}
+
+// TestP2PBandwidthCounterWatch checks that connections already open when the
+// counter is installed are counted, so that their close notifications match a
+// connection the counter knows about.
+func TestP2PBandwidthCounterWatch(t *testing.T) {
+	partitiontest.PartitionTest(t)
+	t.Parallel()
+
+	early := peer.ID("early")
+	bwc := makePeerBandwidthCounter()
+	bwc.watch(&bandwidthTestNetwork{conns: []network.Conn{bandwidthTestConn{remote: early}}})
+
+	bwc.LogRecvMessageStream(100, p2p.AlgorandWsProtocolV22, early)
+	in, _ := bwc.bytesForPeer(early)
+	require.EqualValues(t, 100, in)
+
+	bwc.Disconnected(nil, bandwidthTestConn{remote: early})
+	require.Empty(t, bwc.GetBandwidthByPeer())
+}
+
+// bandwidthTestConn is a network.Conn that only answers RemotePeer, which is
+// all the bandwidth counter asks of a connection.
+type bandwidthTestConn struct {
+	network.Conn
+	remote peer.ID
+}
+
+func (c bandwidthTestConn) RemotePeer() peer.ID { return c.remote }
+
+// bandwidthTestNetwork is a network.Network that only answers Conns, which is
+// all peerBandwidthCounter.watch uses.
+type bandwidthTestNetwork struct {
+	network.Network
+	conns []network.Conn
+}
+
+func (n *bandwidthTestNetwork) Conns() []network.Conn { return n.conns }

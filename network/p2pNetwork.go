@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -106,6 +107,11 @@ type P2PNetwork struct {
 	httpServer        *p2p.HTTPServer
 
 	identityTracker identityTracker
+
+	// bandwidthCounter accumulates per-peer traffic totals across all libp2p
+	// protocols on the host. It is pruned as connections close, so it only
+	// retains counters for currently connected peers.
+	bandwidthCounter *peerBandwidthCounter
 
 	// supportedProtocolVersions defines versions supported by this network.
 	// Should be used instead of a global network.SupportedProtocolVersions for network/peers configuration
@@ -300,7 +306,8 @@ func NewP2PNetwork(log logging.Logger, cfg config.Local, datadir string, phonebo
 		return nil, err
 	}
 
-	h, la, err := p2p.MakeHost(cfg, datadir, pstore)
+	net.bandwidthCounter = makePeerBandwidthCounter()
+	h, la, err := p2p.MakeHost(cfg, datadir, pstore, net.bandwidthCounter)
 	if err != nil {
 		return nil, err
 	}
@@ -331,6 +338,12 @@ func NewP2PNetwork(log logging.Logger, cfg config.Local, datadir string, phonebo
 	if err != nil {
 		return nil, err
 	}
+	// the bandwidth counter follows the host's connections so that it does not
+	// retain an entry for every peer ever seen. A connection opened between
+	// these two calls would be counted twice and never released, which cannot
+	// happen here: the host does not listen or dial until Start.
+	net.service.NetworkNotify(net.bandwidthCounter)
+	net.bandwidthCounter.watch(h.Network())
 
 	peerIDs := pstore.Peers()
 	addrInfos := make([]*peer.AddrInfo, 0, len(peerIDs))
@@ -504,6 +517,7 @@ func (n *P2PNetwork) Stop() {
 	}
 	n.ctxCancel()
 
+	n.service.NetworkStopNotify(n.bandwidthCounter)
 	n.service.Close()
 	n.bootstrapperStop()
 	n.httpServer.Close()
@@ -758,10 +772,42 @@ func (n *P2PNetwork) transportConnPeers(dir network.Direction) []Peer {
 	var peers []Peer
 	for _, c := range n.service.Conns() {
 		if c.Stat().Direction == dir {
-			peers = append(peers, transportPeer{addr: c.RemoteMultiaddr().String(), networkType: PeerNetworkTypeLibP2P})
+			peers = append(peers, transportPeer{
+				addr:        c.RemoteMultiaddr().String(),
+				networkType: PeerNetworkTypeLibP2P,
+				usage:       n.connUsage(c),
+			})
 		}
 	}
 	return peers
+}
+
+// connUsage reports how a libp2p connection is used. Traffic totals are the
+// host's per-peer totals, covering all connections to that peer, so every
+// connection to one peer reports the same totals: group on PeerID rather than
+// on the remote multiaddr, which is per connection and can change under a
+// stable identity.
+func (n *P2PNetwork) connUsage(c network.Conn) PeerUsage {
+	var usage PeerUsage
+	remotePeer := c.RemotePeer()
+	usage.PeerID = remotePeer.String()
+	if protos, err := n.pstore.GetProtocols(remotePeer); err == nil {
+		usage.SupportedProtocols = make([]string, 0, len(protos))
+		for _, proto := range protos {
+			usage.SupportedProtocols = append(usage.SupportedProtocols, string(proto))
+		}
+		slices.Sort(usage.SupportedProtocols)
+	}
+	streams := c.GetStreams()
+	usage.ActiveStreams = make([]string, 0, len(streams))
+	for _, s := range streams {
+		usage.ActiveStreams = append(usage.ActiveStreams, string(s.Protocol()))
+	}
+	slices.Sort(usage.ActiveStreams)
+	if n.bandwidthCounter != nil {
+		usage.TotalBytesReceived, usage.TotalBytesSent = n.bandwidthCounter.bytesForPeer(remotePeer)
+	}
+	return usage
 }
 
 // GetPeers returns a list of Peers we could potentially send a direct message to.

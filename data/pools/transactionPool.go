@@ -916,6 +916,10 @@ func (pool *TransactionPool) AssembleBlock(round basics.Round, deadline time.Tim
 
 	pool.assemblyDeadline = deadline
 	pool.assemblyRound = round
+	// Clear the deadline on every return path (runs before the deferred unlock above). A deadline left
+	// behind would make isAssemblyTimedOut() true for the next round's recompute, truncating its block to
+	// the first transaction group if that recompute runs before the next AssembleBlock call.
+	defer func() { pool.assemblyDeadline = time.Time{} }()
 
 	for time.Now().Before(deadline) && (!pool.assemblyResults.ok || pool.assemblyResults.roundStartedEvaluating != round) {
 		condvar.TimedWait(&pool.assemblyCond, time.Until(deadline))
@@ -953,7 +957,6 @@ func (pool *TransactionPool) AssembleBlock(round basics.Round, deadline time.Tim
 			return emptyBlock, emptyBlockErr
 		}
 	}
-	pool.assemblyDeadline = time.Time{}
 
 	if pool.assemblyResults.err != nil {
 		pool.log.Warnf("AssembleBlock: encountered error for round %d, assembling empty block instead: %v", round, pool.assemblyResults.err)

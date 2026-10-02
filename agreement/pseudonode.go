@@ -25,6 +25,7 @@ import (
 
 	"github.com/algorand/go-algorand/data/account"
 	"github.com/algorand/go-algorand/data/basics"
+	"github.com/algorand/go-algorand/data/committee"
 	"github.com/algorand/go-algorand/logging"
 	"github.com/algorand/go-algorand/logging/logspec"
 	"github.com/algorand/go-algorand/logging/telemetryspec"
@@ -296,9 +297,29 @@ func (n asyncPseudonode) makeProposals(round basics.Round, period period, accoun
 		return nil, nil
 	}
 
+	cparams, err := n.ledger.ConsensusParams(ParamsRound(round))
+	if err != nil {
+		n.log.Warnf("pseudonode.makeProposals: could not get consensus params for round %d: %v", round, err)
+		return nil, nil
+	}
+
 	votes := make([]unauthenticatedVote, 0, len(accounts))
 	proposals := make([]proposal, 0, len(accounts))
 	for _, acc := range accounts {
+		// Check sortition credential before doing any per-account work.
+		m, err := membership(n.ledger, acc.Account, round, period, propose)
+		if err != nil {
+			n.log.Warnf("pseudonode.makeProposals: could not get membership parameters for %v: %v", acc.Account, err)
+			continue
+		}
+		if round < m.Record.VoteFirstValid || m.Record.VoteLastValid != 0 && round > m.Record.VoteLastValid {
+			continue // skip this account, not valid for participation in this round
+		}
+		cred := committee.MakeCredential(&acc.VRF.SK, m.Selector)
+		if _, err = cred.Verify(cparams, m); err != nil {
+			continue // skip this account, credential not valid proposer
+		}
+
 		payload, proposal, pErr := proposalForBlock(acc.Account, acc.VRF, ve, period, n.ledger)
 		if pErr != nil {
 			n.log.Errorf("pseudonode.makeProposals: could not create proposal for block (address %v): %v", acc.Account, pErr)

@@ -545,5 +545,163 @@ func TestPseudonodeNonEnqueuedTasks(t *testing.T) {
 		drainChannel(ch)
 	}
 	require.Equal(t, enqueuedVotes*len(accounts), subStrLogger.instancesFound[0])
-	require.Equal(t, enqueuedProposals*len(accounts), subStrLogger.instancesFound[1])
+	// makeProposals only builds a vote for accounts selected to propose in
+	// that period, so each enqueued proposal task fails to enqueue one vote
+	// verification per selected account.
+	partKeys := keyManager.VotingKeys(startRound, startRound)
+	expectedProposalVotes := 0
+	for p := 0; p < enqueuedProposals; p++ {
+		for _, acc := range partKeys {
+			rv := rawVote{Sender: acc.Account, Round: startRound, Period: period(p), Step: propose, Proposal: makeProposalValue(period(p), acc.Account)}
+			uv, err := makeVote(rv, acc.VotingSigner(), acc.VRF, ledger)
+			require.NoError(t, err)
+			if _, err := uv.verify(ledger); err == nil {
+				expectedProposalVotes++
+			}
+		}
+	}
+	require.Positive(t, expectedProposalVotes)
+	require.Equal(t, expectedProposalVotes, subStrLogger.instancesFound[1])
+}
+
+// TestMakeProposalsSkipsUnselected checks that makeProposals builds a proposal
+// and vote for exactly the accounts whose propose-step vote passes full
+// verification. Fewer would drop valid proposals; more would do per-account
+// proposal work that the vote verifier then throws away.
+func TestMakeProposalsSkipsUnselected(t *testing.T) {
+	partitiontest.PartitionTest(t)
+	t.Parallel()
+
+	rootSeed := sha256.Sum256([]byte(t.Name()))
+	accounts, balances := createTestAccountsAndBalances(t, 20, rootSeed[:])
+	// Vary stakes so sortition weights differ, and include zero-stake accounts.
+	for i, acc := range accounts {
+		b := balances[acc.Parent]
+		if i%5 == 0 {
+			b.MicroAlgos = basics.MicroAlgos{}
+		} else {
+			b.MicroAlgos = basics.MicroAlgos{Raw: uint64(i+1) * 1_000_000}
+		}
+		balances[acc.Parent] = b
+	}
+	ledger := makeTestLedger(balances)
+	pn := asyncPseudonode{
+		factory: testBlockFactory{Owner: 0},
+		keys:    makeRecordingKeyManager(accounts),
+		ledger:  ledger,
+		log:     serviceLogger{logging.TestingLog(t)},
+	}
+	round := ledger.NextRound()
+	partKeys := pn.loadRoundParticipationKeys(round)
+	require.Len(t, partKeys, len(accounts))
+
+	// Sortition depends on the period through the selector, so each period
+	// gives a different selection.
+	totalSelected, totalChecked := 0, 0
+	for p := period(0); p < 50; p++ {
+		proposals, votes := pn.makeProposals(round, p, partKeys)
+		require.Len(t, proposals, len(votes))
+		made := make(map[basics.Address]unauthenticatedVote, len(votes))
+		for _, uv := range votes {
+			made[uv.R.Sender] = uv
+		}
+		for _, acc := range partKeys {
+			rv := rawVote{Sender: acc.Account, Round: round, Period: p, Step: propose, Proposal: makeProposalValue(p, acc.Account)}
+			uv, err := makeVote(rv, acc.VotingSigner(), acc.VRF, ledger)
+			require.NoError(t, err)
+			_, verr := uv.verify(ledger)
+			got, ok := made[acc.Account]
+			require.Equal(t, verr == nil, ok, "period %d, account %v: proposal made=%v, vote verification error=%v", p, acc.Account, ok, verr)
+			if ok {
+				_, err = got.verify(ledger)
+				require.NoError(t, err)
+			}
+			totalChecked++
+		}
+		totalSelected += len(votes)
+	}
+	// Both outcomes must have been exercised.
+	require.Positive(t, totalSelected)
+	require.Less(t, totalSelected, totalChecked)
+}
+
+// proposerCirculationLedger overrides the test ledger's circulation, which
+// otherwise includes expired stake.
+type proposerCirculationLedger struct {
+	Ledger
+	circulation basics.MicroAlgos
+}
+
+func (l proposerCirculationLedger) Circulation(basics.Round, basics.Round) (basics.MicroAlgos, error) {
+	return l.circulation, nil
+}
+
+// TestMakeProposalsKeyValidity checks that makeProposals and vote verification
+// agree on which on-chain key registrations are valid for the round, and that
+// an invalid key never reaches sortition, which panics once an expired key's
+// stake has been excluded from the circulation.
+func TestMakeProposalsKeyValidity(t *testing.T) {
+	partitiontest.PartitionTest(t)
+	t.Parallel()
+
+	const round basics.Round = 900
+	for _, tc := range []struct {
+		name        string
+		first, last basics.Round
+		circulation uint64
+		verifyErr   string // expected vote verification error; empty if the key is valid
+	}{
+		{"beforeFirstValid", round + 1, round + 10, 1_000_000, "before VoteFirstValid"},
+		{"atFirstValid", round, round + 10, 1_000_000, ""},
+		{"atLastValid", round - 10, round, 1_000_000, ""},
+		{"noLastValid", round - 10, 0, 1_000_000, ""},
+		{"expiredWithRemainingStake", round - 10, round - 1, 100_000, "after VoteLastValid"},
+		{"expiredWithZeroCirculation", round - 10, round - 1, 0, "after VoteLastValid"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			rootSeed := sha256.Sum256([]byte(t.Name()))
+			accounts, balances := createTestAccountsAndBalances(t, 1, rootSeed[:])
+			addr := accounts[0].Parent
+			record := balances[addr]
+			record.VoteFirstValid = tc.first
+			record.VoteLastValid = tc.last
+			balances[addr] = record
+
+			baseLedger := makeTestLedger(balances).(*testLedger)
+			baseLedger.nextRound = round
+			ledger := proposerCirculationLedger{Ledger: baseLedger, circulation: basics.MicroAlgos{Raw: tc.circulation}}
+			pn := asyncPseudonode{
+				factory: testBlockFactory{},
+				keys:    makeRecordingKeyManager(accounts),
+				ledger:  ledger,
+				log:     serviceLogger{logging.TestingLog(t)},
+			}
+			// The local key stays valid past round 900 even when its on-chain
+			// registration has expired, and both public keys still match, so
+			// only the on-chain validity window can reject it.
+			partKeys := pn.loadRoundParticipationKeys(round)
+			require.Len(t, partKeys, 1)
+			require.GreaterOrEqual(t, partKeys[0].LastValid, round)
+			require.Equal(t, record.SelectionID, partKeys[0].VRF.PK)
+			require.Equal(t, record.VoteID, partKeys[0].Voting.OneTimeSignatureVerifier)
+
+			proposals, votes := pn.makeProposals(round, 0, partKeys)
+			if tc.verifyErr != "" {
+				rv := rawVote{Sender: addr, Round: round, Period: 0, Step: propose, Proposal: makeProposalValue(0, addr)}
+				uv, err := makeVote(rv, partKeys[0].VotingSigner(), partKeys[0].VRF, ledger)
+				require.NoError(t, err)
+				_, err = uv.verify(ledger)
+				require.ErrorContains(t, err, tc.verifyErr)
+				require.Empty(t, proposals)
+				require.Empty(t, votes)
+				return
+			}
+			require.Len(t, proposals, 1)
+			require.Len(t, votes, 1)
+			_, err := votes[0].verify(ledger)
+			require.NoError(t, err)
+		})
+	}
 }

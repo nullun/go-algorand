@@ -312,7 +312,7 @@ func (n asyncPseudonode) makeProposals(round basics.Round, period period, accoun
 			n.log.Warnf("pseudonode.makeProposals: could not get membership parameters for %v: %v", acc.Account, err)
 			continue
 		}
-		if round < m.Record.VoteFirstValid || m.Record.VoteLastValid != 0 && round > m.Record.VoteLastValid {
+		if checkVoteKeyValidity(m.Record.OnlineAccountData, round) != nil {
 			continue // skip this account, not valid for participation in this round
 		}
 		cred := committee.MakeCredential(&acc.VRF.SK, m.Selector)

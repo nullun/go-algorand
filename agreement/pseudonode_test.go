@@ -545,5 +545,23 @@ func TestPseudonodeNonEnqueuedTasks(t *testing.T) {
 		drainChannel(ch)
 	}
 	require.Equal(t, enqueuedVotes*len(accounts), subStrLogger.instancesFound[0])
-	require.Equal(t, enqueuedProposals*len(accounts), subStrLogger.instancesFound[1])
+
+	// Only accounts selected to propose build a proposal, so count the
+	// accounts whose proposal vote verifies in each enqueued period.
+	cparams, err := ledger.ConsensusParams(ParamsRound(startRound))
+	require.NoError(t, err)
+	partKeys := keyManager.VotingKeys(startRound, BalanceRound(startRound, cparams))
+	require.Len(t, partKeys, len(accounts))
+	selected := 0
+	for p := period(0); p < period(enqueuedProposals); p++ {
+		for _, acc := range partKeys {
+			rv := rawVote{Sender: acc.Account, Round: startRound, Period: p, Step: propose, Proposal: proposalValue{OriginalPeriod: p, OriginalProposer: acc.Account}}
+			uv, err := makeVote(rv, acc.VotingSigner(), acc.VRF, ledger)
+			require.NoError(t, err)
+			if _, err := uv.verify(ledger); err == nil {
+				selected++
+			}
+		}
+	}
+	require.Equal(t, selected, subStrLogger.instancesFound[1])
 }

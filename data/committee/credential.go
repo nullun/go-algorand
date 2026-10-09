@@ -76,7 +76,27 @@ type (
 func (cred UnauthenticatedCredential) Verify(proto config.ConsensusParams, m Membership) (res Credential, err error) {
 	selectionKey := m.Record.SelectionID
 	ok, vrfOut := selectionKey.Verify(cred.Proof, m.Selector)
+	if !ok {
+		err = fmt.Errorf("UnauthenticatedCredential.Verify: could not verify VRF Proof with %v (parameters = %+v, proof = %#v)", selectionKey, m, cred.Proof)
+		return
+	}
+	return cred.sortition(proto, m, vrfOut)
+}
 
+// VerifyLocal is Verify for a credential this node just made with MakeCredential
+// from its own key. It reads the VRF output from the proof without checking the
+// proof against the selection key, so it must never be used on network input.
+func (cred UnauthenticatedCredential) VerifyLocal(proto config.ConsensusParams, m Membership) (res Credential, err error) {
+	vrfOut, ok := cred.Proof.Hash()
+	if !ok {
+		err = fmt.Errorf("UnauthenticatedCredential.VerifyLocal: malformed VRF proof")
+		return
+	}
+	return cred.sortition(proto, m, vrfOut)
+}
+
+// sortition runs sortition on a VRF output that the caller has already authenticated.
+func (cred UnauthenticatedCredential) sortition(proto config.ConsensusParams, m Membership, vrfOut crypto.VrfOutput) (res Credential, err error) {
 	hashable := hashableCredential{
 		RawOut: vrfOut,
 		Member: m.Record.Addr,
@@ -88,11 +108,6 @@ func (cred UnauthenticatedCredential) Verify(proto config.ConsensusParams, m Mem
 		h = crypto.HashObj(hashable)
 	} else {
 		h = crypto.Hash(append(vrfOut[:], m.Record.Addr[:]...))
-	}
-
-	if !ok {
-		err = fmt.Errorf("UnauthenticatedCredential.Verify: could not verify VRF Proof with %v (parameters = %+v, proof = %#v)", selectionKey, m, cred.Proof)
-		return
 	}
 
 	var weight uint64

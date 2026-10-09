@@ -25,6 +25,7 @@ import (
 
 	"github.com/algorand/go-algorand/data/account"
 	"github.com/algorand/go-algorand/data/basics"
+	"github.com/algorand/go-algorand/data/committee"
 	"github.com/algorand/go-algorand/logging"
 	"github.com/algorand/go-algorand/logging/logspec"
 	"github.com/algorand/go-algorand/logging/telemetryspec"
@@ -299,6 +300,9 @@ func (n asyncPseudonode) makeProposals(round basics.Round, period period, accoun
 	votes := make([]unauthenticatedVote, 0, len(accounts))
 	proposals := make([]proposal, 0, len(accounts))
 	for _, acc := range accounts {
+		if !n.selectedToPropose(acc, round, period) {
+			continue
+		}
 		payload, proposal, pErr := proposalForBlock(acc.Account, acc.VRF, ve, period, n.ledger)
 		if pErr != nil {
 			n.log.Errorf("pseudonode.makeProposals: could not create proposal for block (address %v): %v", acc.Account, pErr)
@@ -319,6 +323,29 @@ func (n asyncPseudonode) makeProposals(round basics.Round, period period, accoun
 	}
 
 	return proposals, votes
+}
+
+// selectedToPropose reports whether sortition selects acc to propose in round and
+// period. Votes from unselected accounts fail verification and are dropped, so
+// makeProposals skips them before building their proposals. When it cannot decide,
+// it returns true and leaves the verifier to reject the vote as before.
+func (n asyncPseudonode) selectedToPropose(acc account.ParticipationRecordForRound, round basics.Round, period period) bool {
+	m, err := membership(n.ledger, acc.Account, round, period, propose)
+	if err != nil {
+		return true
+	}
+	// Like verify(), check the key range before sortition, which can panic on the
+	// stake of an expired key.
+	if round < m.Record.VoteFirstValid || (m.Record.VoteLastValid != 0 && round > m.Record.VoteLastValid) {
+		return true
+	}
+	proto, err := n.ledger.ConsensusParams(ParamsRound(round))
+	if err != nil {
+		return true
+	}
+	cred := committee.MakeCredential(&acc.VRF.SK, m.Selector)
+	_, err = cred.VerifyLocal(proto, m)
+	return err == nil
 }
 
 // makeVotes creates a slice of votes for a given proposal value in a given

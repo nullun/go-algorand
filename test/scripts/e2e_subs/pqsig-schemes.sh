@@ -136,3 +136,43 @@ if [ "$BALANCEED" -ne "$EXPECTED" ]; then
     date "+${scriptname} FAIL wanted ed25519 balance=${EXPECTED} but got ${BALANCEED} %Y%m%d_%H%M%S"
     false
 fi
+
+# Repeat with sqisign-1. Its fee surcharge is 10 basic min fees, so the
+# required min fee is 11mA.
+algokey pq generate -S sqisign-1 -k pq-sqi.sk > generate-sqi.out
+
+grep 'PQ scheme: sqisign-1' < generate-sqi.out
+SQIMNEMONIC=$(grep 'PQ private key mnemonic:' < generate-sqi.out | sed 's/PQ private key mnemonic: //')
+SQIADDRESS=$(grep 'PQ address:' < generate-sqi.out | sed 's/PQ address: //')
+
+echo "$SQIMNEMONIC"
+echo "$SQIADDRESS"
+
+# Restoring from mnemonic reproduces the key file.
+algokey pq import -m "$SQIMNEMONIC" -S sqisign-1 -k pq-sqi-restored.sk
+cmp pq-sqi.sk pq-sqi-restored.sk
+
+${gcmd} clerk send -a "${FUNDING}" -f "${ACCOUNT}" -t "${SQIADDRESS}"
+
+## Show the usual min fee is insufficient
+${gcmd} clerk send -a 5555 -f "${SQIADDRESS}" -t "${ACCOUNT}" --fee 1000 -o lowsqi.tx
+algokey pq sign -t lowsqi.tx -k pq-sqi.sk -o lowsqi-signed.tx
+set +o pipefail
+${gcmd} clerk rawsend -f lowsqi-signed.tx 2>&1 | grep "1mA fees is less than 11mA" || exit 1
+set -o pipefail
+
+## Show that 11000 min fee is sufficient
+${gcmd} clerk send -a 6666 -f "${SQIADDRESS}" -t "${ACCOUNT}" --fee 11000 -o enoughsqi.tx
+algokey pq sign -t enoughsqi.tx -k pq-sqi.sk -o enoughsqi-signed.tx
+${gcmd} clerk rawsend -f enoughsqi-signed.tx
+
+## Show that a delegated LogicSig signed by the sqisign-1 account can authorize a txn
+algokey pq sign-program -k pq-sqi.sk -p pq-true.tok -o pq-sqi-true.lsig
+${gcmd} clerk send -a 7777 -f "${SQIADDRESS}" -t "${ACCOUNT}" --fee 11000 -L pq-sqi-true.lsig
+
+BALANCESQI=$(${gcmd} account balance -a "${SQIADDRESS}" | awk '{ print $1 }')
+EXPECTSQI=$((FUNDING - 6666 - 11000 - 7777 - 11000))
+if [ "$BALANCESQI" -ne "$EXPECTSQI" ]; then
+    date "+${scriptname} FAIL wanted sqisign-1 balance=${EXPECTSQI} but got ${BALANCESQI} %Y%m%d_%H%M%S"
+    false
+fi

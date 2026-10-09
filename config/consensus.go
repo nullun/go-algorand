@@ -623,6 +623,10 @@ type ConsensusParams struct {
 	// ed scheme's hashed-address profile.
 	EnablePQSchemeEd25519 bool
 
+	// EnablePQSchemeSQIsign1 enables SQIsign NIST-I transaction authorization
+	// for the s1 PQ scheme.
+	EnablePQSchemeSQIsign1 bool
+
 	// RequireLogicSigArgAccess requires that a LogicSig carry no argument it did
 	// not read: nothing above the highest index it read, and nothing unread
 	// below that index unless it is empty. Args are covered by no signature, and
@@ -731,6 +735,8 @@ func (proto ConsensusParams) PQSchemeEnabled(scheme protocol.PQScheme) bool {
 		return proto.EnablePQSchemeFalcon512
 	case protocol.PQSchemeEd25519:
 		return proto.EnablePQSchemeEd25519
+	case protocol.PQSchemeSQIsign1:
+		return proto.EnablePQSchemeSQIsign1
 	default:
 		return false
 	}
@@ -748,6 +754,11 @@ func (proto ConsensusParams) PQSchemeFeeContribution(scheme protocol.PQScheme) b
 		return 1e6 // it is half of the Falcon-1024 contribution
 	case protocol.PQSchemeEd25519:
 		return 0 // we consider a single Ed25519 signature to be part of min fee
+	case protocol.PQSchemeSQIsign1:
+		// Placeholder until there is a cost model: SQIsign verification
+		// costs milliseconds, two to three orders of magnitude more than
+		// Falcon, and only a per-block limit can bound a block's total cost.
+		return 10e6
 	default:
 		return 0
 	}
@@ -1582,6 +1593,7 @@ func initConsensusProtocols() {
 	vFuture.LogicSigVersion = 14 // When moving this to a release, put a new higher LogicSigVersion here
 	vFuture.EnablePQSchemeFalcon512 = true
 	vFuture.EnablePQSchemeEd25519 = true
+	vFuture.EnablePQSchemeSQIsign1 = true
 	vFuture.RequireLogicSigArgAccess = true
 	vFuture.AllowGroupedHeartbeats = true
 

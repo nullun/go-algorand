@@ -73,6 +73,24 @@ func (s falcon512Signer) PublicKey() []byte {
 	return slices.Clone(s.Falcon512Signer.PublicKey[:])
 }
 
+type sqisign1Signer struct{ crypto.SQIsign1Signer }
+
+func (s sqisign1Signer) Sign(message crypto.Hashable) ([]byte, error) {
+	return s.SQIsign1Signer.Sign(message)
+}
+func (s sqisign1Signer) SignBytes(data []byte) ([]byte, error) {
+	return s.SQIsign1Signer.SignBytes(data)
+}
+func (s sqisign1Signer) Verify(message crypto.Hashable, sig []byte) error {
+	return crypto.VerifySQIsign1(message, s.PublicKey(), sig)
+}
+func (s sqisign1Signer) VerifyBytes(data []byte, sig []byte) error {
+	return crypto.VerifySQIsign1Bytes(data, s.PublicKey(), sig)
+}
+func (s sqisign1Signer) PublicKey() []byte {
+	return slices.Clone(s.SQIsign1Signer.PublicKey[:])
+}
+
 type ed25519Signer struct{ *crypto.SignatureSecrets }
 
 func (s ed25519Signer) Sign(message crypto.Hashable) ([]byte, error) {
@@ -123,6 +141,11 @@ var PQTestSchemes = []PQTestScheme{
 		Scheme:           protocol.PQSchemeEd25519,
 		MaxSignatureSize: len(crypto.Signature{}),
 	},
+	{
+		Name:             "sqisign-1",
+		Scheme:           protocol.PQSchemeSQIsign1,
+		MaxSignatureSize: crypto.SQIsign1SignatureSize,
+	},
 }
 
 // PQTestSchemeInfo returns the PQTestSchemes entry for scheme, failing the
@@ -164,6 +187,10 @@ func MakePQSigner(t testing.TB, firstSeedByte byte, scheme protocol.PQScheme) PQ
 		return falcon512Signer{signer}
 	case protocol.PQSchemeEd25519:
 		return ed25519Signer{crypto.GenerateSignatureSecrets(crypto.Seed{firstSeedByte})}
+	case protocol.PQSchemeSQIsign1:
+		signer, err := crypto.GenerateSQIsign1Signer(crypto.SQIsignSeed{firstSeedByte})
+		require.NoError(t, err)
+		return sqisign1Signer{signer}
 	}
 	t.Fatalf("unknown scheme %s", scheme)
 	return nil

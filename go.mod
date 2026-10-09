@@ -46,6 +46,7 @@ require (
 	github.com/miekg/dns v1.1.72
 	github.com/multiformats/go-multiaddr v0.16.1
 	github.com/multiformats/go-multiaddr-dns v0.4.1
+	github.com/nullun/go-sqisign v0.0.0
 	github.com/oapi-codegen/runtime v1.1.1
 	github.com/olivere/elastic v6.2.14+incompatible
 	github.com/prometheus/client_golang v1.23.2
@@ -201,3 +202,5 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 	lukechampine.com/blake3 v1.4.1 // indirect
 )
+
+replace github.com/nullun/go-sqisign => ../go-sqisign

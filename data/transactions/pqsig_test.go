@@ -55,6 +55,8 @@ func (f pqSigTestFixture) protoWithSchemeDisabled(t *testing.T) config.Consensus
 		proto.EnablePQSchemeFalcon512 = false
 	case protocol.PQSchemeEd25519:
 		proto.EnablePQSchemeEd25519 = false
+	case protocol.PQSchemeSQIsign1:
+		proto.EnablePQSchemeSQIsign1 = false
 	default:
 		t.Fatalf("unknown scheme %s", f.pqSig.Scheme)
 	}

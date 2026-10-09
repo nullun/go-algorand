@@ -515,6 +515,7 @@ func TestTxnValidationPQSigSchemeBoundary(t *testing.T) {
 	require.True(t, v42.PQSchemeEnabled(protocol.PQSchemeFalcon1024))
 	require.False(t, v42.PQSchemeEnabled(protocol.PQSchemeFalcon512))
 	require.False(t, v42.PQSchemeEnabled(protocol.PQSchemeEd25519))
+	require.False(t, v42.PQSchemeEnabled(protocol.PQSchemeSQIsign1))
 
 	blkHdr := createDummyBlockHeader(protocol.ConsensusV42)
 	dummyLedger := DummyLedgerForSignature{}
@@ -534,7 +535,7 @@ func TestTxnValidationPQSigSchemeBoundary(t *testing.T) {
 		require.NoError(t, err)
 	})
 
-	for i, scheme := range []protocol.PQScheme{protocol.PQSchemeFalcon512, protocol.PQSchemeEd25519} {
+	for i, scheme := range []protocol.PQScheme{protocol.PQSchemeFalcon512, protocol.PQSchemeEd25519, protocol.PQSchemeSQIsign1} {
 		t.Run(scheme.String()+"-txn", func(t *testing.T) {
 			stxn := makePQSignedTxnForScheme(t, byte(i+2), scheme)
 

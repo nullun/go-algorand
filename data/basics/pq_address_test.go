@@ -41,6 +41,10 @@ func publicKeyForPQAddressTest(t *testing.T, scheme protocol.PQScheme, firstSeed
 	case protocol.PQSchemeEd25519:
 		signer := crypto.GenerateSignatureSecrets(crypto.Seed{firstSeedByte})
 		return signer.SignatureVerifier[:]
+	case protocol.PQSchemeSQIsign1:
+		signer, err := crypto.GenerateSQIsign1Signer(crypto.SQIsignSeed{firstSeedByte})
+		require.NoError(t, err)
+		return signer.PublicKey[:]
 	}
 	t.Fatalf("unknown scheme %s", scheme)
 	return nil
@@ -68,6 +72,11 @@ func TestPQAddressPreimage(t *testing.T) {
 			name:            "ed25519",
 			scheme:          protocol.PQSchemeEd25519,
 			expectedPayload: []byte{'e', 'd', 0x7f, 0xab, 0xcd, 0xef},
+		},
+		{
+			name:            "sqisign-1",
+			scheme:          protocol.PQSchemeSQIsign1,
+			expectedPayload: []byte{'s', '1', 0x7f, 0xab, 0xcd, 0xef},
 		},
 	}
 
@@ -246,6 +255,54 @@ func TestPQAddressKnownAnswers(t *testing.T) {
 				},
 			},
 		},
+		{
+			name:   "sqisign-1",
+			scheme: protocol.PQSchemeSQIsign1,
+			answers: []knownAnswer{
+				{
+					name:            "zero salt",
+					firstSeedByte:   3,
+					salt:            0,
+					expectedAddress: "DZ4XDQB7DEXI3FIUUVIOG7OKAAGO3NC54CTWEANYSIUNHGSUNPYFIIUG3Q",
+					compliant:       false,
+				},
+				{
+					name:            "nonzero salt",
+					firstSeedByte:   1,
+					salt:            1,
+					expectedAddress: "7S34I6SUWV6CP6AXFMYCXOQZJH7B5B2H6UTS3UNBUEM53JOPABZRAVWRY4",
+					compliant:       true,
+				},
+				{
+					name:            "max salt",
+					firstSeedByte:   0,
+					salt:            255,
+					expectedAddress: "IZRTNMTXJEB3T4LSAQJ75BTWFCQ6ZHJZYFVX2W6ZIZRUEFUIFWT4ALFCQ4",
+					compliant:       false,
+				},
+				{
+					name:            "different seed",
+					firstSeedByte:   2,
+					salt:            2,
+					expectedAddress: "SIF5RA77ZSAXRSBSIVLVNMU5HPTPU4C2GHOZISABM6OHK3FFOGUM6KPRL4",
+					compliant:       true,
+				},
+				{
+					name:            "max seed and salt",
+					firstSeedByte:   255,
+					salt:            255,
+					expectedAddress: "SLGEBG4PNGOFVBNCUZMXZ5276QOSSAKHPSDTOL4LERAYVVEPLXX2LZY4YQ",
+					compliant:       false,
+				},
+				{
+					name:            "different salt",
+					firstSeedByte:   1,
+					salt:            0,
+					expectedAddress: "6YONQUAGHEKLDG3EFYLG6H5F7FNKIUA2JI2ACCDMDY2FKTFNHCDMHRMEGU",
+					compliant:       true,
+				},
+			},
+		},
 	}
 
 	for _, sc := range testCases {
@@ -293,6 +350,12 @@ func TestCanonicalPQAddressSalt(t *testing.T) {
 			scheme:          protocol.PQSchemeEd25519,
 			expectedSalt:    0,
 			expectedAddress: "52TWNOHFPAIAQPARIGBF3SXBHZ6NEX6QURSOTXYBUI5JXIO4DEBMZEF5AQ",
+		},
+		{
+			name:            "sqisign-1",
+			scheme:          protocol.PQSchemeSQIsign1,
+			expectedSalt:    0,
+			expectedAddress: "6YONQUAGHEKLDG3EFYLG6H5F7FNKIUA2JI2ACCDMDY2FKTFNHCDMHRMEGU",
 		},
 	}
 

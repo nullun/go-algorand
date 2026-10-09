@@ -37,4 +37,8 @@ var (
 
 	// PQSchemeFalcon512 - f5: Falcon-512 using a deterministic signing profile.
 	PQSchemeFalcon512 = PQScheme{'f', '5'}
+
+	// PQSchemeSQIsign1 - s1: SQIsign (spec v3.0) at NIST level I using a
+	// deterministic signing profile.
+	PQSchemeSQIsign1 = PQScheme{'s', '1'}
 )

@@ -1165,6 +1165,11 @@ func enableDeveloperAPI() postTransactionOpt {
 	}
 }
 
+// pqMinFee is the minimum fee, under proto, of a transaction authorized by scheme.
+func pqMinFee(proto config.ConsensusParams, scheme protocol.PQScheme) uint64 {
+	return proto.MinTxnFee + proto.MinTxnFee*uint64(proto.PQSchemeFeeContribution(scheme))/1e6
+}
+
 func makePQSigWithAddressCompliance(t *testing.T, compliant bool) (basics_testing.PQSigner, basics.Address, transactions.PQSig) {
 	t.Helper()
 
@@ -1241,7 +1246,7 @@ func makePQDelegatedLogicSigTxnWithAddressCompliance(t *testing.T, compliant boo
 		Type: protocol.PaymentTx,
 		Header: transactions.Header{
 			Sender:      authorizer,
-			Fee:         basics.MicroAlgos{Raw: config.Consensus[protocol.ConsensusFuture].MinTxnFee * 3},
+			Fee:         basics.MicroAlgos{Raw: pqMinFee(config.Consensus[protocol.ConsensusFuture], pqSig.Scheme)},
 			FirstValid:  0,
 			LastValid:   100,
 			GenesisHash: genesisHash,
@@ -1774,7 +1779,7 @@ func TestPostSimulateTransactionPlaceholderPQSignatureValidation(t *testing.T) {
 			Type:     protocol.PaymentTx,
 			Sender:   roots[0].Address(),
 			Receiver: roots[0].Address(),
-			Fee:      minFee * 3,
+			Fee:      pqMinFee(config.Consensus[hdr.CurrentProtocol], fixablePQSig.Scheme),
 		})
 		fixableGroup := txntest.Group(&rekeyTxn, &pqTxn)
 		fixableGroup[1].AuthAddr = roots[1].Address()

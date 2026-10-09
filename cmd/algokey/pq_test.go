@@ -150,6 +150,16 @@ func TestPQGenerateUsesMnemonicSizedEntropy(t *testing.T) {
 				return signer.SignatureVerifier[:], signer.SK[:]
 			},
 		},
+		{
+			name:    "sqisign-1",
+			scheme:  protocol.PQSchemeSQIsign1,
+			address: "UIDNRKFPN4VCVAQRMUWT2LBYGKZKIQ7TY5B44LXDIPNEH547HZLILZCWVY",
+			rederive: func(t *testing.T, seed crypto.Digest) ([]byte, []byte) {
+				signer, err := crypto.GenerateSQIsign1Signer(crypto.SQIsignSeed(seed))
+				require.NoError(t, err)
+				return signer.PublicKey[:], signer.PrivateKey[:]
+			},
+		},
 	}
 
 	for _, tc := range testcases {
@@ -184,7 +194,7 @@ func TestPQSchemeRegistriesConsistent(t *testing.T) {
 		require.True(t, ok, "algokey scheme %q missing from crypto registry", scheme)
 	}
 
-	for _, scheme := range []protocol.PQScheme{protocol.PQSchemeFalcon1024, protocol.PQSchemeFalcon512, protocol.PQSchemeEd25519} {
+	for _, scheme := range []protocol.PQScheme{protocol.PQSchemeFalcon1024, protocol.PQSchemeFalcon512, protocol.PQSchemeEd25519, protocol.PQSchemeSQIsign1} {
 		_, ok := pqSchemeOpsByScheme[scheme]
 		require.True(t, ok, "basics scheme %q missing from algokey ops registry", scheme)
 	}
@@ -229,6 +239,14 @@ func TestParsePQSchemeAcceptsLongName(t *testing.T) {
 	scheme, err = parsePQScheme("ed")
 	require.NoError(t, err)
 	require.Equal(t, protocol.PQSchemeEd25519, scheme)
+
+	scheme, err = parsePQScheme("sqisign-1")
+	require.NoError(t, err)
+	require.Equal(t, protocol.PQSchemeSQIsign1, scheme)
+
+	scheme, err = parsePQScheme("s1")
+	require.NoError(t, err)
+	require.Equal(t, protocol.PQSchemeSQIsign1, scheme)
 }
 
 func TestFormatPQScheme(t *testing.T) {
@@ -238,6 +256,7 @@ func TestFormatPQScheme(t *testing.T) {
 	require.Equal(t, pqSchemeFalcon1024Name, formatPQScheme(protocol.PQSchemeFalcon1024))
 	require.Equal(t, pqSchemeFalcon512Name, formatPQScheme(protocol.PQSchemeFalcon512))
 	require.Equal(t, pqSchemeEd25519Name, formatPQScheme(protocol.PQSchemeEd25519))
+	require.Equal(t, pqSchemeSQIsign1Name, formatPQScheme(protocol.PQSchemeSQIsign1))
 	require.Equal(t, protocol.PQScheme{'z', 'z'}.String(), formatPQScheme(protocol.PQScheme{'z', 'z'}))
 }
 
@@ -433,6 +452,7 @@ func TestPQSignProducesVerifiablePQEnvelope(t *testing.T) {
 		{"falcon-1024", protocol.PQSchemeFalcon1024},
 		{"falcon-512", protocol.PQSchemeFalcon512},
 		{"ed25519", protocol.PQSchemeEd25519},
+		{"sqisign-1", protocol.PQSchemeSQIsign1},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()

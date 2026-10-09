@@ -52,8 +52,8 @@ type PQBatchPreparer interface {
 // signature means growing these; TestPQBoundsCoverSchemes guards against
 // undersizing the current schemes.
 const (
-	MaxPQPublicKeySize = max(Falcon1024PublicKeySize, Falcon512PublicKeySize, len(PublicKey{}))
-	MaxPQSignatureSize = max(Falcon1024MaxSignatureSize, Falcon512MaxSignatureSize, len(Signature{}))
+	MaxPQPublicKeySize = max(Falcon1024PublicKeySize, Falcon512PublicKeySize, SQIsign1PublicKeySize, len(PublicKey{}))
+	MaxPQSignatureSize = max(Falcon1024MaxSignatureSize, Falcon512MaxSignatureSize, SQIsign1SignatureSize, len(Signature{}))
 )
 
 // LookupPQScheme returns the verifier for a PQ scheme tag.
@@ -74,6 +74,8 @@ func LookupPQScheme(s protocol.PQScheme) (PQVerifier, bool) {
 		return falcon512{}, true
 	case protocol.PQSchemeEd25519:
 		return ed25519Scheme{}, true
+	case protocol.PQSchemeSQIsign1:
+		return sqisign1{}, true
 	}
 	return nil, false
 }
@@ -90,6 +92,13 @@ type falcon512 struct{}
 
 func (falcon512) Verify(message Hashable, publicKey, signature []byte) error {
 	return VerifyFalcon512(message, publicKey, signature)
+}
+
+// sqisign1 is the SQIsign NIST-I (s1) scheme.
+type sqisign1 struct{}
+
+func (sqisign1) Verify(message Hashable, publicKey, signature []byte) error {
+	return VerifySQIsign1(message, publicKey, signature)
 }
 
 // ed25519Scheme is the classical Ed25519 (ed) scheme.

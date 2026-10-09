@@ -29,6 +29,7 @@ const (
 	pqSchemeFalcon1024Name = "falcon-1024"
 	pqSchemeFalcon512Name  = "falcon-512"
 	pqSchemeEd25519Name    = "ed25519"
+	pqSchemeSQIsign1Name   = "sqisign-1"
 )
 
 // pqSchemeOps holds the signing-side, private-key operations for one PQ
@@ -46,11 +47,13 @@ var pqSchemeOpsByScheme = map[protocol.PQScheme]pqSchemeOps{
 	protocol.PQSchemeFalcon1024: falcon1024Ops{},
 	protocol.PQSchemeFalcon512:  falcon512Ops{},
 	protocol.PQSchemeEd25519:    ed25519Ops{},
+	protocol.PQSchemeSQIsign1:   sqisign1Ops{},
 }
 
 type falcon1024Ops struct{}
 type falcon512Ops struct{}
 type ed25519Ops struct{}
+type sqisign1Ops struct{}
 
 func parsePQScheme(value string) (protocol.PQScheme, error) {
 	value = strings.TrimSpace(value)
@@ -62,6 +65,9 @@ func parsePQScheme(value string) (protocol.PQScheme, error) {
 	}
 	if strings.EqualFold(value, pqSchemeEd25519Name) {
 		return protocol.PQSchemeEd25519, nil
+	}
+	if strings.EqualFold(value, pqSchemeSQIsign1Name) {
+		return protocol.PQSchemeSQIsign1, nil
 	}
 
 	var scheme protocol.PQScheme
@@ -81,6 +87,9 @@ func formatPQScheme(scheme protocol.PQScheme) string {
 	}
 	if scheme == protocol.PQSchemeEd25519 {
 		return pqSchemeEd25519Name
+	}
+	if scheme == protocol.PQSchemeSQIsign1 {
+		return pqSchemeSQIsign1Name
 	}
 	return scheme.String()
 }
@@ -226,4 +235,42 @@ func (ed25519Ops) sign(privateKey []byte, message crypto.Hashable) ([]byte, erro
 	}
 	sig := signer.Sign(message)
 	return sig[:], nil
+}
+
+func (sqisign1Ops) deriveSigning(seed crypto.Digest) (pqSigningMaterial, error) {
+	signer, err := crypto.GenerateSQIsign1Signer(crypto.SQIsignSeed(seed))
+	if err != nil {
+		return pqSigningMaterial{}, err
+	}
+
+	publicKey := signer.PublicKey[:]
+	privateKey := signer.PrivateKey[:]
+	salt, _, err := basics.CanonicalPQAddressSalt(protocol.PQSchemeSQIsign1, publicKey)
+	if err != nil {
+		return pqSigningMaterial{}, err
+	}
+
+	return pqSigningMaterial{
+		Public: pqPublicMaterial{
+			Scheme:    protocol.PQSchemeSQIsign1,
+			Salt:      salt,
+			PublicKey: publicKey,
+		},
+		PrivateKey: privateKey,
+	}, nil
+}
+
+func (sqisign1Ops) publicKeySize() uint64 { return crypto.SQIsign1PublicKeySize }
+
+func (sqisign1Ops) privateKeySize() uint64 { return crypto.SQIsign1PrivateKeySize }
+
+func (sqisign1Ops) sign(privateKey []byte, message crypto.Hashable) ([]byte, error) {
+	var sk crypto.SQIsign1PrivateKey
+	if len(privateKey) != len(sk) {
+		return nil, fmt.Errorf("%w: got private key size %d, want %d", errPQKeyMalformed, len(privateKey), len(sk))
+	}
+	copy(sk[:], privateKey)
+
+	signer := crypto.SQIsign1Signer{PrivateKey: sk}
+	return signer.Sign(message)
 }

@@ -97,6 +97,7 @@ func (t *trustChain) ensure(ctx context.Context, fqZoneName string, keytags []ui
 
 	zoneIdx := 0
 	refreshedZones := make([]bool, len(zones)) // indexes of refreshed zones during the loop iterations
+	chain := make([]trustedZone, len(zones))   // zones accepted by this call, safe from concurrent eviction
 	// the loop goes over zones and cached trust chain and creates new entries if needed.
 	// cache invalidation happens in these three cases:
 	// 1. no cached key in parent zone verifies newly obtained DS
@@ -110,28 +111,31 @@ func (t *trustChain) ensure(ctx context.Context, fqZoneName string, keytags []ui
 	// causing 2 * len(zones) iterations
 	// makeTrustedZone cannot return cacheOutdated for root, and refreshedZones prevents a second refresh
 
-	// this would not survive after granular locks and concurrent underlying zones removal
+	// The lock guards only the cache, so a slow DNS server does not stall lookups the
+	// cache can answer. Evicting a zone keeps its children cached, so drop every expired
+	// zone here to keep zones that are no longer looked up from piling up.
 	t.mu.Lock()
-	defer t.mu.Unlock()
-	// Evicting a zone keeps its children cached, so drop every expired zone here to
-	// keep zones that are no longer looked up from piling up.
 	now := t.currentTime()
 	for zone, tz := range t.trustedZones {
 		if tz.isExpired(now) || tz.ttlExpired(now) {
 			delete(t.trustedZones, zone)
 		}
 	}
+	startGen := t.nextGen
+	t.mu.Unlock()
 	for {
 		zone := zones[zoneIdx]
+		t.mu.RLock()
 		tz, ok := t.trustedZones[zone]
+		t.mu.RUnlock()
+		// A copy newer than startGen was fetched by a concurrent lookup after this call
+		// began. Treating it as refreshed keeps the loop bounded.
+		refreshedZones[zoneIdx] = ok && tz.gen > startGen
 		if !ok {
-			if refreshedZones[zoneIdx] {
-				return nil, false, 0, fmt.Errorf("cache outdated for already updated zone %s", zone)
-			}
 			var cacheOutdated bool
 			parentZone := trustedZone{}
 			if zoneIdx > 0 {
-				parentZone = t.trustedZones[zones[zoneIdx-1]]
+				parentZone = chain[zoneIdx-1]
 			}
 			if tz, cacheOutdated, err = makeTrustedZone(ctx, zone, parentZone, t.client, t.currentTime); err != nil {
 				return nil, false, 0, err
@@ -151,20 +155,23 @@ func (t *trustChain) ensure(ctx context.Context, fqZoneName string, keytags []ui
 					// the parent keys are already fresh, so refreshing them again would not help
 					return nil, false, 0, fmt.Errorf("DS signature verification failed for %s", zone)
 				}
-				delete(t.trustedZones, parentZoneName)
+				t.invalidate(parentZoneName, parentZone.gen)
 				continue
 			}
 			// successfully created a new zone, record it
+			t.mu.Lock()
 			t.nextGen++
 			tz.gen = t.nextGen
 			t.trustedZones[zone] = tz
+			t.mu.Unlock()
 			refreshedZones[zoneIdx] = true
 		}
+		chain[zoneIdx] = tz
 		// A zone fetched by this call stays usable for it even if its TTL is zero or has
 		// just run out, but its DNSKEY signatures must still be valid.
 		now = t.currentTime()
 		if tz.isExpired(now) || (!refreshedZones[zoneIdx] && tz.ttlExpired(now)) {
-			delete(t.trustedZones, zone)
+			t.invalidate(zone, tz.gen)
 			if refreshedZones[zoneIdx] {
 				return nil, false, 0, fmt.Errorf("DNSKEY RRSIG expired during validation for %s", zone)
 			}
@@ -177,7 +184,7 @@ func (t *trustChain) ensure(ctx context.Context, fqZoneName string, keytags []ui
 					return nil, false, 0, fmt.Errorf("DNSKEY %v not found in zone %s", keytags, fqZoneName)
 				}
 				// seems like the latest zone
-				delete(t.trustedZones, zone)
+				t.invalidate(zone, tz.gen)
 				continue
 			}
 			keys = tz.zsk

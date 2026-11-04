@@ -624,7 +624,16 @@ func (qs *accountsDbQueries) LookupLimitedResources(addr basics.Address, minIdx 
 				return err
 			}
 
-			var prdwc trackerdb.PersistedResourcesDataWithCreator
+			// The row starts as the account's own record with no creator,
+			// which is what a deleted creatable returns.
+			prdwc := trackerdb.PersistedResourcesDataWithCreator{
+				PersistedResourcesData: trackerdb.PersistedResourcesData{
+					AcctRef: sqlRowRef{addrid.Int64},
+					Aidx:    basics.CreatableIndex(aidx.Int64),
+					Data:    actResData,
+					Round:   dbRound,
+				},
+			}
 			if len(crtResourceBuf) > 0 {
 				err = protocol.Decode(crtResourceBuf, &crtResData)
 				if err != nil {
@@ -644,28 +653,8 @@ func (qs *accountsDbQueries) LookupLimitedResources(addr basics.Address, minIdx 
 					crtResData.KeyValue = actResData.KeyValue
 				}
 				crtResData.ResourceFlags = actResData.ResourceFlags
-
-				creatorAddr := basics.Address{}
-				copy(creatorAddr[:], creatorAddrBuf)
-
-				prdwc = trackerdb.PersistedResourcesDataWithCreator{
-					PersistedResourcesData: trackerdb.PersistedResourcesData{
-						AcctRef: sqlRowRef{addrid.Int64},
-						Aidx:    basics.CreatableIndex(aidx.Int64),
-						Data:    crtResData,
-						Round:   dbRound,
-					},
-					Creator: creatorAddr,
-				}
-			} else { // no creator found, creatable was likely deleted, will not have params
-				prdwc = trackerdb.PersistedResourcesDataWithCreator{
-					PersistedResourcesData: trackerdb.PersistedResourcesData{
-						AcctRef: sqlRowRef{addrid.Int64},
-						Aidx:    basics.CreatableIndex(aidx.Int64),
-						Data:    actResData,
-						Round:   dbRound,
-					},
-				}
+				prdwc.Data = crtResData
+				copy(prdwc.Creator[:], creatorAddrBuf)
 			}
 
 			data = append(data, prdwc)

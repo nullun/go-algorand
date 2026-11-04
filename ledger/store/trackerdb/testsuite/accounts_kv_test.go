@@ -287,13 +287,14 @@ func CustomTestResourcesQueryAllLimited(t *customT) {
 	_, err = aow.InsertResource(refAccB, aidxResA0, resDataA0AcctB)
 	require.NoError(t, err)
 
-	// App A-1 for accounts A and B - this should be completely ignored
+	// App A-1 for accounts A and B - the asset lookups ignore it
 	resDataA1AcctA := trackerdb.ResourcesData{}
 	appParams := ledgertesting.RandomAppParams()
+	appParams.GlobalState = basics.TealKeyValue{"g": {Type: basics.TealUintType, Uint: 1}}
 	resDataA1AcctA.SetAppParams(appParams, true)
 	resDataA1AcctA.SetAppLocalState(basics.AppLocalState{})
 	resDataA1AcctB := trackerdb.ResourcesData{}
-	resDataA1AcctB.SetAppLocalState(basics.AppLocalState{})
+	resDataA1AcctB.SetAppLocalState(basics.AppLocalState{KeyValue: basics.TealKeyValue{"l": {Type: basics.TealUintType, Uint: 2}}})
 	aidxResA1 := basics.CreatableIndex(2)
 	_, err = aow.InsertResource(refAccA, aidxResA1, resDataA1AcctA)
 	require.NoError(t, err)
@@ -373,6 +374,15 @@ func CustomTestResourcesQueryAllLimited(t *customT) {
 	require.Equal(t, resDataWithParamsA0AcctB, prs[0].Data)
 	require.Equal(t, resDataWithParamsA1AcctB, prs[1].Data)
 	require.Equal(t, expectedRound, rnd) // db round (from the return)
+
+	// Application pages merge the creator's params with the account's local state.
+	prs, _, err = aor.LookupLimitedResources(addrB, 0, 1, basics.AppCreatable)
+	require.NoError(t, err)
+	require.Equal(t, 1, len(prs))
+	require.Equal(t, addrA, prs[0].Creator)
+	require.Equal(t, resDataA1AcctA.GetAppParams(), prs[0].Data.GetAppParams())
+	require.Equal(t, resDataA1AcctB.GetAppLocalState(), prs[0].Data.GetAppLocalState())
+	require.Equal(t, resDataA1AcctB.ResourceFlags, prs[0].Data.ResourceFlags)
 
 	// Set limit to 1, should return only 1 resource
 	prs, rnd, err = aor.LookupLimitedResources(addrB, 0, 1, basics.AssetCreatable)

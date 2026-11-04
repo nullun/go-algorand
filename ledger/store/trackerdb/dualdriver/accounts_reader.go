@@ -204,9 +204,9 @@ func (ar *accountsReader) LookupResources(addr basics.Address, aidx basics.Creat
 	return dataP, nil
 }
 
-func (ar *accountsReader) LookupLimitedResources(addr basics.Address, minIdx basics.CreatableIndex, maxCreatables uint64, ctype basics.CreatableType) (data []trackerdb.PersistedResourcesDataWithCreator, rnd basics.Round, err error) {
-	dataP, rndP, errP := ar.primary.LookupLimitedResources(addr, minIdx, maxCreatables, ctype)
-	dataS, rndS, errS := ar.secondary.LookupLimitedResources(addr, minIdx, maxCreatables, ctype)
+func (ar *accountsReader) LookupLimitedResources(addr basics.Address, minIdx basics.CreatableIndex, maxCreatables uint64, ctype basics.CreatableType, includeParams bool) (data []trackerdb.PersistedResourcesDataWithCreator, rnd basics.Round, err error) {
+	dataP, rndP, errP := ar.primary.LookupLimitedResources(addr, minIdx, maxCreatables, ctype, includeParams)
+	dataS, rndS, errS := ar.secondary.LookupLimitedResources(addr, minIdx, maxCreatables, ctype, includeParams)
 	// coalesce errors
 	err = coalesceErrors(errP, errS)
 	if err != nil {

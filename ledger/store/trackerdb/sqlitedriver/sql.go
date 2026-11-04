@@ -35,6 +35,8 @@ type accountsDbQueries struct {
 	lookupAllResourcesStmt     *sql.Stmt
 	lookupLimitedResourcesStmt *sql.Stmt
 
+	lookupLimitedResourcesNoParamsStmt *sql.Stmt
+
 	lookupKvPairStmt                     *sql.Stmt
 	lookupKeysByRangeStmt                *sql.Stmt
 	lookupKeysByRangeCursorStmt          *sql.Stmt
@@ -109,6 +111,25 @@ func AccountsInitDbQueries(q db.Queryable) (*accountsDbQueries, error) {
 				WHERE ar.id = 'acctbase'
   					AND r.ctype = ?
   					AND r.aidx > ?
+				ORDER BY r.aidx ASC
+				LIMIT ?`)
+	if err != nil {
+		return nil, err
+	}
+
+	// The statement without params skips the creator joins and returns
+	// ac.asset, which shows whether the creatable still exists. It agrees
+	// with the statement above because an assetcreators row and its
+	// creator's resource row are written and deleted in the same commit.
+	qs.lookupLimitedResourcesNoParamsStmt, err = q.Prepare(
+		`SELECT ab.rowid, ar.rnd, r.aidx, ac.creator, r.data, ac.asset
+				FROM acctrounds ar
+				JOIN accountbase ab ON ab.address = ?
+				JOIN resources r ON r.addrid = ab.addrid
+				LEFT JOIN assetcreators ac ON r.aidx = ac.asset
+				WHERE ar.id = 'acctbase'
+					AND r.ctype = ?
+					AND r.aidx > ?
 				ORDER BY r.aidx ASC
 				LIMIT ?`)
 	if err != nil {
@@ -589,9 +610,13 @@ func (qs *accountsDbQueries) LookupAllResources(addr basics.Address) (data []tra
 	return
 }
 
-func (qs *accountsDbQueries) LookupLimitedResources(addr basics.Address, minIdx basics.CreatableIndex, maxCreatables uint64, ctype basics.CreatableType) (data []trackerdb.PersistedResourcesDataWithCreator, rnd basics.Round, err error) {
+func (qs *accountsDbQueries) LookupLimitedResources(addr basics.Address, minIdx basics.CreatableIndex, maxCreatables uint64, ctype basics.CreatableType, includeParams bool) (data []trackerdb.PersistedResourcesDataWithCreator, rnd basics.Round, err error) {
+	stmt := qs.lookupLimitedResourcesStmt
+	if !includeParams {
+		stmt = qs.lookupLimitedResourcesNoParamsStmt
+	}
 	err = db.Retry(func() error {
-		rows, err0 := qs.lookupLimitedResourcesStmt.Query(addr[:], ctype, minIdx, maxCreatables)
+		rows, err0 := stmt.Query(addr[:], ctype, minIdx, maxCreatables)
 		if err0 != nil {
 			return err0
 		}
@@ -603,8 +628,15 @@ func (qs *accountsDbQueries) LookupLimitedResources(addr basics.Address, minIdx 
 		var actResourceBuf []byte
 		var crtResourceBuf []byte
 		var creatorAddrBuf []byte
+		// Without params the last column is ac.asset rather than the
+		// creator's resource data.
+		var crtAidx sql.NullInt64
+		var lastCol any = &crtResourceBuf
+		if !includeParams {
+			lastCol = &crtAidx
+		}
 		for rows.Next() {
-			err = rows.Scan(&addrid, &dbRound, &aidx, &creatorAddrBuf, &actResourceBuf, &crtResourceBuf)
+			err = rows.Scan(&addrid, &dbRound, &aidx, &creatorAddrBuf, &actResourceBuf, lastCol)
 			if err != nil {
 				return err
 			}
@@ -634,7 +666,11 @@ func (qs *accountsDbQueries) LookupLimitedResources(addr basics.Address, minIdx 
 					Round:   dbRound,
 				},
 			}
-			if len(crtResourceBuf) > 0 {
+			switch {
+			case crtAidx.Valid:
+				// Without params the account's own record is the row.
+				copy(prdwc.Creator[:], creatorAddrBuf)
+			case len(crtResourceBuf) > 0:
 				err = protocol.Decode(crtResourceBuf, &crtResData)
 				if err != nil {
 					return err
@@ -787,6 +823,7 @@ func (qs *accountsDbQueries) Close() {
 		&qs.lookupResourcesStmt,
 		&qs.lookupAllResourcesStmt,
 		&qs.lookupLimitedResourcesStmt,
+		&qs.lookupLimitedResourcesNoParamsStmt,
 		&qs.lookupKvPairStmt,
 		&qs.lookupKeysByRangeStmt,
 		&qs.lookupKeysByRangeCursorStmt,

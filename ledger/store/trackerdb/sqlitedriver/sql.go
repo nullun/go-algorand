@@ -97,6 +97,8 @@ func AccountsInitDbQueries(q db.Queryable) (*accountsDbQueries, error) {
 		return nil, err
 	}
 
+	// The creator joins are skipped when the account is the creator, because
+	// r.data already holds that row.
 	qs.lookupLimitedResourcesStmt, err = q.Prepare(
 		`SELECT ab.rowid,
 						ar.rnd,
@@ -108,7 +110,7 @@ func AccountsInitDbQueries(q db.Queryable) (*accountsDbQueries, error) {
 				JOIN accountbase ab ON ab.address = ?
 				JOIN resources r ON r.addrid = ab.addrid
 				LEFT JOIN assetcreators ac ON r.aidx = ac.asset
-				LEFT JOIN accountbase cab ON ac.creator = cab.address
+				LEFT JOIN accountbase cab ON ac.creator = cab.address AND ac.creator <> ab.address
 				LEFT JOIN resources cr ON cr.addrid = cab.addrid
 				AND cr.aidx = r.aidx
 				WHERE ar.id = 'acctbase'
@@ -679,6 +681,10 @@ func (qs *accountsDbQueries) LookupLimitedResources(addr basics.Address, minIdx 
 			switch {
 			case crtAidx.Valid:
 				// Without params the account's own record is the row.
+				copy(prdwc.Creator[:], creatorAddrBuf)
+			case ownCreatable:
+				// The account created the creatable, so its own record already
+				// holds the params.
 				copy(prdwc.Creator[:], creatorAddrBuf)
 			case len(crtResourceBuf) > 0:
 				err = protocol.Decode(crtResourceBuf, &crtResData)

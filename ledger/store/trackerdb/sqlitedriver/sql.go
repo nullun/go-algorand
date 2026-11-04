@@ -630,9 +630,11 @@ func (qs *accountsDbQueries) LookupLimitedResources(addr basics.Address, minIdx 
 		var addrid, aidx sql.NullInt64
 		var dbRound basics.Round
 		data = nil
-		var actResourceBuf []byte
-		var crtResourceBuf []byte
-		var creatorAddrBuf []byte
+		// RawBytes avoids copying each blob a second time. The buffers are
+		// valid only until the next Scan, so each row is decoded before it.
+		var actResourceBuf sql.RawBytes
+		var crtResourceBuf sql.RawBytes
+		var creatorAddrBuf sql.RawBytes
 		// Without params the last column is ac.asset rather than the
 		// creator's resource data.
 		var crtAidx sql.NullInt64

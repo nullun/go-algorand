@@ -17,8 +17,11 @@
 package sqlitedriver
 
 import (
+	"bytes"
 	"database/sql"
 	"fmt"
+
+	"github.com/algorand/msgp/msgp"
 
 	"github.com/algorand/go-algorand/data/basics"
 	"github.com/algorand/go-algorand/ledger/ledgercore"
@@ -635,6 +638,7 @@ func (qs *accountsDbQueries) LookupLimitedResources(addr basics.Address, minIdx 
 		if !includeParams {
 			lastCol = &crtAidx
 		}
+		var scratch []byte
 		for rows.Next() {
 			err = rows.Scan(&addrid, &dbRound, &aidx, &creatorAddrBuf, &actResourceBuf, lastCol)
 			if err != nil {
@@ -651,7 +655,13 @@ func (qs *accountsDbQueries) LookupLimitedResources(addr basics.Address, minIdx 
 			}
 			var actResData trackerdb.ResourcesData
 			var crtResData trackerdb.ResourcesData
-			err = protocol.Decode(actResourceBuf, &actResData)
+			// Only the account's own creatables hold params.
+			ownCreatable := bytes.Equal(creatorAddrBuf, addr[:])
+			if !includeParams && ownCreatable {
+				scratch, err = decodeResourcesDataWithoutParams(actResourceBuf, &actResData, scratch)
+			} else {
+				err = protocol.Decode(actResourceBuf, &actResData)
+			}
 			if err != nil {
 				return err
 			}
@@ -700,6 +710,57 @@ func (qs *accountsDbQueries) LookupLimitedResources(addr basics.Address, minIdx 
 		return nil
 	})
 	return
+}
+
+// resourceParamsKeys marks the msgp keys of the trackerdb.ResourcesData
+// fields that ClearAssetParams and ClearAppParams reset.
+// TestDecodeResourcesDataWithoutParams fails when the two disagree. A params
+// field missing from this list is still decoded, so the list affects only
+// the cost of a lookup without params.
+var resourceParamsKeys = [256]bool{
+	// asset params
+	'a': true, 'b': true, 'c': true, 'd': true, 'e': true, 'f': true,
+	'g': true, 'h': true, 'i': true, 'j': true, 'k': true,
+	// app params
+	'q': true, 'r': true, 's': true, 't': true, 'u': true, 'v': true,
+	'w': true, 'x': true, 'A': true, 'B': true, 'C': true, 'D': true,
+}
+
+// decodeResourcesDataWithoutParams decodes buf into rd but leaves the asset
+// and app params empty, so a creator's programs and global state are skipped
+// rather than copied. It copies the other fields into scratch and decodes
+// them, and it returns scratch for reuse by the next call.
+func decodeResourcesDataWithoutParams(buf []byte, rd *trackerdb.ResourcesData, scratch []byte) ([]byte, error) {
+	sz, isnil, rest, err := msgp.ReadMapHeaderBytes(buf)
+	if err != nil || isnil {
+		return scratch, protocol.Decode(buf, rd)
+	}
+	// Leave room in front of the kept fields for the largest map header.
+	const maxMapHeader = 5
+	out := append(scratch[:0], make([]byte, maxMapHeader)...)
+	kept := 0
+	for range sz {
+		field := rest
+		var key []byte
+		key, rest, err = msgp.ReadMapKeyZC(rest)
+		if err != nil {
+			return out, err
+		}
+		rest, err = msgp.Skip(rest)
+		if err != nil {
+			return out, err
+		}
+		if len(key) == 1 && resourceParamsKeys[key[0]] {
+			continue
+		}
+		out = append(out, field[:len(field)-len(rest)]...)
+		kept++
+	}
+	var hdr [maxMapHeader]byte
+	h := msgp.AppendMapHeader(hdr[:0], uint32(kept))
+	start := maxMapHeader - len(h)
+	copy(out[start:], h)
+	return out, protocol.Decode(out[start:], rd)
 }
 
 // LookupAccount looks up for a the account data given it's address. It returns the persistedAccountData, which includes the current database round and the matching

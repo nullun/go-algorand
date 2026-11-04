@@ -104,7 +104,7 @@ type AccountsReader interface {
 
 	LookupResources(addr basics.Address, aidx basics.CreatableIndex, ctype basics.CreatableType) (data PersistedResourcesData, err error)
 	LookupAllResources(addr basics.Address) (data []PersistedResourcesData, rnd basics.Round, err error)
-	// When includeParams is false, LookupLimitedResources does not read the creatable params from another creator.
+	// When includeParams is false, LookupLimitedResources returns no creatable params, even for creatables the account created.
 	LookupLimitedResources(addr basics.Address, minIdx basics.CreatableIndex, maxCreatables uint64, ctype basics.CreatableType, includeParams bool) (data []PersistedResourcesDataWithCreator, rnd basics.Round, err error)
 
 	LookupKeyValue(key string) (pv PersistedKVData, err error)

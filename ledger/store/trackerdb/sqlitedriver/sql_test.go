@@ -109,3 +109,37 @@ func TestWrapIOError(t *testing.T) {
 	require.Equal(t, wrapIOError(err), wrapIOError(wrapIOError(err)))
 
 }
+
+// TestDecodeResourcesDataWithoutParams checks the decoder against
+// ClearAssetParams and ClearAppParams, which define the params fields. A
+// params field missing from resourceParamsKeys, or another field listed in
+// it, makes the results differ.
+func TestDecodeResourcesDataWithoutParams(t *testing.T) {
+	partitiontest.PartitionTest(t)
+	t.Parallel()
+
+	var scratch []byte
+	for range 1000 {
+		obj, err := protocol.RandomizeObject(&trackerdb.ResourcesData{})
+		require.NoError(t, err)
+		buf := protocol.Encode(obj.(*trackerdb.ResourcesData))
+
+		var want trackerdb.ResourcesData
+		require.NoError(t, protocol.Decode(buf, &want))
+		flags := want.ResourceFlags
+		want.ClearAssetParams()
+		want.ClearAppParams()
+		want.ResourceFlags = flags
+
+		var got trackerdb.ResourcesData
+		scratch, err = decodeResourcesDataWithoutParams(buf, &got, scratch)
+		require.NoError(t, err)
+		require.Equal(t, want, got)
+
+		// A record without params decodes to the same result.
+		got = trackerdb.ResourcesData{}
+		scratch, err = decodeResourcesDataWithoutParams(protocol.Encode(&want), &got, scratch)
+		require.NoError(t, err)
+		require.Equal(t, want, got)
+	}
+}

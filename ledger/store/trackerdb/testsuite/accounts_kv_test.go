@@ -292,7 +292,7 @@ func CustomTestResourcesQueryAllLimited(t *customT) {
 	appParams := ledgertesting.RandomAppParams()
 	appParams.GlobalState = basics.TealKeyValue{"g": {Type: basics.TealUintType, Uint: 1}}
 	resDataA1AcctA.SetAppParams(appParams, true)
-	resDataA1AcctA.SetAppLocalState(basics.AppLocalState{})
+	resDataA1AcctA.SetAppLocalState(basics.AppLocalState{KeyValue: basics.TealKeyValue{"a": {Type: basics.TealUintType, Uint: 3}}})
 	resDataA1AcctB := trackerdb.ResourcesData{}
 	resDataA1AcctB.SetAppLocalState(basics.AppLocalState{KeyValue: basics.TealKeyValue{"l": {Type: basics.TealUintType, Uint: 2}}})
 	aidxResA1 := basics.CreatableIndex(2)
@@ -388,6 +388,14 @@ func CustomTestResourcesQueryAllLimited(t *customT) {
 	require.Equal(t, resDataA2AcctB, prs[1].Data)
 	require.Equal(t, expectedRound, rnd)
 
+	// Without params the creator's own records keep only the holding.
+	prs, _, err = aor.LookupLimitedResources(addrA, 0, 2, basics.AssetCreatable, false)
+	require.NoError(t, err)
+	require.Equal(t, 2, len(prs))
+	require.Equal(t, addrA, prs[0].Creator)
+	require.Equal(t, trackerdb.ResourcesData{Amount: 10, ResourceFlags: resDataA0AcctA.ResourceFlags}, prs[0].Data)
+	require.Equal(t, trackerdb.ResourcesData{Amount: 100, ResourceFlags: resDataA2AcctA.ResourceFlags}, prs[1].Data)
+
 	// Application pages merge the creator's params with the account's local state.
 	prs, _, err = aor.LookupLimitedResources(addrB, 0, 1, basics.AppCreatable, true)
 	require.NoError(t, err)
@@ -396,6 +404,13 @@ func CustomTestResourcesQueryAllLimited(t *customT) {
 	require.Equal(t, resDataA1AcctA.GetAppParams(), prs[0].Data.GetAppParams())
 	require.Equal(t, resDataA1AcctB.GetAppLocalState(), prs[0].Data.GetAppLocalState())
 	require.Equal(t, resDataA1AcctB.ResourceFlags, prs[0].Data.ResourceFlags)
+
+	// Without params the creator's own app record keeps only its local state.
+	prs, _, err = aor.LookupLimitedResources(addrA, 0, 1, basics.AppCreatable, false)
+	require.NoError(t, err)
+	require.Equal(t, 1, len(prs))
+	require.Equal(t, addrA, prs[0].Creator)
+	require.Equal(t, trackerdb.ResourcesData{KeyValue: resDataA1AcctA.KeyValue, ResourceFlags: resDataA1AcctA.ResourceFlags}, prs[0].Data)
 
 	// Set limit to 1, should return only 1 resource
 	prs, rnd, err = aor.LookupLimitedResources(addrB, 0, 1, basics.AssetCreatable, true)

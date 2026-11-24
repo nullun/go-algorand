@@ -2149,6 +2149,7 @@ pushint 1
 block BlkSha512TxnCommitment
 pushint 1
 block BlkSha256TxnCommitment
+global OriginAddress
 `, AssemblerMaxVersion)
 	for _, names := range [][]string{GlobalFieldNames[:], TxnFieldNames[:], blockFieldNames[:]} {
 		for _, f := range names {

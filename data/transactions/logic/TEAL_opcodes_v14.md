@@ -474,6 +474,7 @@ Fields (see [transaction reference](https://developer.algorand.org/docs/referenc
 | 20 | PayoutsPercent | uint64 | v11  | The percentage of transaction fees in a block that can be paid to the block proposer. |
 | 21 | PayoutsMinBalance | uint64 | v11  | The minimum balance an account must have in the agreement round to receive block payouts in the proposal round. |
 | 22 | PayoutsMaxBalance | uint64 | v11  | The maximum balance an account can have in the agreement round to receive block payouts in the proposal round. |
+| 23 | OriginAddress | address | v14  | The Sender of the top-level transaction whose execution led to this program. Equal to `txn Sender` if this application is at the top-level. Application mode only. |
 
 ## gtxn
 

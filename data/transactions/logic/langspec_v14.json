@@ -1676,7 +1676,8 @@
         "PayoutsGoOnlineFee",
         "PayoutsPercent",
         "PayoutsMinBalance",
-        "PayoutsMaxBalance"
+        "PayoutsMaxBalance",
+        "OriginAddress"
       ],
       "ArgEnumTypes": [
         "uint64",
@@ -1701,7 +1702,8 @@
         "uint64",
         "uint64",
         "uint64",
-        "uint64"
+        "uint64",
+        "address"
       ],
       "ArgDetails": [
         {
@@ -1866,6 +1868,14 @@
           "Doc": "The maximum balance an account can have in the agreement round to receive block payouts in the proposal round.",
           "ByteEncoding": 22,
           "Version": 11
+        },
+        {
+          "Name": "OriginAddress",
+          "Type": "address",
+          "Doc": "The Sender of the top-level transaction whose execution led to this program. Equal to `txn Sender` if this application is at the top-level. Application mode only.",
+          "ByteEncoding": 23,
+          "Modes": 2,
+          "Version": 14
         }
       ],
       "DocCost": "1",

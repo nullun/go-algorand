@@ -1481,8 +1481,8 @@ const globalV12TestProgram = globalV11TestProgram + `
 const globalV13TestProgram = globalV12TestProgram + `
 `
 
-// v14 adds no new global fields.
 const globalV14TestProgram = globalV13TestProgram + `
+global OriginAddress; txn Sender; ==; assert
 `
 
 func TestAllGlobals(t *testing.T) {
@@ -1509,7 +1509,7 @@ func TestAllGlobals(t *testing.T) {
 		11: {PayoutsMaxBalance, globalV11TestProgram},
 		12: {PayoutsMaxBalance, globalV12TestProgram},
 		13: {PayoutsMaxBalance, globalV13TestProgram},
-		14: {PayoutsMaxBalance, globalV14TestProgram},
+		14: {OriginAddress, globalV14TestProgram},
 	}
 	// tests keys are versions so they must be in a range 1..AssemblerMaxVersion plus zero version
 	require.LessOrEqual(t, len(tests), AssemblerMaxVersion+1)

@@ -3032,6 +3032,52 @@ int 1
 `, ep)
 }
 
+// TestOriginAddress checks that apps at every inner depth see the Sender of
+// the top-level transaction, rather than the address of their caller.
+func TestOriginAddress(t *testing.T) {
+	partitiontest.PartitionTest(t)
+	t.Parallel()
+
+	ep, tx, ledger := MakeSampleEnv()
+	tx.ForeignApps = []basics.AppIndex{222, 333}
+
+	check := fmt.Sprintf(`
+global OriginAddress
+addr %s
+==
+assert
+`, tx.Sender)
+
+	// 333 is the innermost app. 222 checks OriginAddress, then calls 333.
+	ledger.NewApp(tx.Receiver, 333, basics.AppParams{
+		ApprovalProgram: TestProg(t, check+"int 1", AssemblerMaxVersion).Program,
+	})
+	ledger.NewApp(tx.Receiver, 222, basics.AppParams{
+		ApprovalProgram: TestProg(t, check+`
+itxn_begin
+int appl;    itxn_field TypeEnum
+int 333;     itxn_field ApplicationID
+itxn_submit
+int 1
+`, AssemblerMaxVersion).Program,
+	})
+	ledger.NewAccount(appAddr(222), 50_000)
+
+	ledger.NewApp(tx.Receiver, 888, basics.AppParams{})
+	ledger.NewAccount(appAddr(888), 50_000)
+	TestApp(t, check+`
+itxn_begin
+int appl;    itxn_field TypeEnum
+int 222;     itxn_field ApplicationID
+itxn_submit
+int 1
+`, ep)
+
+	// OriginAddress is not the caller's address in an inner app.
+	require.NotEqual(t, tx.Sender, appAddr(888))
+	require.NotEqual(t, tx.Sender, appAddr(222))
+}
+
 // TestNumInnerDeep ensures that inner call limits apply to inner calls of inner
 // transactions.
 func TestNumInnerDeep(t *testing.T) {

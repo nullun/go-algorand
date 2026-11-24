@@ -4636,6 +4636,13 @@ func (cx *EvalContext) globalFieldToValue(fs globalFieldSpec) (sv stackValue, er
 		sv.Uint = cx.Proto.Payouts.MinBalance
 	case PayoutsMaxBalance:
 		sv.Uint = cx.Proto.Payouts.MaxBalance
+	case OriginAddress:
+		// The caller chain is at most maxAppCallDepth long, so walking it is cheap.
+		root := cx
+		for root.caller != nil {
+			root = root.caller
+		}
+		sv.Bytes = root.txn.Txn.Sender[:]
 	default:
 		return sv, fmt.Errorf("invalid global field %s", fs.field)
 	}

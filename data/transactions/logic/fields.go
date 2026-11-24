@@ -621,6 +621,11 @@ const (
 	// PayoutsMaxBalance is the maximum algo balance an account can have to receive block payouts (in the agreement round).
 	PayoutsMaxBalance
 
+	// v14
+
+	// OriginAddress is the Sender of the top-level transaction that led to this program's execution.
+	OriginAddress
+
 	invalidGlobalField // compile-time constant for number of fields
 )
 
@@ -701,6 +706,8 @@ var globalFieldSpecs = [...]globalFieldSpec{
 		"The minimum balance an account must have in the agreement round to receive block payouts in the proposal round."},
 	{PayoutsMaxBalance, StackUint64, modeAny, incentiveVersion,
 		"The maximum balance an account can have in the agreement round to receive block payouts in the proposal round."},
+	{OriginAddress, StackAddress, ModeApp, 14,
+		"The Sender of the top-level transaction whose execution led to this program. Equal to `txn Sender` if this application is at the top-level."},
 }
 
 func globalFieldSpecByField(f GlobalField) (globalFieldSpec, bool) {
